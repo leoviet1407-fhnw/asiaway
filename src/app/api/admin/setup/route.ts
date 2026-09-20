@@ -15,6 +15,7 @@ import {
 } from '../../../../server/db/schema';
 import { parseMenuCsv } from '../../../../server/menu/import';
 import { parseDrinksCsv } from '../../../../server/menu/drinks-import';
+import { loadPhotoManifest, photoFor } from '../../../../server/menu/photos';
 import { ALLERGENS } from '../../../../domain/menu/allergens';
 import { generateQrToken } from '../../../../domain/session/qr-token';
 import { hashPassword } from '../../../../server/auth/password';
@@ -145,6 +146,7 @@ export async function POST(request: Request) {
     const dataDir = join(process.cwd(), 'data');
     const food = parseMenuCsv(readFileSync(join(dataDir, 'menu_trilingual_EN_DE_VI.csv'), 'utf8'));
     const drinks = parseDrinksCsv(readFileSync(join(dataDir, 'asiaway_drinks_menu.csv'), 'utf8'));
+    const photos = loadPhotoManifest(dataDir);
 
     for (const a of ALLERGENS) {
       await database
@@ -199,6 +201,7 @@ export async function POST(request: Request) {
           descriptionVi: item.descriptionVi,
           priceCents: item.priceCents,
           allergenCodes: [...item.allergenCodes],
+          imagePath: photoFor(photos, item.dishNumber),
           sortOrder: item.sortOrder,
         })
         .onConflictDoUpdate({
@@ -215,6 +218,7 @@ export async function POST(request: Request) {
             descriptionVi: item.descriptionVi,
             priceCents: item.priceCents,
             allergenCodes: [...item.allergenCodes],
+            imagePath: photoFor(photos, item.dishNumber),
             sortOrder: item.sortOrder,
             isActive: true,
             updatedAt: new Date(),

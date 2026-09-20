@@ -26,6 +26,7 @@ import {
 } from '../src/server/db/schema';
 import { parseMenuCsv } from '../src/server/menu/import';
 import { MISSING_ALLERGEN_WARNING, parseDrinksCsv } from '../src/server/menu/drinks-import';
+import { loadPhotoManifest, photoFor } from '../src/server/menu/photos';
 import { ALLERGENS } from '../src/domain/menu/allergens';
 import { generateQrToken, qrUrlFor } from '../src/domain/session/qr-token';
 import { hashPassword } from '../src/server/auth/password';
@@ -43,6 +44,7 @@ const DEMO_WAITER = {
 };
 
 async function seedMenu(db: AppDatabase): Promise<number> {
+  const photos = loadPhotoManifest();
   const csv = readFileSync(resolve(process.cwd(), 'data/menu_trilingual_EN_DE_VI.csv'), 'utf8');
   const food = parseMenuCsv(csv);
 
@@ -104,6 +106,7 @@ async function seedMenu(db: AppDatabase): Promise<number> {
         priceCents: item.priceCents,
         allergenCodes: [...item.allergenCodes],
         volume: item.volume ?? null,
+        imagePath: photoFor(photos, item.dishNumber),
         sortOrder: item.sortOrder,
       })
       .onConflictDoUpdate({
@@ -116,6 +119,7 @@ async function seedMenu(db: AppDatabase): Promise<number> {
           priceCents: item.priceCents,
           allergenCodes: [...item.allergenCodes],
           volume: item.volume ?? null,
+          imagePath: photoFor(photos, item.dishNumber),
           sortOrder: item.sortOrder,
           isActive: true,
         },

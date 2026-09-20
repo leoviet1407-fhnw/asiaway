@@ -109,7 +109,20 @@ export default function MenuPage() {
           <ul className="space-y-2">
             {category.items.map((item) => (
               <li key={item.id} className="card p-3">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  {/* Only 17 of 106 dishes have a photograph. Rows without one
+                      simply have no thumbnail — no grey box, no stand-in. */}
+                  {item.imagePath && (
+                    <Link href={`/menu/${item.id}`} className="shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.imagePath}
+                        alt=""
+                        loading="lazy"
+                        className="h-20 w-20 rounded-xl object-cover"
+                      />
+                    </Link>
+                  )}
                   <Link href={`/menu/${item.id}`} className="min-w-0 flex-1">
                     <p className="font-medium leading-snug">
                       {item.dishNumber && (

@@ -76,7 +76,7 @@ export default function ItemDetailPage() {
         <img
           src={item.imagePath}
           alt={item.name}
-          className="aspect-[4/3] w-full rounded-2xl object-cover"
+          className="aspect-[4/3] w-full rounded-2xl bg-surface-sunken object-cover"
         />
       )}
 

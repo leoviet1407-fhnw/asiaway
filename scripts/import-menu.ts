@@ -16,6 +16,7 @@ import { createPostgresDatabase, type AppDatabase } from '../src/server/db/clien
 import { applyMigrations, createPgliteDatabase } from '../src/server/db/pglite';
 import { allergens, auditEvents, menuCategories, menuItems } from '../src/server/db/schema';
 import { parseMenuCsv, type ImportedMenu } from '../src/server/menu/import';
+import { loadPhotoManifest, photoFor } from '../src/server/menu/photos';
 import { ALLERGENS } from '../src/domain/menu/allergens';
 import { formatCents } from '../src/lib/money';
 
@@ -44,6 +45,7 @@ function report(menu: ImportedMenu): void {
 }
 
 async function applyToDatabase(db: AppDatabase, menu: ImportedMenu): Promise<void> {
+  const photos = loadPhotoManifest();
   await db.transaction(async (tx: AppDatabase) => {
     for (const a of ALLERGENS) {
       await tx
@@ -100,6 +102,7 @@ async function applyToDatabase(db: AppDatabase, menu: ImportedMenu): Promise<voi
           priceCents: item.priceCents,
           allergenCodes: [...item.allergenCodes],
           volume: item.volume ?? null,
+          imagePath: photoFor(photos, item.dishNumber),
           sortOrder: item.sortOrder,
           isActive: true,
         })
@@ -117,6 +120,7 @@ async function applyToDatabase(db: AppDatabase, menu: ImportedMenu): Promise<voi
             priceCents: item.priceCents,
             allergenCodes: [...item.allergenCodes],
             volume: item.volume ?? null,
+            imagePath: photoFor(photos, item.dishNumber),
             sortOrder: item.sortOrder,
             isActive: true,
             updatedAt: new Date(),

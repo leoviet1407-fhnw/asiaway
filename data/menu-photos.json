@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "Dish photographs extracted from the restaurant's own menu PDF, mapped to",
+    "dishes by the caption printed beside each photo (e.g. 'n° 43 - Hue Spicy",
+    "Beef Soup'), then checked by eye. Keys are printed dish numbers.",
+    "",
+    "Two are deliberately narrower than their caption. The n° 12 photo shows",
+    "prawn rolls, so it is assigned to 12.2 Prawn only rather than to all four",
+    "summer-roll variants — a beef roll illustrated by a prawn one is worse",
+    "than no picture. The n° 91 photo is captioned 'Red Curry with Beef' and",
+    "goes to 91.3 alone for the same reason.",
+    "",
+    "Dishes absent from this file have no photograph and render none. The menu",
+    "PDF simply does not contain one for them; nothing has been substituted."
+  ],
+  "photos": {
+    "12.2": "/images/menu/dish-12.2.jpg",
+    "14": "/images/menu/dish-14.jpg",
+    "15": "/images/menu/dish-15.jpg",
+    "17": "/images/menu/dish-17.jpg",
+    "18": "/images/menu/dish-18.jpg",
+    "23": "/images/menu/dish-23.jpg",
+    "43": "/images/menu/dish-43.jpg",
+    "44": "/images/menu/dish-44.jpg",
+    "45": "/images/menu/dish-45.jpg",
+    "52": "/images/menu/dish-52.jpg",
+    "56": "/images/menu/dish-56.jpg",
+    "57": "/images/menu/dish-57.jpg",
+    "61": "/images/menu/dish-61.jpg",
+    "64": "/images/menu/dish-64.jpg",
+    "65": "/images/menu/dish-65.jpg",
+    "91.3": "/images/menu/dish-91.3.jpg",
+    "94": "/images/menu/dish-94.jpg"
+  }
+}
