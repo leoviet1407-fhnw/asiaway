@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useWaiterEvents } from './useWaiterEvents';
+import { FloorPlan } from './FloorPlan';
 import { formatElapsed, formatMoney, formatTime } from '../../lib/format';
 
 interface TableTile {
@@ -214,65 +215,13 @@ export function WaiterDashboard({ userName }: { userName: string }) {
 
       {!tables && <p className="text-sm text-ink-muted">Loading…</p>}
       {tables && tables.length === 0 && (
-        <p className="card p-4 text-sm text-ink-muted">
-          No tables configured yet. Run the seed script to add demo tables.
-        </p>
+        <p className="card p-4 text-sm text-ink-muted">No tables configured yet.</p>
       )}
 
-      {/* Grouped by area: the terrace is a different walk, and it closes when
-          the weather turns. */}
-      {groupsInOrder(tables).map(([area, group]) => (
-        <section key={area ?? 'unassigned'} className="mb-5">
-          <h2 className="mb-2 h-label">{AREA_LABEL[area ?? 'UNASSIGNED']}</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {group.map((table) => {
-              const inner = (
-                <>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-lg font-bold">{table.tableNumber}</span>
-                    <span className="chip">{STATE_LABEL[table.state]}</span>
-                  </div>
-                  {table.sessionId ? (
-                    <div className="mt-2 space-y-0.5 text-sm text-ink-muted">
-                      <p>
-                        {table.orderCount} orders · {formatMoney(table.sessionTotalCents)}
-                      </p>
-                      {table.openedAt && <p>Seated {formatElapsed(table.openedAt)}</p>}
-                      {table.pendingOrders > 0 && (
-                        <p className="font-semibold text-warn-500">
-                          {table.pendingOrders} waiting
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-ink-muted">Available</p>
-                  )}
-                </>
-              );
-
-              return table.sessionId ? (
-                <Link
-                  key={table.tableId}
-                  href={`/waiter/sessions/${table.sessionId}`}
-                  className={`card border p-3 ${STATE_STYLE[table.state]}`}
-                >
-                  {inner}
-                </Link>
-              ) : (
-                // A free table is still a place someone might be seated and
-                // order verbally, so it links straight to the order pad.
-                <Link
-                  key={table.tableId}
-                  href={`/waiter/order?tableId=${table.tableId}`}
-                  className={`card border p-3 ${STATE_STYLE[table.state]}`}
-                >
-                  {inner}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {/* The room as it actually is, from the restaurant's own floor sketch, so
+          a waiter can look at the tablet and at the room and see the same
+          thing. Colour carries state exactly as the list did. */}
+      {tables && tables.length > 0 && <FloorPlan tables={tables} />}
 
       <div className="mt-6">
         <button className="btn-secondary text-sm" onClick={() => void refresh()}>
