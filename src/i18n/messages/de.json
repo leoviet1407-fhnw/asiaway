@@ -63,5 +63,7 @@
   "nav.cart": "Bestellung",
   "nav.bill": "Rechnung",
   "menu.allergens.none": "Allergene nicht deklariert — bitte fragen Sie Ihre Bedienung",
-  "menu.allergens.declared": "Enthält"
+  "menu.allergens.declared": "Enthält",
+  "menu.highlights": "Ein Blick auf unsere Gerichte",
+  "menu.highlights.hint": "Wischen zum Blättern · tippen für Details"
 }

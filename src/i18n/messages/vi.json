@@ -63,5 +63,7 @@
   "nav.cart": "Đơn",
   "nav.bill": "Hoá đơn",
   "menu.allergens.none": "Chưa khai báo chất gây dị ứng — vui lòng hỏi nhân viên",
-  "menu.allergens.declared": "Chứa"
+  "menu.allergens.declared": "Chứa",
+  "menu.highlights": "Hình ảnh món ăn",
+  "menu.highlights.hint": "Vuốt để xem · chạm để biết chi tiết"
 }

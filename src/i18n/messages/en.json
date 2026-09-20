@@ -63,5 +63,7 @@
   "nav.cart": "Order",
   "nav.bill": "Bill",
   "menu.allergens.none": "Allergens not declared — please ask your waiter",
-  "menu.allergens.declared": "Contains"
+  "menu.allergens.declared": "Contains",
+  "menu.highlights": "A look at our dishes",
+  "menu.highlights.hint": "Swipe to browse · tap for details"
 }

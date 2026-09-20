@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useCustomer } from '../../components/customer/CustomerProvider';
+import { MenuHighlights } from '../../components/customer/MenuHighlights';
 import { formatMoney } from '../../lib/format';
 
 interface MenuItem {
@@ -57,6 +58,13 @@ export default function MenuPage() {
 
   const shown = (categories ?? []).filter((c) => c.kind === tab);
 
+  // Photographed dishes, in menu order. Sold-out ones stay in the strip so the
+  // menu does not appear to change shape through the evening; the card says so.
+  const photographed = (categories ?? [])
+    .filter((c) => c.kind === 'FOOD')
+    .flatMap((c) => c.items)
+    .filter((i) => i.imagePath);
+
   return (
     <div className="space-y-5">
       <h1 className="h-section">{t('menu.title')}</h1>
@@ -103,26 +111,31 @@ export default function MenuPage() {
         </p>
       )}
 
+      {/* Photographed dishes get their own strip. Showing them here rather than
+          as a thumbnail per row keeps the list itself clean, since only 17 of
+          106 items have a picture. */}
+      {tab === 'FOOD' && (
+        <MenuHighlights
+          items={photographed}
+          t={t}
+          onAdd={(item) =>
+            addToCart({
+              menuItemId: item.id,
+              name: item.name,
+              dishNumber: item.dishNumber,
+              unitPriceCents: item.priceCents,
+            })
+          }
+        />
+      )}
+
       {shown.map((category) => (
         <section key={category.id} className="space-y-2">
           <h2 className="h-label pt-2">{category.name}</h2>
           <ul className="space-y-2">
             {category.items.map((item) => (
               <li key={item.id} className="card p-3">
-                <div className="flex items-start gap-3">
-                  {/* Only 17 of 106 dishes have a photograph. Rows without one
-                      simply have no thumbnail — no grey box, no stand-in. */}
-                  {item.imagePath && (
-                    <Link href={`/menu/${item.id}`} className="shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.imagePath}
-                        alt=""
-                        loading="lazy"
-                        className="h-20 w-20 rounded-xl object-cover"
-                      />
-                    </Link>
-                  )}
+                <div className="flex items-start justify-between gap-3">
                   <Link href={`/menu/${item.id}`} className="min-w-0 flex-1">
                     <p className="font-medium leading-snug">
                       {item.dishNumber && (
