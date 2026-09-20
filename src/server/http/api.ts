@@ -113,6 +113,12 @@ export async function getStaffMember(): Promise<AuthenticatedUser | null> {
   return resolveSession(await db(), token);
 }
 
+/** Only a MANAGER plans the roster, approves absences and closes the month. */
+export async function getManager(): Promise<AuthenticatedUser | null> {
+  const user = await getStaffMember();
+  return user && user.role === 'MANAGER' ? user : null;
+}
+
 /** A signed-in employee who may work the floor. Kitchen STAFF may not. */
 export async function getWaiter(): Promise<AuthenticatedUser | null> {
   const user = await getStaffMember();
@@ -146,6 +152,12 @@ export async function withStaffMember<T>(
   fn: (user: AuthenticatedUser) => Promise<T>,
 ): Promise<T | NextResponse> {
   return withAuthenticated(getStaffMember, fn);
+}
+
+export async function withManager<T>(
+  fn: (user: AuthenticatedUser) => Promise<T>,
+): Promise<T | NextResponse> {
+  return withAuthenticated(getManager, fn);
 }
 
 async function withAuthenticated<T>(

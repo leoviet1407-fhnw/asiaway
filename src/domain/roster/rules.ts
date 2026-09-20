@@ -123,7 +123,11 @@ function hhmm(totalMinutes: number): string {
 }
 
 function hours(minutes: number): string {
-  return `${(minutes / 60).toFixed(1).replace('.0', '')} h`;
+  return `${bareHours(minutes)} h`;
+}
+
+function bareHours(minutes: number): string {
+  return (minutes / 60).toFixed(1).replace('.0', '');
 }
 
 function num(config: Record<string, unknown>, key: string, fallback: number): number {
@@ -445,7 +449,7 @@ function checkCorridor(
     userId: person.userId,
     onDate: null,
     shiftIds: [],
-    message: `${person.displayName} is planned ${hours(planned)} against a ${person.pensumPercent}% corridor of ${hours(
+    message: `${person.displayName} is planned ${hours(planned)} against a ${person.pensumPercent}% corridor of ${bareHours(
       corridor.minMinutes,
     )}–${hours(corridor.maxMinutes)} (${verdict.toLowerCase()}).`,
   });

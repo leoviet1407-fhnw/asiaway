@@ -113,6 +113,34 @@ describe('generating a month from the weekly skeleton', () => {
   });
 });
 
+describe('a band that is self-serve even though its station is staffed', () => {
+  it('is not counted as understaffed', async () => {
+    // The food pass: "Kellner selbst" at lunch, a foodrunner at dinner. The
+    // September plan could only say this in prose.
+    const p = await period();
+    const id = await stationId('FOODPASS');
+    await db()
+      .insert(shiftTemplates)
+      .values([
+        {
+          stationId: id, weekday: 4, startsAt: '11:30', endsAt: '14:00',
+          headcount: 1, staffingPolicy: 'SELF_SERVE' as const, effectiveFrom: '2026-01-01',
+        },
+        {
+          stationId: id, weekday: 4, startsAt: '18:00', endsAt: '22:00',
+          headcount: 1, effectiveFrom: '2026-01-01',
+        },
+      ]);
+    await generatePeriod(db(), p);
+
+    const v = await validatePeriod(db(), p);
+    const understaffed = v.filter((x) => x.code === 'R7_UNDERSTAFFED');
+    // 2026-10-01 is the only Thursday in the period; only the dinner band counts.
+    expect(understaffed).toHaveLength(1);
+    expect(understaffed[0]!.message).toContain('18:00');
+  });
+});
+
 describe('validating before publishing', () => {
   it('warns that a staffed station has nobody on it', async () => {
     const p = await period();

@@ -38,7 +38,10 @@ async function create(): Promise<DatabaseHandle> {
   const { PGlite, createPgliteDatabase } = await import('./pglite');
   const { runMigrations } = await import('./migrator');
 
-  const dir = resolve(process.cwd(), '.pglite');
+  // PGLITE_DIR lets a second dev server run against its own database. PGlite
+  // is an in-process engine, so two servers pointed at one directory each hold
+  // their own view of it and neither sees the other's writes.
+  const dir = resolve(process.cwd(), process.env.PGLITE_DIR ?? '.pglite');
   mkdirSync(dir, { recursive: true });
   const client = new PGlite(resolve(dir, 'asiaway'));
 

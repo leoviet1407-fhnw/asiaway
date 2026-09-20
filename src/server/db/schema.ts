@@ -597,6 +597,8 @@ export const shifts = pgTable(
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
     plannedBreakMinutes: smallint('planned_break_minutes').notNull().default(0),
     roleLabel: text('role_label'),
+    /** Overrides the station's policy for this shift alone. NULL = inherit. */
+    staffingPolicy: stationStaffingPolicy('staffing_policy'),
     state: shiftState('state').notNull().default('DRAFT'),
     revision: integer('revision').notNull().default(1),
     acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),

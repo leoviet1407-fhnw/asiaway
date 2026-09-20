@@ -10,7 +10,7 @@ import {
   type RuleSettings,
   type Violation,
 } from '../../domain/roster/rules';
-import { RESTAURANT_TIME_ZONE, zonedInstant } from '../../domain/roster/time';
+import { RESTAURANT_TIME_ZONE, localMinutesIn, zonedInstant } from '../../domain/roster/time';
 import type { EmploymentType } from '../../domain/roster/availability';
 import {
   absences,
@@ -134,6 +134,7 @@ export async function generatePeriod(
           endsAt,
           plannedBreakMinutes: template.breakMinutes,
           roleLabel: template.roleLabel,
+          staffingPolicy: template.staffingPolicy,
           state: 'DRAFT',
         });
       }
@@ -173,6 +174,7 @@ export async function loadRosterInput(db: AppDatabase, periodId: string): Promis
       acknowledgedAt: shifts.acknowledgedAt,
       stationCode: stations.code,
       stationPolicy: stations.staffingPolicy,
+      shiftPolicy: shifts.staffingPolicy,
     })
     .from(shifts)
     .innerJoin(stations, eq(stations.id, shifts.stationId))
@@ -182,7 +184,8 @@ export async function loadRosterInput(db: AppDatabase, periodId: string): Promis
     id: s.id,
     onDate: s.onDate,
     stationCode: s.stationCode,
-    stationPolicy: s.stationPolicy,
+    // The band's own answer wins; the station's is the default.
+    stationPolicy: s.shiftPolicy ?? s.stationPolicy,
     userId: s.userId,
     startsAt: s.startsAt,
     endsAt: s.endsAt,
@@ -406,6 +409,129 @@ export async function getMySchedule(
     roleLabel: r.roleLabel,
     acknowledged: r.acknowledgedAt !== null,
   }));
+}
+
+export interface GridShift {
+  readonly id: string;
+  readonly onDate: string;
+  readonly stationCode: string;
+  readonly userId: string | null;
+  readonly from: string;
+  readonly to: string;
+  readonly roleLabel: string | null;
+  /** The band's effective policy: SELF_SERVE bands need nobody assigned. */
+  readonly policy: string;
+  readonly acknowledged: boolean;
+}
+
+export interface RosterGrid {
+  readonly period: {
+    readonly id: string;
+    readonly startsOn: string;
+    readonly endsOn: string;
+    readonly state: string;
+  };
+  readonly dates: readonly string[];
+  readonly stations: readonly {
+    readonly code: string;
+    readonly name: string;
+    readonly policy: string;
+  }[];
+  readonly shifts: readonly GridShift[];
+  readonly people: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly employmentType: string;
+    readonly pensumPercent: number | null;
+  }[];
+  readonly violations: readonly Violation[];
+  readonly canPublish: boolean;
+}
+
+/**
+ * The manager's grid: stations down, days across — the same shape as the paper
+ * plan, because that layout works and the team can read it. The difference is
+ * that this one is a query, so it cannot disagree with the person view.
+ */
+export async function getRosterGrid(db: AppDatabase, periodId: string): Promise<RosterGrid> {
+  const period = await loadPeriod(db, periodId);
+
+  const planned = await db
+    .select({
+      id: shifts.id,
+      onDate: shifts.onDate,
+      userId: shifts.userId,
+      startsAt: shifts.startsAt,
+      endsAt: shifts.endsAt,
+      roleLabel: shifts.roleLabel,
+      acknowledgedAt: shifts.acknowledgedAt,
+      stationCode: stations.code,
+      stationPolicy: stations.staffingPolicy,
+      shiftPolicy: shifts.staffingPolicy,
+    })
+    .from(shifts)
+    .innerJoin(stations, eq(stations.id, shifts.stationId))
+    .where(and(eq(shifts.periodId, periodId), sql`${shifts.state} <> 'CANCELLED'`))
+    .orderBy(asc(shifts.onDate), asc(shifts.startsAt));
+
+  const stationRows = await db
+    .select()
+    .from(stations)
+    .where(eq(stations.isActive, true))
+    .orderBy(asc(stations.sortOrder));
+
+  const staff = await db
+    .select({
+      id: users.id,
+      name: users.displayName,
+      employmentType: employments.employmentType,
+      pensumPercent: employments.pensumPercent,
+    })
+    .from(users)
+    .innerJoin(employments, and(eq(employments.userId, users.id), isNull(employments.validTo)))
+    .where(eq(users.isActive, true))
+    .orderBy(asc(users.displayName));
+
+  const violations = await validatePeriod(db, periodId);
+
+  return {
+    period: {
+      id: period.id,
+      startsOn: period.startsOn,
+      endsOn: period.endsOn,
+      state: period.state,
+    },
+    dates: eachDate(period.startsOn, period.endsOn),
+    stations: stationRows.map((s) => ({
+      code: s.code,
+      name: s.nameDe,
+      policy: s.staffingPolicy,
+    })),
+    shifts: planned.map((s) => ({
+      id: s.id,
+      onDate: s.onDate,
+      stationCode: s.stationCode,
+      userId: s.userId,
+      from: hhmmIn(s.startsAt),
+      to: hhmmIn(s.endsAt),
+      roleLabel: s.roleLabel,
+      policy: s.shiftPolicy ?? s.stationPolicy,
+      acknowledged: s.acknowledgedAt !== null,
+    })),
+    people: staff.map((p) => ({
+      id: p.id,
+      name: p.name,
+      employmentType: p.employmentType,
+      pensumPercent: p.pensumPercent === null ? null : Number(p.pensumPercent),
+    })),
+    violations,
+    canPublish: !blocksPublish(violations) && period.state !== 'LOCKED',
+  };
+}
+
+function hhmmIn(instant: Date): string {
+  const minutes = localMinutesIn(instant, RESTAURANT_TIME_ZONE);
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
 export type { RuleCode, Violation };
