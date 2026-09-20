@@ -410,6 +410,7 @@ export async function getTableOverview(db: Db) {
       tableId: restaurantTables.id,
       tableNumber: restaurantTables.tableNumber,
       displayName: restaurantTables.displayName,
+      area: restaurantTables.area,
       sessionId: diningSessions.id,
       sessionNumber: diningSessions.sessionNumber,
       sessionStatus: diningSessions.status,

@@ -52,4 +52,5 @@ export const MIGRATION_FILES = [
   '0000_init.sql',
   '0002_auth_sessions.sql',
   '0003_menu_item_volume.sql',
+  '0004_table_area.sql',
 ] as const;

@@ -37,6 +37,7 @@ export async function GET() {
             tableId: t.tableId,
             tableNumber: t.tableNumber,
             displayName: t.displayName,
+            area: t.area,
             state: tableDisplayState(t.sessionStatus),
             sessionId: t.sessionId,
             sessionNumber: t.sessionNumber,

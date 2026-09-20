@@ -53,6 +53,7 @@ export const notificationType = pgEnum('notification_type', [
 ]);
 export const notificationStatus = pgEnum('notification_status', ['PENDING', 'ACKNOWLEDGED']);
 export const idempotencyState = pgEnum('idempotency_state', ['IN_PROGRESS', 'COMPLETED']);
+export const tableArea = pgEnum('table_area', ['INSIDE', 'OUTSIDE']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -127,6 +128,8 @@ export const restaurantTables = pgTable('restaurant_tables', {
   id: uuid('id').primaryKey().defaultRandom(),
   tableNumber: text('table_number').notNull().unique(),
   displayName: text('display_name').notNull(),
+  /** Where the table stands. NULL where the venue makes no distinction. */
+  area: tableArea('area'),
   qrToken: text('qr_token').notNull().unique(),
   qrTokenVersion: integer('qr_token_version').notNull().default(1),
   isActive: boolean('is_active').notNull().default(true),

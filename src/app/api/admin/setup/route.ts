@@ -42,7 +42,15 @@ export const maxDuration = 60;
  * never returns a credential.
  */
 const Body = z.object({
-  tables: z.array(z.string().min(1).max(20)).max(100).optional(),
+  tables: z
+    .array(
+      z.object({
+        tableNumber: z.string().min(1).max(20),
+        area: z.enum(['INSIDE', 'OUTSIDE']).optional(),
+      }),
+    )
+    .max(200)
+    .optional(),
   user: z
     .object({
       email: z.string().email().max(255),
@@ -164,24 +172,38 @@ export async function POST(request: Request) {
     }
 
     // --- tables ----------------------------------------------------------
-    const createdTables: { tableNumber: string; url: string }[] = [];
+    const createdTables: { tableNumber: string; area: string | null; url: string }[] = [];
     const base = (body.baseUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
 
-    for (const tableNumber of body.tables ?? []) {
+    for (const table of body.tables ?? []) {
       const existing = await database
         .select()
         .from(restaurantTables)
-        .where(eq(restaurantTables.tableNumber, tableNumber));
+        .where(eq(restaurantTables.tableNumber, table.tableNumber));
 
+      // An existing table KEEPS its token: rotating it would silently invalidate
+      // a QR code already printed and glued to that table.
       const token = existing[0]?.qrToken ?? generateQrToken();
+
       if (!existing[0]) {
         await database.insert(restaurantTables).values({
-          tableNumber,
-          displayName: `Table ${tableNumber}`,
+          tableNumber: table.tableNumber,
+          displayName: `Table ${table.tableNumber}`,
           qrToken: token,
+          area: table.area ?? null,
         });
+      } else if (table.area && existing[0].area !== table.area) {
+        await database
+          .update(restaurantTables)
+          .set({ area: table.area })
+          .where(eq(restaurantTables.id, existing[0].id));
       }
-      createdTables.push({ tableNumber, url: `${base}/t/${token}` });
+
+      createdTables.push({
+        tableNumber: table.tableNumber,
+        area: table.area ?? existing[0]?.area ?? null,
+        url: `${base}/t/${token}`,
+      });
     }
 
     // --- first staff account ---------------------------------------------

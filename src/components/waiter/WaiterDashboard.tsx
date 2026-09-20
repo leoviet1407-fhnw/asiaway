@@ -9,6 +9,7 @@ interface TableTile {
   tableId: string;
   tableNumber: string;
   displayName: string;
+  area: 'INSIDE' | 'OUTSIDE' | null;
   state: 'AVAILABLE' | 'OCCUPIED' | 'ORDER_PENDING' | 'CHECKOUT_REQUESTED';
   sessionId: string | null;
   openedAt: string | null;
@@ -24,6 +25,23 @@ const STATE_STYLE: Record<TableTile['state'], string> = {
   ORDER_PENDING: 'border-warn-500/50 bg-warn-50',
   CHECKOUT_REQUESTED: 'border-danger-500/50 bg-danger-50',
 };
+
+const AREA_LABEL: Record<string, string> = {
+  INSIDE: 'Inside',
+  OUTSIDE: 'Outside',
+  UNASSIGNED: 'Tables',
+};
+
+/** Inside first, then outside, then anything unassigned. */
+function groupsInOrder(
+  tables: TableTile[] | null,
+): [TableTile['area'], TableTile[]][] {
+  if (!tables || tables.length === 0) return [];
+  const order: TableTile['area'][] = ['INSIDE', 'OUTSIDE', null];
+  return order
+    .map((area) => [area, tables.filter((t) => t.area === area)] as [TableTile['area'], TableTile[]])
+    .filter(([, group]) => group.length > 0);
+}
 
 const STATE_LABEL: Record<TableTile['state'], string> = {
   AVAILABLE: 'Free',
@@ -197,45 +215,54 @@ export function WaiterDashboard({ userName }: { userName: string }) {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {(tables ?? []).map((table) => {
-          const inner = (
-            <>
-              <div className="flex items-baseline justify-between">
-                <span className="text-lg font-bold">{table.tableNumber}</span>
-                <span className="chip">{STATE_LABEL[table.state]}</span>
-              </div>
-              {table.sessionId ? (
-                <div className="mt-2 space-y-0.5 text-sm text-ink-muted">
-                  <p>{table.orderCount} orders · {formatMoney(table.sessionTotalCents)}</p>
-                  {table.openedAt && <p>Seated {formatElapsed(table.openedAt)}</p>}
-                  {table.pendingOrders > 0 && (
-                    <p className="font-semibold text-warn-500">
-                      {table.pendingOrders} waiting
-                    </p>
+      {/* Grouped by area: the terrace is a different walk, and it closes when
+          the weather turns. */}
+      {groupsInOrder(tables).map(([area, group]) => (
+        <section key={area ?? 'unassigned'} className="mb-5">
+          <h2 className="mb-2 h-label">{AREA_LABEL[area ?? 'UNASSIGNED']}</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {group.map((table) => {
+              const inner = (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-lg font-bold">{table.tableNumber}</span>
+                    <span className="chip">{STATE_LABEL[table.state]}</span>
+                  </div>
+                  {table.sessionId ? (
+                    <div className="mt-2 space-y-0.5 text-sm text-ink-muted">
+                      <p>
+                        {table.orderCount} orders · {formatMoney(table.sessionTotalCents)}
+                      </p>
+                      {table.openedAt && <p>Seated {formatElapsed(table.openedAt)}</p>}
+                      {table.pendingOrders > 0 && (
+                        <p className="font-semibold text-warn-500">
+                          {table.pendingOrders} waiting
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-ink-muted">Available</p>
                   )}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-ink-muted">Available</p>
-              )}
-            </>
-          );
+                </>
+              );
 
-          return table.sessionId ? (
-            <Link
-              key={table.tableId}
-              href={`/waiter/sessions/${table.sessionId}`}
-              className={`card border p-3 ${STATE_STYLE[table.state]}`}
-            >
-              {inner}
-            </Link>
-          ) : (
-            <div key={table.tableId} className={`card border p-3 ${STATE_STYLE[table.state]}`}>
-              {inner}
-            </div>
-          );
-        })}
-      </div>
+              return table.sessionId ? (
+                <Link
+                  key={table.tableId}
+                  href={`/waiter/sessions/${table.sessionId}`}
+                  className={`card border p-3 ${STATE_STYLE[table.state]}`}
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <div key={table.tableId} className={`card border p-3 ${STATE_STYLE[table.state]}`}>
+                  {inner}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       <div className="mt-6">
         <button className="btn-secondary text-sm" onClick={() => void refresh()}>
