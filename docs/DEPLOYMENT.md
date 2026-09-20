@@ -11,6 +11,37 @@ The deliverable is a Docker image, so it runs on any host that satisfies those
 three. **No hosting provider has been chosen** — that is still an open decision
 for the restaurant. Fly.io, Railway, Hetzner with Coolify, or any VPS all work.
 
+## Deploying to Vercel (free tier)
+
+Vercel is serverless, which this app tolerates but is not built for. It works,
+with one trade-off and three required settings.
+
+**The trade-off:** alerts arrive within ~20 seconds instead of instantly. Each
+invocation is its own process, so an order submitted by one cannot reach an SSE
+stream held by another. The waiter client reconciles against the notification
+queue on a timer regardless, so nothing is ever lost — only delayed.
+
+**Required settings**, beyond the usual variables:
+
+| Variable | Value | Why |
+|---|---|---|
+| `NEXT_PUBLIC_DISABLE_SSE` | `1` | Skips a stream that cannot deliver and would burn an invocation on every reconnect |
+| `CRON_SECRET` | `openssl rand -base64 32` | **Without it the idle-session cleanup refuses every request and silently never runs** |
+| `DATABASE_URL` | the **pooled** connection string | See below |
+
+`vercel.json` pins the region to `fra1` and schedules the cleanup hourly.
+
+**Pooled connections.** Neon, Supabase and friends put PgBouncer in front of
+Postgres in transaction mode, where prepared statements break — usually as a
+baffling error once traffic picks up, not immediately. `createPostgresDatabase`
+detects a pooled URL and disables prepared statements, and drops to one
+connection per instance on serverless. Use the **pooled** string, not the direct
+one.
+
+**Before real service**, move to a small always-on host (~EUR 5/month). Instant
+alerts come back with no code change: drop `NEXT_PUBLIC_DISABLE_SSE` and run the
+same Docker image.
+
 ## Environments
 
 | | Database | Data | Purpose |

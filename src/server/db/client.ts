@@ -12,8 +12,38 @@ import { schema } from './schema';
  */
 export type AppDatabase = PgDatabase<any, any, any>;
 
+/**
+ * A connection pooler in transaction mode (PgBouncer, which is what Neon,
+ * Supabase and most serverless Postgres put in front of the database) hands a
+ * different backend connection to each transaction. Prepared statements are
+ * per-connection, so postgres-js's default prepared statements fail against it —
+ * usually as a baffling "prepared statement already exists" once traffic picks
+ * up rather than immediately.
+ *
+ * Detected from the connection string rather than configured, because getting
+ * this wrong produces an error that only appears under load.
+ */
+export function isPooledConnection(connectionString: string): boolean {
+  return /-pooler\.|pgbouncer=true|\bpool\b/i.test(connectionString);
+}
+
+/** Serverless runs many short-lived instances, so each one keeps few connections. */
+function isServerless(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
 export function createPostgresDatabase(connectionString: string) {
-  const client = postgres(connectionString, { max: 10 });
+  const pooled = isPooledConnection(connectionString);
+  const serverless = isServerless();
+
+  const client = postgres(connectionString, {
+    // One instance must not hoard the connection budget shared by all of them.
+    max: serverless ? 1 : 10,
+    prepare: pooled ? false : undefined,
+    idle_timeout: serverless ? 10 : undefined,
+    connect_timeout: 10,
+  });
+
   return { db: drizzlePostgres(client, { schema }) as unknown as AppDatabase, client };
 }
 

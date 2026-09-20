@@ -97,7 +97,13 @@ export function WaiterDashboard({ userName }: { userName: string }) {
                 : undefined
             }
           >
-            {connection === 'live' ? 'Live' : connection === 'degraded' ? 'Delayed' : 'Connecting…'}
+            {connection === 'live'
+              ? 'Live'
+              : connection === 'degraded'
+                ? process.env.NEXT_PUBLIC_DISABLE_SSE === '1'
+                  ? 'Checking every 10s'
+                  : 'Delayed'
+                : 'Connecting…'}
           </span>
 
           <button

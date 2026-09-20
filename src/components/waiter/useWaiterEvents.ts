@@ -16,6 +16,16 @@ export interface PendingNotification {
 export type ConnectionState = 'connecting' | 'live' | 'degraded';
 
 /**
+ * Set NEXT_PUBLIC_DISABLE_SSE=1 on a serverless host.
+ *
+ * There, the process publishing an event is rarely the one holding the stream,
+ * so SSE delivers nothing useful — while a tablet left open all day reconnects
+ * endlessly, each reconnect spending another function invocation. Polling the
+ * authoritative queue is both more correct and far cheaper.
+ */
+const SSE_DISABLED = process.env.NEXT_PUBLIC_DISABLE_SSE === '1';
+
+/**
  * Live waiter alerts.
  *
  * The server-side queue is the source of truth, so this hook always reconciles
@@ -93,6 +103,10 @@ export function useWaiterEvents(soundEnabled: boolean) {
 
     const connect = () => {
       if (closed) return;
+      if (SSE_DISABLED) {
+        startPolling();
+        return;
+      }
       try {
         source = new EventSource('/api/waiter/stream');
       } catch {
