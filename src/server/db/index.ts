@@ -28,7 +28,25 @@ async function create(): Promise<DatabaseHandle> {
 
   if (url) {
     const { db, client } = createPostgresDatabase(url);
-    return { db, mode: 'postgres', executeMultiple: (text) => client.unsafe(text) };
+    const executeMultiple = (text: string) => client.unsafe(text);
+
+    // Bring the schema up to date before serving anything.
+    //
+    // This used to be a manual call to /api/admin/setup after each deploy, and
+    // on 2026-09-20 that gap took the guest menu down: the code shipped, the
+    // migration did not, and every read of a table with a new column failed.
+    // A deployment step a person has to remember is not a deployment step.
+    //
+    // Safe to do here, and what the migrator was built for: the ledger makes a
+    // second run a no-op, and the advisory lock serialises the several
+    // instances a serverless host can wake at once. The cost is one cheap
+    // SELECT per cold start.
+    if (process.env.MIGRATE_ON_BOOT !== '0') {
+      const { runMigrations } = await import('./migrator');
+      await runMigrations(db, executeMultiple);
+    }
+
+    return { db, mode: 'postgres', executeMultiple };
   }
 
   if (process.env.NODE_ENV === 'production') {
@@ -38,7 +56,10 @@ async function create(): Promise<DatabaseHandle> {
   const { PGlite, createPgliteDatabase } = await import('./pglite');
   const { runMigrations } = await import('./migrator');
 
-  const dir = resolve(process.cwd(), '.pglite');
+  // PGLITE_DIR lets a second dev server run against its own database. PGlite is
+  // an in-process engine, so two servers sharing one directory each hold their
+  // own view of it and neither sees the other's writes.
+  const dir = resolve(process.cwd(), process.env.PGLITE_DIR ?? '.pglite');
   mkdirSync(dir, { recursive: true });
   const client = new PGlite(resolve(dir, 'asiaway'));
 
@@ -75,7 +96,14 @@ async function create(): Promise<DatabaseHandle> {
 }
 
 export function getDatabase(): Promise<DatabaseHandle> {
-  return (globalRef.__asiawayDb ??= create());
+  // A failed attempt must not be cached. Without this, one transient error at
+  // boot — a lock held a moment too long, a connection refused — would be
+  // remembered as a rejected promise and every later request on this instance
+  // would fail with it, long after the cause had gone.
+  return (globalRef.__asiawayDb ??= create().catch((error: unknown) => {
+    globalRef.__asiawayDb = undefined;
+    throw error;
+  }));
 }
 
 export async function db(): Promise<AppDatabase> {
