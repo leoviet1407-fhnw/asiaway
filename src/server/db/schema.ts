@@ -15,10 +15,12 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   smallint,
   text,
+  time,
   timestamp,
   uniqueIndex,
   uuid,
@@ -30,7 +32,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => 'bytea',
 });
 
-export const userRole = pgEnum('user_role', ['WAITER']);
+export const userRole = pgEnum('user_role', ['WAITER', 'MANAGER', 'STAFF']);
 export const categoryKind = pgEnum('category_kind', ['FOOD', 'DRINK']);
 export const tableGroupStatus = pgEnum('table_group_status', ['ACTIVE', 'DISSOLVED']);
 export const qrPolicy = pgEnum('qr_policy', ['ANY_MEMBER', 'PRIMARY_ONLY']);
@@ -405,6 +407,147 @@ export const loginAttempts = pgTable('login_attempts', {
   attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---------------------------------------------------------------------------
+// Workforce planning (B1). Mirrors migrations/0007 and /0008.
+// ---------------------------------------------------------------------------
+
+export const employmentType = pgEnum('employment_type', ['FULL_TIME', 'PART_TIME', 'ON_CALL']);
+export const stationStaffingPolicy = pgEnum('station_staffing_policy', [
+  'STAFFED',
+  'SELF_SERVE',
+  'CLOSED',
+]);
+export const rosterPeriodState = pgEnum('roster_period_state', [
+  'DRAFT',
+  'AVAILABILITY_OPEN',
+  'PLANNING',
+  'PUBLISHED',
+  'LOCKED',
+]);
+export const availabilityKind = pgEnum('availability_kind', [
+  'AVAILABLE',
+  'PREFERRED',
+  'UNAVAILABLE',
+]);
+export const absenceType = pgEnum('absence_type', [
+  'VACATION',
+  'SICK',
+  'MILITARY',
+  'UNPAID',
+  'PUBLIC_HOLIDAY',
+]);
+export const absenceState = pgEnum('absence_state', ['REQUESTED', 'APPROVED', 'REJECTED']);
+
+/**
+ * The house basis a pensum percentage is measured against.
+ *
+ * 100% is a corridor (40–42.5 h/week), not a number, so hours are derived from
+ * the percentage rather than stored per person. Versioned by validity: a month
+ * is always settled against the policy that was in force during it.
+ */
+export const workTimePolicy = pgTable('work_time_policy', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  validFrom: date('valid_from').notNull(),
+  /** NULL marks the policy in force now; at most one such row exists. */
+  validTo: date('valid_to'),
+  weeklyHoursMinAt100: numeric('weekly_hours_min_at_100', { precision: 4, scale: 2 }).notNull(),
+  weeklyHoursMaxAt100: numeric('weekly_hours_max_at_100', { precision: 4, scale: 2 }).notNull(),
+  /** The default end of an evening shift. Retires the literal "END". */
+  defaultShiftEnd: time('default_shift_end').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Contract history. A pensum change closes one row and opens the next. */
+export const employments = pgTable(
+  'employments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    employmentType: employmentType('employment_type').notNull(),
+    /** NULL exactly when ON_CALL: an Aushilfe is owed no hours. */
+    pensumPercent: numeric('pensum_percent', { precision: 5, scale: 2 }),
+    validFrom: date('valid_from').notNull(),
+    validTo: date('valid_to'),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ userIdx: index('employments_user_idx').on(t.userId, t.validFrom) }),
+);
+
+export const stations = pgTable('stations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: text('code').notNull().unique(),
+  nameDe: text('name_de').notNull(),
+  nameEn: text('name_en').notNull(),
+  /** SELF_SERVE is an answer ("Kellner selbst"); an empty roster cell is not. */
+  staffingPolicy: stationStaffingPolicy('staffing_policy').notNull().default('STAFFED'),
+  sortOrder: integer('sort_order').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const rosterPeriods = pgTable('roster_periods', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  startsOn: date('starts_on').notNull().unique(),
+  endsOn: date('ends_on').notNull(),
+  state: rosterPeriodState('state').notNull().default('DRAFT'),
+  availabilityDeadline: timestamp('availability_deadline', { withTimezone: true }),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  publishedBy: uuid('published_by').references(() => users.id),
+  lockedAt: timestamp('locked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * What a person says about a date. Binding on the planner for ON_CALL staff,
+ * advisory for everyone whose contract already obliges the hours.
+ */
+export const availability = pgTable(
+  'availability',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    periodId: uuid('period_id')
+      .notNull()
+      .references(() => rosterPeriods.id, { onDelete: 'cascade' }),
+    onDate: date('on_date').notNull(),
+    fromTime: time('from_time').notNull(),
+    toTime: time('to_time').notNull(),
+    kind: availabilityKind('kind').notNull(),
+    note: text('note'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slot: uniqueIndex('availability_slot_idx').on(t.userId, t.onDate, t.fromTime),
+    periodIdx: index('availability_period_idx').on(t.periodId, t.onDate),
+    userIdx: index('availability_user_idx').on(t.userId, t.onDate),
+  }),
+);
+
+/** So that an empty row on the roster can only ever mean "not needed". */
+export const absences = pgTable(
+  'absences',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    startsOn: date('starts_on').notNull(),
+    endsOn: date('ends_on').notNull(),
+    absenceType: absenceType('absence_type').notNull(),
+    state: absenceState('state').notNull().default('REQUESTED'),
+    note: text('note'),
+    requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+    decidedBy: uuid('decided_by').references(() => users.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+  },
+  (t) => ({ userIdx: index('absences_user_idx').on(t.userId, t.startsOn) }),
+);
+
 export const schema = {
   users,
   allergens,
@@ -425,4 +568,10 @@ export const schema = {
   idempotencyKeys,
   authSessions,
   loginAttempts,
+  workTimePolicy,
+  employments,
+  stations,
+  rosterPeriods,
+  availability,
+  absences,
 };

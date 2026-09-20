@@ -32,3 +32,17 @@ REVOKE UPDATE, DELETE, TRUNCATE ON audit_events, order_revisions FROM asiaway_ap
 
 GRANT USAGE, SELECT ON SEQUENCE order_number_seq, session_number_seq, audit_events_id_seq
 TO asiaway_app;
+
+-- ---------- workforce planning (0007, 0008) ----------------------------------
+-- Ordinary mutable operational data: a roster is edited until it is published,
+-- and an employee revises their availability until the deadline. The history
+-- that must not be rewritten lives in audit_events, which is already locked
+-- down above and is where roster and timesheet changes are recorded.
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  employments, stations, roster_periods, availability, absences
+TO asiaway_app;
+
+-- The corridor a past month was settled against must stay as it was, so the
+-- application may add a new policy but never rewrite or remove an old one.
+GRANT SELECT, INSERT ON work_time_policy TO asiaway_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON work_time_policy FROM asiaway_app;
