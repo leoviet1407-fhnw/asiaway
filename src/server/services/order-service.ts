@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 import { domainError } from '../../domain/errors';
 import {
@@ -632,4 +632,238 @@ export async function getOrderHistory(db: Db, orderId: string) {
     .from(orderRevisions)
     .where(eq(orderRevisions.orderId, orderId))
     .orderBy(orderRevisions.revisionNumber);
+}
+
+export interface CreateOrderForTableInput {
+  readonly tableId: string;
+  readonly userId: string;
+  readonly lines: readonly CartLineRequest[];
+  readonly note: string | null;
+  readonly idempotencyKey: string;
+}
+
+/**
+ * An order taken by a waiter at the table, for guests who are not ordering from
+ * their own phone.
+ *
+ * It goes straight to CONFIRMED. The review step exists so that a waiter checks
+ * what a guest sent from their phone; here the waiter IS the one taking it, and
+ * making them confirm their own typing at the table would be theatre. The audit
+ * trail still records both steps, so a confirmed order always has the same
+ * shape however it arrived.
+ *
+ * Attribution is honest throughout: actor WAITER rather than CUSTOMER, no
+ * device id, and the waiter's user id on the order, the revisions and every
+ * audit event. Nothing here pretends a guest pressed a button.
+ *
+ * Availability is deliberately NOT enforced, matching waiter edits: staff at
+ * the table know what the kitchen actually has.
+ */
+export async function createOrderForTable(
+  db: Db,
+  input: CreateOrderForTableInput,
+): Promise<{ orderId: string; orderNumber: number; totalCents: number; replayed: boolean }> {
+  const requestHash = hashRequest({ lines: input.lines, note: input.note, table: input.tableId });
+
+  return db.transaction(async (tx: Db) => {
+    const claimed = await tx
+      .insert(idempotencyKeys)
+      .values({
+        key: input.idempotencyKey,
+        scope: 'waiter.order.create',
+        requestHash,
+        state: 'IN_PROGRESS',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      })
+      .onConflictDoNothing()
+      .returning({ key: idempotencyKeys.key });
+
+    if (claimed.length === 0) {
+      const [existing] = await tx
+        .select()
+        .from(idempotencyKeys)
+        .where(eq(idempotencyKeys.key, input.idempotencyKey));
+      if (existing?.state === 'COMPLETED' && existing.responseBody) {
+        const body = existing.responseBody as {
+          orderId: string;
+          orderNumber: number;
+          totalCents: number;
+        };
+        return { ...body, replayed: true };
+      }
+      throw domainError('REQUEST_IN_FLIGHT', 'This order is already being created');
+    }
+
+    // Find the table's open session, or open one. A party seated and ordering
+    // through a waiter still gets a session, so their bill accumulates exactly
+    // as it would if they had scanned.
+    const [openSession] = await tx
+      .select()
+      .from(diningSessions)
+      .where(and(eq(diningSessions.primaryTableId, input.tableId), ne(diningSessions.status, 'CLOSED')));
+
+    let session = openSession;
+    if (!session) {
+      const [created] = await tx
+        .insert(diningSessions)
+        .values({ primaryTableId: input.tableId, status: 'OCCUPIED' })
+        .returning();
+      session = created!;
+      await tx.insert(auditEvents).values({
+        actorType: 'WAITER',
+        actorUserId: input.userId,
+        action: 'SESSION_OPENED',
+        entityType: 'SESSION',
+        entityId: session.id,
+        tableId: input.tableId,
+        sessionId: session.id,
+        afterValue: { status: 'OCCUPIED' },
+        metadata: { openedByStaff: true, reason: 'waiter took an order at the table' },
+      });
+    }
+
+    const requestedIds = [...new Set(input.lines.map((l) => l.menuItemId))];
+    const records = requestedIds.length
+      ? await tx.select().from(menuItems).where(inArray(menuItems.id, requestedIds))
+      : [];
+
+    const menuMap = new Map<string, MenuItemRecord>(
+      records.map((r) => [
+        r.id,
+        {
+          id: r.id,
+          dishNumber: r.dishNumber,
+          nameEn: r.nameEn,
+          nameDe: r.nameDe,
+          nameVi: r.nameVi,
+          priceCents: r.priceCents,
+          allergenCodes: r.allergenCodes,
+          isAvailable: true, // staff override; see the note above
+          isActive: r.isActive,
+        },
+      ]),
+    );
+
+    const cart = validateCart(input.lines, menuMap, input.note);
+    const submitted = buildSnapshot({ status: 'SUBMITTED', items: cart.items, customerNote: cart.note });
+    const now = new Date();
+
+    const [order] = await tx
+      .insert(orders)
+      .values({
+        sessionId: session.id,
+        tableId: input.tableId,
+        status: 'CONFIRMED',
+        submittedByDeviceId: null,
+        openedByWaiterAt: now,
+        openedBy: input.userId,
+        confirmedAt: now,
+        confirmedBy: input.userId,
+        totalCents: submitted.totalCents,
+        currentRevisionNumber: 1,
+      })
+      .returning();
+
+    await tx.insert(orderItems).values(
+      submitted.items.map((item, index) => ({
+        orderId: order!.id,
+        menuItemId: item.menuItemId,
+        dishNumber: item.dishNumber,
+        nameEn: item.nameEn,
+        nameDe: item.nameDe,
+        nameVi: item.nameVi,
+        unitPriceCents: item.unitPriceCents,
+        quantity: item.quantity,
+        lineTotalCents: item.lineTotalCents,
+        allergenCodes: [...item.allergenCodes],
+        sortIndex: index,
+      })),
+    );
+
+    if (cart.note) {
+      await tx.insert(orderNotes).values({
+        orderId: order!.id,
+        noteText: cart.note,
+        source: 'CUSTOMER', // the guest's request, written down by the waiter
+        createdBy: input.userId,
+      });
+    }
+
+    const confirmed = buildSnapshot({
+      status: 'CONFIRMED',
+      items: cart.items,
+      customerNote: cart.note,
+    });
+
+    await tx.insert(orderRevisions).values([
+      {
+        orderId: order!.id,
+        revisionNumber: 0,
+        revisionType: 'ORIGINAL_SUBMISSION',
+        actorType: 'WAITER',
+        actorUserId: input.userId,
+        reason: 'taken at the table by staff',
+        beforeSnapshot: null,
+        afterSnapshot: submitted,
+        totalCentsBefore: null,
+        totalCentsAfter: submitted.totalCents,
+      },
+      {
+        orderId: order!.id,
+        revisionNumber: 1,
+        revisionType: 'FINAL_CONFIRMED',
+        actorType: 'WAITER',
+        actorUserId: input.userId,
+        beforeSnapshot: submitted,
+        afterSnapshot: confirmed,
+        totalCentsBefore: submitted.totalCents,
+        totalCentsAfter: confirmed.totalCents,
+      },
+    ]);
+
+    await tx
+      .update(diningSessions)
+      .set({ lastActivityAt: now })
+      .where(eq(diningSessions.id, session.id));
+
+    await writeAuditEvents(tx, [
+      {
+        action: 'ORDER_SUBMITTED',
+        actor: { type: 'WAITER', userId: input.userId },
+        entityType: 'ORDER',
+        entityId: order!.id,
+        tableId: input.tableId,
+        sessionId: session.id,
+        orderId: order!.id,
+        beforeValue: null,
+        afterValue: submitted,
+        metadata: { orderNumber: order!.orderNumber, takenByStaff: true },
+      },
+      {
+        action: 'ORDER_CONFIRMED',
+        actor: { type: 'WAITER', userId: input.userId },
+        entityType: 'ORDER',
+        entityId: order!.id,
+        tableId: input.tableId,
+        sessionId: session.id,
+        orderId: order!.id,
+        beforeValue: { status: 'SUBMITTED' },
+        afterValue: { status: 'CONFIRMED', totalCents: confirmed.totalCents },
+        metadata: { orderNumber: order!.orderNumber, takenByStaff: true },
+      },
+    ]);
+
+    const result = {
+      orderId: order!.id,
+      orderNumber: order!.orderNumber,
+      totalCents: confirmed.totalCents,
+    };
+
+    await tx
+      .update(idempotencyKeys)
+      .set({ state: 'COMPLETED', responseStatus: 201, responseBody: result })
+      .where(eq(idempotencyKeys.key, input.idempotencyKey));
+
+    return { ...result, replayed: false };
+  });
 }

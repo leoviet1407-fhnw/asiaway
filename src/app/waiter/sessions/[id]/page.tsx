@@ -24,7 +24,7 @@ interface SessionDetail {
     checkoutRequestedAt: string | null;
     closedAt: string | null;
   };
-  table: { tableNumber: string; displayName: string } | null;
+  table: { id: string; tableNumber: string; displayName: string } | null;
   orders: SessionOrder[];
   totalCents: number;
 }
@@ -189,6 +189,15 @@ export default function WaiterSessionPage() {
         <p className="mt-1 text-xs text-ink-muted">
           Take payment at the POS, then close the session here.
         </p>
+
+        {!isClosed && detail.table && (
+          <Link
+            href={`/waiter/order?tableId=${detail.table.id}`}
+            className="btn-secondary mt-3 w-full"
+          >
+            Add another order for this table
+          </Link>
+        )}
       </section>
 
       {error && (

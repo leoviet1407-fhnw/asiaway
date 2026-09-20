@@ -159,6 +159,7 @@ export async function getAvailabilityList(db: Db) {
       priceCents: menuItems.priceCents,
       isAvailable: menuItems.isAvailable,
       categoryName: menuCategories.nameEn,
+      categoryKind: menuCategories.kind,
       categorySort: menuCategories.sortOrder,
       sortOrder: menuItems.sortOrder,
     })

@@ -21,7 +21,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
           closedAt: detail.session.closedAt?.toISOString() ?? null,
         },
         table: detail.table
-          ? { tableNumber: detail.table.tableNumber, displayName: detail.table.displayName }
+          ? {
+              id: detail.table.id,
+              tableNumber: detail.table.tableNumber,
+              displayName: detail.table.displayName,
+            }
           : null,
         orders: detail.orders.map((o) => ({
           id: o.id,

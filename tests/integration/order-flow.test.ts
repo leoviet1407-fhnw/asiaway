@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestContext } from '../helpers/db';
 import {
@@ -17,6 +17,7 @@ import {
 } from '../../src/server/db/schema';
 import {
   confirmOrder,
+  createOrderForTable,
   editOrder,
   openOrderForReview,
   submitOrder,
@@ -498,6 +499,139 @@ describe('history is append-only', () => {
 
     const revs = await db.select().from(orderRevisions).where(eq(orderRevisions.orderId, orderId));
     expect(revs.length).toBeGreaterThan(0);
+  });
+});
+
+describe('an order taken by a waiter at the table', () => {
+  it('is confirmed immediately and attributed to the waiter, not a guest', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 2 }],
+      note: 'no coriander',
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.totalCents).toBe(4900);
+
+    const [order] = await db.select().from(orders).where(eq(orders.id, result.orderId));
+    expect(order!.status).toBe('CONFIRMED');
+    expect(order!.confirmedBy).toBe(fx.waiterId);
+    // Nothing pretends a guest pressed a button.
+    expect(order!.submittedByDeviceId).toBeNull();
+  });
+
+  it('records the same revision shape as a guest order, with WAITER as the actor', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+
+    const revs = await db
+      .select()
+      .from(orderRevisions)
+      .where(eq(orderRevisions.orderId, result.orderId))
+      .orderBy(asc(orderRevisions.revisionNumber));
+
+    expect(revs.map((r) => r.revisionType)).toEqual(['ORIGINAL_SUBMISSION', 'FINAL_CONFIRMED']);
+    expect(revs.every((r) => r.actorType === 'WAITER')).toBe(true);
+    expect(revs.every((r) => r.actorUserId === fx.waiterId)).toBe(true);
+  });
+
+  it('audits both the taking and the confirming', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+
+    const events = await db.select().from(auditEvents).where(eq(auditEvents.orderId, result.orderId));
+    expect(events.map((e) => e.action).sort()).toEqual(['ORDER_CONFIRMED', 'ORDER_SUBMITTED']);
+    expect(events.every((e) => e.actorType === 'WAITER')).toBe(true);
+    expect(events.every((e) => (e.metadata as any).takenByStaff === true)).toBe(true);
+  });
+
+  it('never lands in the pending queue, because there is nothing to review', async () => {
+    await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+
+    const pending = await db
+      .select()
+      .from(orders)
+      .where(inArray(orders.status, ['SUBMITTED', 'EMPLOYEE_REVIEW']));
+    expect(pending).toHaveLength(0);
+  });
+
+  it('opens a session when the table is free, and joins the open one otherwise', async () => {
+    // fx.tableId already has an open session from the fixture.
+    const first = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+    const second = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.coke, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+
+    const [a] = await db.select().from(orders).where(eq(orders.id, first.orderId));
+    const [b] = await db.select().from(orders).where(eq(orders.id, second.orderId));
+    expect(a!.sessionId).toBe(b!.sessionId);
+    expect(b!.orderNumber).toBe(a!.orderNumber + 1);
+  });
+
+  it('lets staff order a dish the guest could not, because they know the kitchen', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.soldOut, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.totalCents).toBe(2350);
+  });
+
+  it('survives a double tap on the tablet', async () => {
+    const key = randomUUID();
+    const input = {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: key,
+    };
+    const first = await createOrderForTable(db, input);
+    const second = await createOrderForTable(db, input);
+
+    expect(second.replayed).toBe(true);
+    expect(second.orderNumber).toBe(first.orderNumber);
+    expect(await db.select().from(orders)).toHaveLength(1);
+  });
+
+  it('still computes the total from the database, not the tablet', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 2, unitPriceCents: 1 } as never],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+    expect(result.totalCents).toBe(4900);
   });
 });
 

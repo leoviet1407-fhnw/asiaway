@@ -132,6 +132,10 @@ export function WaiterDashboard({ userName }: { userName: string }) {
             {soundEnabled ? 'Sound on' : 'Sound off'}
           </button>
 
+          <Link href="/waiter/order" className="btn-primary px-3 py-2 text-sm">
+            Take an order
+          </Link>
+
           <Link href="/waiter/menu" className="btn-secondary px-3 py-2 text-sm">
             Sold out
           </Link>
@@ -255,9 +259,15 @@ export function WaiterDashboard({ userName }: { userName: string }) {
                   {inner}
                 </Link>
               ) : (
-                <div key={table.tableId} className={`card border p-3 ${STATE_STYLE[table.state]}`}>
+                // A free table is still a place someone might be seated and
+                // order verbally, so it links straight to the order pad.
+                <Link
+                  key={table.tableId}
+                  href={`/waiter/order?tableId=${table.tableId}`}
+                  className={`card border p-3 ${STATE_STYLE[table.state]}`}
+                >
                   {inner}
-                </div>
+                </Link>
               );
             })}
           </div>
