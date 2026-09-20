@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseDrinksCsv } from '../../src/server/menu/drinks-import';
+import { ALLERGEN_CODES } from '../../src/domain/menu/allergens';
 
 const csv = readFileSync(resolve(process.cwd(), 'data/asiaway_drinks_menu.csv'), 'utf8');
 const drinks = parseDrinksCsv(csv);
@@ -65,12 +66,52 @@ describe('drinks import from the real Asiaway CSV', () => {
     );
   });
 
-  it('carries NO allergens, because the source supplies none', () => {
-    // Allergen data is a legal declaration. The beers almost certainly contain
-    // gluten and the coffees milk, but that must come from the restaurant, not
-    // be inferred here from a product name.
-    expect(drinks.stats.withoutAllergens).toBe(50);
-    expect(drinks.items.every((i) => i.allergenCodes.length === 0)).toBe(true);
+  it('reads allergen codes from the CSV where they are declared', () => {
+    const byName = new Map(drinks.items.map((i) => [i.nameEn, i]));
+    // Gluten: beer is a barley product.
+    expect(byName.get('Saigon (Vietnam)')!.allergenCodes).toEqual(['A']);
+    expect(byName.get('Feldschlösschen Alkoholfrei')!.allergenCodes).toEqual(['A']);
+    // Milk: in the name or the definition of the drink.
+    expect(byName.get('Cappuccino')!.allergenCodes).toEqual(['G']);
+    expect(byName.get('Schale (mit warmer Milch)')!.allergenCodes).toEqual(['G']);
+    expect(byName.get('Thai Red Milk Tea')!.allergenCodes).toEqual(['G']);
+    // Sulfites: grape-wine based.
+    expect(byName.get('Prosecco')!.allergenCodes).toEqual(['O']);
+    expect(byName.get('Aperol Spritz')!.allergenCodes).toEqual(['O']);
+  });
+
+  it('leaves genuinely uncertain drinks undeclared rather than guessing', () => {
+    const byName = new Map(drinks.items.map((i) => [i.nameEn, i]));
+    // Sulfites in sake and soju vary by producer; the house coffee recipe
+    // decides whether condensed milk is involved. A wrong declaration is worse
+    // than a missing one, so these stay blank until the restaurant confirms.
+    for (const name of [
+      'Sake (Japan)',
+      'Soju Original (Korea)',
+      'Café Crème',
+      'Vietnamesischer Eiskaffee',
+    ]) {
+      expect(byName.get(name)!.allergenCodes, name).toEqual([]);
+    }
+  });
+
+  it('declares allergens on 16 drinks and leaves the rest blank', () => {
+    expect(drinks.stats.withAllergens).toBe(16);
+    expect(drinks.stats.withAllergens + drinks.stats.withoutAllergens).toBe(50);
+  });
+
+  it('only ever uses codes from the printed legend', () => {
+    for (const item of drinks.items) {
+      for (const code of item.allergenCodes) {
+        expect(ALLERGEN_CODES.has(code), `${item.nameEn}: ${code}`).toBe(true);
+      }
+    }
+  });
+
+  it('rejects an allergen code that is not in the legend', () => {
+    expect(() => parseDrinksCsv(csv.replace('Beer,Saigon (Vietnam),30 cl,6.0,A', 'Beer,Saigon (Vietnam),30 cl,6.0,Z'))).toThrow(
+      /allergen/i,
+    );
   });
 
   it('carries no descriptions, because the source has no description column', () => {
@@ -102,18 +143,18 @@ describe('drinks import from the real Asiaway CSV', () => {
   });
 
   it('rejects a missing price or name instead of importing a broken item', () => {
-    expect(() => parseDrinksCsv(csv.replace('Aperitif,Aperol Spritz,,12.0', 'Aperitif,,,12.0'))).toThrow(
-      /"Name" is empty/,
-    );
     expect(() =>
-      parseDrinksCsv(csv.replace('Aperitif,Aperol Spritz,,12.0', 'Aperitif,Aperol Spritz,,')),
+      parseDrinksCsv(csv.replace('Aperitif,Aperol Spritz,,12.0,O', 'Aperitif,,,12.0,O')),
+    ).toThrow(/"Name" is empty/);
+    expect(() =>
+      parseDrinksCsv(csv.replace('Aperitif,Aperol Spritz,,12.0,O', 'Aperitif,Aperol Spritz,,,O')),
     ).toThrow(/"Price CHF" is empty/);
   });
 
   it('rejects a duplicate drink within a category', () => {
     const doubled = csv.replace(
-      'Aperitif,Hugo,,12.0',
-      'Aperitif,Hugo,,12.0\nAperitif,Hugo,,12.0',
+      'Aperitif,Hugo,,12.0,O',
+      'Aperitif,Hugo,,12.0,O\nAperitif,Hugo,,12.0,O',
     );
     expect(() => parseDrinksCsv(doubled)).toThrow(/duplicate item/i);
   });

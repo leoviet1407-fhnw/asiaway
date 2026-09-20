@@ -61,5 +61,7 @@
   "nav.menu": "Karte",
   "nav.orders": "Bestellungen",
   "nav.cart": "Bestellung",
-  "nav.bill": "Rechnung"
+  "nav.bill": "Rechnung",
+  "menu.allergens.none": "Allergene nicht deklariert — bitte fragen Sie Ihre Bedienung",
+  "menu.allergens.declared": "Enthält"
 }

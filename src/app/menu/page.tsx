@@ -128,8 +128,13 @@ export default function MenuPage() {
                     )}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span className="font-semibold">{formatMoney(item.priceCents)}</span>
-                      {item.allergenCodes.length > 0 && (
+                      {item.allergenCodes.length > 0 ? (
                         <span className="chip">{item.allergenCodes.join(' ')}</span>
+                      ) : (
+                        /* Never let "no codes" read as "no allergens". */
+                        <span className="chip bg-warn-50 text-warn-500">
+                          {t('menu.allergens.none')}
+                        </span>
                       )}
                       {!item.isAvailable && (
                         <span className="chip bg-danger-50 text-danger-500">{t('menu.soldOut')}</span>

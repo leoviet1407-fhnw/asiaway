@@ -1,4 +1,5 @@
 import { parse } from 'csv-parse/sync';
+import { parseAllergenCodes } from '../../domain/menu/allergens';
 import { parsePriceToCents } from '../../lib/money';
 import { slugify, type CategoryMeta, type ImportedMenuItem } from './import';
 
@@ -7,27 +8,28 @@ import { slugify, type CategoryMeta, type ImportedMenuItem } from './import';
  *
  * The drinks list arrives in a different, thinner shape than the food menu:
  *
- *     Category, Name, Volume, Price CHF
+ *     Category, Name, Volume, Price CHF, Allergens
  *
- * It has no per-language names, no descriptions, no allergen codes and no dish
- * numbers, and it adds a serving volume that food does not have. Rather than
- * bend it into the food importer and quietly fabricate the missing columns,
- * this maps what is actually there and leaves the rest genuinely empty:
+ * It has no per-language names, no descriptions and no dish numbers, and it adds
+ * a serving volume that food does not have. Rather than bend it into the food
+ * importer and quietly fabricate the missing columns, this maps what is actually
+ * there and leaves the rest genuinely empty:
  *
  *  - One name, shown in all three languages. Most drink names are proper nouns
  *    ("Coca Cola", "Sake", "Tsingtao") and the rest are German as printed. An
  *    invented translation would be worse than an untranslated one.
  *  - No descriptions. The UI omits the line rather than showing a blank.
- *  - NO ALLERGENS. Several drinks certainly carry them — milk in the coffees,
- *    gluten in the beers, sulfites in the wines — but the source supplies none,
- *    and allergen data is a legal declaration, not something to infer from a
- *    product name. See MISSING_ALLERGEN_WARNING.
+ *  - Allergens come from the CSV's Allergens column where the restaurant has
+ *    filled it in. A blank cell means NOT DECLARED, which the UI states
+ *    explicitly rather than rendering as "contains nothing" — an undeclared
+ *    allergen must never look like an absent one.
  */
 export const DRINKS_CSV_COLUMNS = {
   category: 'Category',
   name: 'Name',
   volume: 'Volume',
   price: 'Price CHF',
+  allergens: 'Allergens',
 } as const;
 
 /**
@@ -105,10 +107,9 @@ export const DRINK_CATEGORY_META: Readonly<Record<string, CategoryMeta>> = {
 };
 
 export const MISSING_ALLERGEN_WARNING =
-  'The drinks CSV has no allergen column, so every drink is imported with none. ' +
-  'Milk in the coffees and Thai Red Milk Tea, gluten in the beers and sulfites ' +
-  'in the wines are all likely declarable. Allergen data is a legal declaration ' +
-  'and has deliberately NOT been guessed — add an Allergens column and re-import.';
+  'Some drinks have no allergen codes yet. A blank cell is shown to guests as ' +
+  '"not declared", never as "allergen free". See docs/DRINKS_ALLERGEN_REVIEW.md ' +
+  'for the list awaiting confirmation, and re-import once the CSV is filled in.';
 
 export interface ImportedDrinks {
   readonly categories: readonly CategoryMeta[];
@@ -117,6 +118,7 @@ export interface ImportedDrinks {
     readonly csvRows: number;
     readonly itemsProduced: number;
     readonly withVolume: number;
+    readonly withAllergens: number;
     readonly withoutAllergens: number;
   };
 }
@@ -171,7 +173,7 @@ export function parseDrinksCsv(csvText: string): ImportedDrinks {
       descriptionDe: '',
       descriptionVi: '',
       priceCents: parsePriceToCents(required(row, DRINKS_CSV_COLUMNS.price, lineNo)),
-      allergenCodes: [],
+      allergenCodes: parseAllergenCodes(row[DRINKS_CSV_COLUMNS.allergens] ?? ''),
       sortOrder: 100 + index,
       volume,
     } satisfies ImportedMenuItem;
@@ -189,6 +191,7 @@ export function parseDrinksCsv(csvText: string): ImportedDrinks {
       csvRows: rows.length,
       itemsProduced: items.length,
       withVolume: items.filter((i) => i.volume).length,
+      withAllergens: items.filter((i) => i.allergenCodes.length > 0).length,
       withoutAllergens: items.filter((i) => i.allergenCodes.length === 0).length,
     },
   };

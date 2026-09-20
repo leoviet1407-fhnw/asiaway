@@ -61,5 +61,7 @@
   "nav.menu": "Menu",
   "nav.orders": "Orders",
   "nav.cart": "Order",
-  "nav.bill": "Bill"
+  "nav.bill": "Bill",
+  "menu.allergens.none": "Allergens not declared — please ask your waiter",
+  "menu.allergens.declared": "Contains"
 }
