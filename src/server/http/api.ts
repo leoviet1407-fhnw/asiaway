@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { DomainError } from '../../domain/errors';
-import { AuthError, CUSTOMER_COOKIE, WAITER_COOKIE, resolveSession } from '../auth/session';
+import {
+  AuthError,
+  CUSTOMER_COOKIE,
+  SERVICE_ROLES,
+  WAITER_COOKIE,
+  resolveSession,
+} from '../auth/session';
 import { decodeCustomerCookie, type CustomerCookiePayload } from '../auth/customer-cookie';
 import { db } from '../db/index';
 import type { AuthenticatedUser } from '../auth/session';
@@ -94,11 +100,24 @@ export async function requireCustomerContext(): Promise<CustomerCookiePayload> {
   return context;
 }
 
-export async function getWaiter(): Promise<AuthenticatedUser | null> {
+/**
+ * Any signed-in employee, whatever their role.
+ *
+ * The cookie is still called aw_wsid: it was minted before anyone but waiters
+ * could sign in, and renaming it would sign the whole team out for no gain.
+ */
+export async function getStaffMember(): Promise<AuthenticatedUser | null> {
   const jar = await cookies();
   const token = jar.get(WAITER_COOKIE)?.value;
   if (!token) return null;
   return resolveSession(await db(), token);
+}
+
+/** A signed-in employee who may work the floor. Kitchen STAFF may not. */
+export async function getWaiter(): Promise<AuthenticatedUser | null> {
+  const user = await getStaffMember();
+  if (!user || !SERVICE_ROLES.includes(user.role)) return null;
+  return user;
 }
 
 export async function requireWaiter(): Promise<AuthenticatedUser> {
@@ -116,7 +135,24 @@ export async function requireWaiter(): Promise<AuthenticatedUser> {
 export async function withWaiter<T>(
   fn: (user: AuthenticatedUser) => Promise<T>,
 ): Promise<T | NextResponse> {
-  const user = await getWaiter();
+  return withAuthenticated(getWaiter, fn);
+}
+
+/**
+ * The same guarantees for a screen every employee uses, such as submitting
+ * availability, where being rostered at all is the only qualification.
+ */
+export async function withStaffMember<T>(
+  fn: (user: AuthenticatedUser) => Promise<T>,
+): Promise<T | NextResponse> {
+  return withAuthenticated(getStaffMember, fn);
+}
+
+async function withAuthenticated<T>(
+  resolve: () => Promise<AuthenticatedUser | null>,
+  fn: (user: AuthenticatedUser) => Promise<T>,
+): Promise<T | NextResponse> {
+  const user = await resolve();
   if (!user) return apiError('UNAUTHENTICATED', 'Please sign in');
 
   const h = await headers();

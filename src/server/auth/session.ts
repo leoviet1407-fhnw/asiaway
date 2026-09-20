@@ -22,11 +22,18 @@ export function newOpaqueToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
+/** Mirrors the user_role enum. MANAGER and STAFF were added in migration 0007. */
+export const USER_ROLES = ['WAITER', 'MANAGER', 'STAFF'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+/** Roles that may use the waiter tablet. Kitchen and cleaning STAFF may not. */
+export const SERVICE_ROLES: readonly UserRole[] = ['WAITER', 'MANAGER'];
+
 export interface AuthenticatedUser {
   readonly id: string;
   readonly displayName: string;
   readonly email: string;
-  readonly role: 'WAITER';
+  readonly role: UserRole;
 }
 
 export class AuthError extends Error {
@@ -154,6 +161,7 @@ export async function resolveSession(
       userId: users.id,
       displayName: users.displayName,
       email: users.email,
+      role: users.role,
       isActive: users.isActive,
     })
     .from(authSessions)
@@ -174,7 +182,7 @@ export async function resolveSession(
     .set({ lastSeenAt: new Date() })
     .where(eq(authSessions.id, row.sessionId));
 
-  return { id: row.userId, displayName: row.displayName, email: row.email, role: 'WAITER' };
+  return { id: row.userId, displayName: row.displayName, email: row.email, role: row.role };
 }
 
 export async function signOut(db: AppDatabase, token: string | undefined | null): Promise<void> {

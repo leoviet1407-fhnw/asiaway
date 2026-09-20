@@ -15,12 +15,14 @@
     "menu:preview": "tsx scripts/import-menu.ts --dry-run",
     "menu:import": "tsx scripts/import-menu.ts",
     "dev": "next dev",
+    "dev:alt": "PGLITE_DIR=.pglite-alt next dev",
     "build": "next build",
     "start": "node .next/standalone/server.js",
     "seed": "tsx scripts/seed.ts",
     "qr": "tsx scripts/generate-qr.ts",
     "user:create": "tsx scripts/create-user.ts",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "workforce:seed": "tsx scripts/seed-workforce.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",

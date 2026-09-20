@@ -1,6 +1,13 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestContext } from '../helpers/db';
+import { SERVICE_ROLES, newOpaqueToken, resolveSession, sha256 } from '../../src/server/auth/session';
+import {
+  clearDayAvailability,
+  getAvailabilityWorkspace,
+  setDayAvailability,
+} from '../../src/server/services/availability-service';
+import type { AppDatabase } from '../../src/server/db/client';
 
 /**
  * The B1 schema's job is to make the September 2026 plan's defects impossible
@@ -20,7 +27,9 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await exec('truncate employments, availability, absences, roster_periods, users cascade;');
+  await exec(
+    'truncate employments, availability, absences, roster_periods, auth_sessions, users cascade;',
+  );
 });
 
 async function makeUser(name: string, role = 'WAITER'): Promise<string> {
@@ -36,6 +45,125 @@ describe('roles', () => {
   it('accepts the planner and back-of-house roles added in 0007', async () => {
     await expect(makeUser('XUAN', 'MANAGER')).resolves.toBeTruthy();
     await expect(makeUser('KITCHEN', 'STAFF')).resolves.toBeTruthy();
+  });
+
+  it('carries the real role on the session, not a hardcoded WAITER', async () => {
+    const db = ctx.db as unknown as AppDatabase;
+    for (const role of ['WAITER', 'MANAGER', 'STAFF'] as const) {
+      const id = await makeUser(`P${role}`, role);
+      const token = newOpaqueToken();
+      await exec(`insert into auth_sessions (user_id, token_hash, expires_at)
+                  values ('${id}', '${sha256(token)}', now() + interval '12 hours')`);
+      const user = await resolveSession(db, token);
+      expect(user?.role).toBe(role);
+    }
+  });
+
+  it('keeps kitchen STAFF off the waiter tablet', () => {
+    // getWaiter() gates on exactly this list; STAFF are rostered but do not serve.
+    expect(SERVICE_ROLES).toContain('WAITER');
+    expect(SERVICE_ROLES).toContain('MANAGER');
+    expect(SERVICE_ROLES).not.toContain('STAFF');
+  });
+});
+
+describe('submitting availability', () => {
+  const db = () => ctx.db as unknown as AppDatabase;
+
+  async function openMonth(deadline = "now() + interval '3 days'"): Promise<string> {
+    const r = await rows(`insert into roster_periods
+        (starts_on, ends_on, state, availability_deadline)
+      values (date '2026-10-01', date '2026-10-31', 'AVAILABILITY_OPEN', ${deadline})
+      returning id`);
+    return r[0].id;
+  }
+
+  async function contracted(name: string, pensum: number): Promise<string> {
+    const id = await makeUser(name);
+    await exec(`insert into employments (user_id, employment_type, pensum_percent, valid_from)
+                values ('${id}', 'PART_TIME', ${pensum}, date '2026-01-01')`);
+    return id;
+  }
+
+  it('gives a 70% contract its October corridor', async () => {
+    const id = await contracted('YEN', 70);
+    await openMonth();
+    const ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.period?.days).toBe(31);
+    // 70% of 40-42.5 h/week, scaled to 31 days.
+    expect(ws.corridor).toMatchObject({ minMinutes: 7440, maxMinutes: 7905 });
+    expect(ws.contract?.weight).toBe('ADVISORY');
+  });
+
+  it('gives an Aushilfe no corridor, because they are owed no hours', async () => {
+    const id = await makeUser('DENNIS');
+    await exec(`insert into employments (user_id, employment_type, valid_from)
+                values ('${id}', 'ON_CALL', date '2026-01-01')`);
+    await openMonth();
+    const ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.corridor).toBeNull();
+    expect(ws.contract?.weight).toBe('BINDING');
+  });
+
+  it('replaces a day rather than leaving two contradictory answers', async () => {
+    const id = await contracted('TAMIE', 80);
+    await openMonth();
+    await setDayAvailability(db(), {
+      userId: id, onDate: '2026-10-05', kind: 'AVAILABLE', fromTime: '10:30', toTime: '14:30',
+    });
+    await setDayAvailability(db(), {
+      userId: id, onDate: '2026-10-05', kind: 'PREFERRED', fromTime: '17:30', toTime: '22:00',
+    });
+    const ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.days).toHaveLength(1);
+    expect(ws.days[0]).toMatchObject({ kind: 'PREFERRED', fromTime: '17:30', toTime: '22:00' });
+  });
+
+  it('stores "cannot work" as the whole day', async () => {
+    const id = await contracted('PHUOC', 80);
+    await openMonth();
+    await setDayAvailability(db(), { userId: id, onDate: '2026-10-06', kind: 'UNAVAILABLE' });
+    const ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.days[0]).toMatchObject({ kind: 'UNAVAILABLE', fromTime: '00:00', toTime: '23:59' });
+  });
+
+  it('clears a day back to "I have not said"', async () => {
+    const id = await contracted('MERSI', 100);
+    await openMonth();
+    await setDayAvailability(db(), {
+      userId: id, onDate: '2026-10-07', kind: 'AVAILABLE', fromTime: '10:30', toTime: '14:30',
+    });
+    await clearDayAvailability(db(), id, '2026-10-07');
+    expect((await getAvailabilityWorkspace(db(), id)).days).toHaveLength(0);
+  });
+
+  it('refuses a date outside the month being collected', async () => {
+    const id = await contracted('APRIL', 100);
+    await openMonth();
+    await expect(
+      setDayAvailability(db(), {
+        userId: id, onDate: '2026-11-02', kind: 'AVAILABLE', fromTime: '10:30', toTime: '14:30',
+      }),
+    ).rejects.toThrow(/not in a month/i);
+  });
+
+  it('refuses a submission after the deadline, however the screen was rendered', async () => {
+    const id = await contracted('EDMOND', 100);
+    await openMonth("now() - interval '1 hour'");
+    const ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.period?.isOpen).toBe(false);
+    await expect(
+      setDayAvailability(db(), {
+        userId: id, onDate: '2026-10-08', kind: 'AVAILABLE', fromTime: '10:30', toTime: '14:30',
+      }),
+    ).rejects.toThrow(/deadline/i);
+  });
+
+  it('reports no period at all when nothing is being collected', async () => {
+    const id = await contracted('XUAN2', 100);
+    const ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.period).toBeNull();
+    expect(ws.days).toHaveLength(0);
   });
 });
 
