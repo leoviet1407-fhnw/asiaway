@@ -548,6 +548,78 @@ export const absences = pgTable(
   (t) => ({ userIdx: index('absences_user_idx').on(t.userId, t.startsOn) }),
 );
 
+export const shiftState = pgEnum('shift_state', ['DRAFT', 'PUBLISHED', 'CANCELLED']);
+export const ruleSeverity = pgEnum('rule_severity', ['BLOCK', 'WARN', 'INFO']);
+
+/** The recurring weekly skeleton a month is generated from. */
+export const shiftTemplates = pgTable(
+  'shift_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    stationId: uuid('station_id')
+      .notNull()
+      .references(() => stations.id),
+    /** ISO-8601: 1 = Monday .. 7 = Sunday. */
+    weekday: smallint('weekday').notNull(),
+    startsAt: time('starts_at').notNull(),
+    endsAt: time('ends_at').notNull(),
+    headcount: smallint('headcount').notNull().default(1),
+    roleLabel: text('role_label'),
+    breakMinutes: smallint('break_minutes').notNull().default(0),
+    /** Overrides the station default for this band alone. */
+    staffingPolicy: stationStaffingPolicy('staffing_policy'),
+    effectiveFrom: date('effective_from').notNull(),
+    effectiveTo: date('effective_to'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ lookup: index('shift_templates_lookup_idx').on(t.weekday, t.stationId) }),
+);
+
+/**
+ * The plan. One row per person per assignment — and one table, so the station
+ * view and the person view cannot contradict each other.
+ */
+export const shifts = pgTable(
+  'shifts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    periodId: uuid('period_id')
+      .notNull()
+      .references(() => rosterPeriods.id, { onDelete: 'cascade' }),
+    onDate: date('on_date').notNull(),
+    stationId: uuid('station_id')
+      .notNull()
+      .references(() => stations.id),
+    /** NULL is an open shift: needed, published, nobody on it yet. */
+    userId: uuid('user_id').references(() => users.id),
+    /** Mandatory. The literal "END" of the old plan is not storable here. */
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    plannedBreakMinutes: smallint('planned_break_minutes').notNull().default(0),
+    roleLabel: text('role_label'),
+    state: shiftState('state').notNull().default('DRAFT'),
+    revision: integer('revision').notNull().default(1),
+    acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    periodIdx: index('shifts_period_idx').on(t.periodId, t.onDate),
+    stationIdx: index('shifts_station_idx').on(t.onDate, t.stationId),
+    personIdx: index('shifts_person_idx').on(t.userId, t.startsAt),
+  }),
+);
+
+/** Rule thresholds as configuration, so a legal correction is not a deploy. */
+export const rosterRules = pgTable('roster_rules', {
+  code: text('code').primaryKey(),
+  severity: ruleSeverity('severity').notNull(),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  config: jsonb('config').notNull().default(sql`'{}'::jsonb`),
+  note: text('note'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schema = {
   users,
   allergens,
@@ -574,4 +646,7 @@ export const schema = {
   rosterPeriods,
   availability,
   absences,
+  shiftTemplates,
+  shifts,
+  rosterRules,
 };

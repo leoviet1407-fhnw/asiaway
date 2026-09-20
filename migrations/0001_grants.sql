@@ -46,3 +46,12 @@ TO asiaway_app;
 -- application may add a new policy but never rewrite or remove an old one.
 GRANT SELECT, INSERT ON work_time_policy TO asiaway_app;
 REVOKE UPDATE, DELETE, TRUNCATE ON work_time_policy FROM asiaway_app;
+
+-- ---------- the roster (0009) -------------------------------------------------
+GRANT SELECT, INSERT, UPDATE, DELETE ON shift_templates, shifts TO asiaway_app;
+
+-- Rule thresholds are configuration, changed deliberately and rarely. The
+-- application reads them on every validation and must never quietly rewrite
+-- the limit it is being judged against.
+GRANT SELECT ON roster_rules TO asiaway_app;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON roster_rules FROM asiaway_app;

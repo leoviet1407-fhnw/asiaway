@@ -16,7 +16,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
 import { createPostgresDatabase, type AppDatabase } from '../src/server/db/client';
 import { createPgliteDatabase } from '../src/server/db/pglite';
-import { employments, rosterPeriods, users } from '../src/server/db/schema';
+import { employments, rosterPeriods, shiftTemplates, stations, users } from '../src/server/db/schema';
 import { hashPassword } from '../src/server/auth/password';
 import { runMigrations } from '../src/server/db/migrator';
 
@@ -40,6 +40,42 @@ const TEAM: Person[] = [
   { name: 'Jenny', role: 'WAITER', type: 'ON_CALL', pensum: null },
   { name: 'Patricia', role: 'WAITER', type: 'ON_CALL', pensum: null },
   { name: 'Dennis', role: 'WAITER', type: 'ON_CALL', pensum: null },
+];
+
+/**
+ * The weekly skeleton, from the bands on the September 2026 Arbeitsplan.
+ *
+ * Two departures from that document, both deliberate:
+ *  - every band has a real end time, 22:00, in place of the literal "END";
+ *  - the two *** NEW *** cleaning duties get a band of their own. On the PDF
+ *    they were written into the lunch column against people already fully
+ *    occupied, so the work had no time to happen in.
+ *
+ * Weekdays are ISO: 1 = Monday .. 7 = Sunday.
+ */
+const TEMPLATES: {
+  station: string;
+  weekdays: number[];
+  from: string;
+  to: string;
+  headcount?: number;
+  role?: string;
+  breakMinutes?: number;
+  policy?: 'STAFFED' | 'SELF_SERVE' | 'CLOSED';
+}[] = [
+  { station: 'EG_ALACARTE', weekdays: [1, 2, 3, 4, 5, 6], from: '10:30', to: '14:30', headcount: 2 },
+  { station: 'EG_ALACARTE', weekdays: [1, 2, 3, 4, 5, 6], from: '17:30', to: '22:00', headcount: 2 },
+  { station: 'EG_ALACARTE', weekdays: [7], from: '11:00', to: '16:00' },
+  { station: 'EG_ALACARTE', weekdays: [7], from: '16:00', to: '22:00' },
+  { station: 'EG_BUBBLE_TEA', weekdays: [1, 2, 3, 4, 5, 6], from: '14:00', to: '18:00' },
+  { station: 'BUFFET', weekdays: [1, 2, 3, 4, 5], from: '10:30', to: '14:30' },
+  { station: 'OG_ALACARTE', weekdays: [1, 2, 3, 4, 5, 6], from: '17:30', to: '22:00' },
+  { station: 'FOODPASS', weekdays: [1, 2, 3, 4, 5, 6], from: '11:30', to: '14:00', policy: 'SELF_SERVE' },
+  { station: 'FOODPASS', weekdays: [1, 2, 3, 4, 5, 6], from: '18:00', to: '22:00', role: 'Foodrunner' },
+  { station: 'CLEANING', weekdays: [1, 2, 3, 4, 5], from: '14:30', to: '15:15', role: 'Buffetbereich' },
+  { station: 'CLEANING', weekdays: [6, 7], from: '21:30', to: '22:00', role: 'Reiskocher' },
+  { station: 'OFFICE', weekdays: [1], from: '10:30', to: '14:00' },
+  { station: 'OFFICE', weekdays: [1], from: '14:30', to: '19:00' },
 ];
 
 /** The next month the restaurant would be planning. */
@@ -143,6 +179,28 @@ async function main(): Promise<void> {
       .update(rosterPeriods)
       .set({ state: 'AVAILABILITY_OPEN', availabilityDeadline: new Date(PERIOD.deadline) })
       .where(eq(rosterPeriods.id, period.id));
+  }
+
+  const stationRows = await db.select({ id: stations.id, code: stations.code }).from(stations);
+  const stationId = new Map(stationRows.map((s) => [s.code, s.id]));
+  const [anyTemplate] = await db.select({ id: shiftTemplates.id }).from(shiftTemplates).limit(1);
+
+  if (!anyTemplate) {
+    const rows = TEMPLATES.flatMap((t) =>
+      t.weekdays.map((weekday) => ({
+        stationId: stationId.get(t.station)!,
+        weekday,
+        startsAt: t.from,
+        endsAt: t.to,
+        headcount: t.headcount ?? 1,
+        roleLabel: t.role ?? null,
+        breakMinutes: t.breakMinutes ?? 0,
+        staffingPolicy: t.policy ?? null,
+        effectiveFrom: '2026-01-01',
+      })),
+    );
+    await db.insert(shiftTemplates).values(rows);
+    console.log(`\n${rows.length} shift templates seeded.`);
   }
 
   console.log(`\nOctober 2026 is open for availability until ${PERIOD.deadline}.`);
