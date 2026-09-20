@@ -99,6 +99,7 @@ async function applyToDatabase(db: AppDatabase, menu: ImportedMenu): Promise<voi
           descriptionVi: item.descriptionVi,
           priceCents: item.priceCents,
           allergenCodes: [...item.allergenCodes],
+          volume: item.volume ?? null,
           sortOrder: item.sortOrder,
           isActive: true,
         })
@@ -115,6 +116,7 @@ async function applyToDatabase(db: AppDatabase, menu: ImportedMenu): Promise<voi
             descriptionVi: item.descriptionVi,
             priceCents: item.priceCents,
             allergenCodes: [...item.allergenCodes],
+            volume: item.volume ?? null,
             sortOrder: item.sortOrder,
             isActive: true,
             updatedAt: new Date(),

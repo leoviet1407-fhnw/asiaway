@@ -8,6 +8,7 @@ import { formatMoney } from '../../lib/format';
 interface MenuItem {
   id: string;
   dishNumber: string | null;
+  volume: string | null;
   name: string;
   description: string;
   priceCents: number;
@@ -115,8 +116,16 @@ export default function MenuPage() {
                         <span className="text-ink-muted">{item.dishNumber} · </span>
                       )}
                       {item.name}
+                      {/* Drinks are priced by serving size; food has none. */}
+                      {item.volume && (
+                        <span className="text-ink-muted"> · {item.volume}</span>
+                      )}
                     </p>
-                    <p className="mt-0.5 line-clamp-2 text-sm text-ink-muted">{item.description}</p>
+                    {/* The drinks list carries no descriptions, so skip the line
+                        entirely rather than leaving a blank gap. */}
+                    {item.description && (
+                      <p className="mt-0.5 line-clamp-2 text-sm text-ink-muted">{item.description}</p>
+                    )}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span className="font-semibold">{formatMoney(item.priceCents)}</span>
                       {item.allergenCodes.length > 0 && (

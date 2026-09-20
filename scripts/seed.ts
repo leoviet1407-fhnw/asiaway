@@ -11,7 +11,7 @@
  * Running it against a production database is refused unless SEED_ALLOW_PROD is
  * set explicitly.
  */
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
@@ -25,6 +25,7 @@ import {
   users,
 } from '../src/server/db/schema';
 import { parseMenuCsv } from '../src/server/menu/import';
+import { MISSING_ALLERGEN_WARNING, parseDrinksCsv } from '../src/server/menu/drinks-import';
 import { ALLERGENS } from '../src/domain/menu/allergens';
 import { generateQrToken, qrUrlFor } from '../src/domain/session/qr-token';
 import { hashPassword } from '../src/server/auth/password';
@@ -43,7 +44,19 @@ const DEMO_WAITER = {
 
 async function seedMenu(db: AppDatabase): Promise<number> {
   const csv = readFileSync(resolve(process.cwd(), 'data/menu_trilingual_EN_DE_VI.csv'), 'utf8');
-  const menu = parseMenuCsv(csv);
+  const food = parseMenuCsv(csv);
+
+  const drinksPath = resolve(process.cwd(), 'data/asiaway_drinks_menu.csv');
+  const drinks = existsSync(drinksPath)
+    ? parseDrinksCsv(readFileSync(drinksPath, 'utf8'))
+    : { categories: [], items: [] };
+
+  if (drinks.items.length > 0) console.warn(`\n  NOTE: ${MISSING_ALLERGEN_WARNING}\n`);
+
+  const menu = {
+    categories: [...food.categories, ...drinks.categories],
+    items: [...food.items, ...drinks.items],
+  };
 
   for (const a of ALLERGENS) {
     await db
@@ -90,6 +103,7 @@ async function seedMenu(db: AppDatabase): Promise<number> {
         descriptionVi: item.descriptionVi,
         priceCents: item.priceCents,
         allergenCodes: [...item.allergenCodes],
+        volume: item.volume ?? null,
         sortOrder: item.sortOrder,
       })
       .onConflictDoUpdate({
@@ -101,6 +115,7 @@ async function seedMenu(db: AppDatabase): Promise<number> {
           nameVi: item.nameVi,
           priceCents: item.priceCents,
           allergenCodes: [...item.allergenCodes],
+          volume: item.volume ?? null,
           sortOrder: item.sortOrder,
           isActive: true,
         },

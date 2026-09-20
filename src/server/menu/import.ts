@@ -104,6 +104,8 @@ export interface ImportedMenuItem {
   readonly priceCents: number;
   readonly allergenCodes: readonly string[];
   readonly sortOrder: number;
+  /** Serving size as printed, e.g. "50 cl". Drinks only; null for food. */
+  readonly volume?: string | null;
 }
 
 export interface ImportedMenu {

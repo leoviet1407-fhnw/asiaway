@@ -9,6 +9,7 @@ import { formatMoney } from '../../../lib/format';
 interface ItemDetail {
   id: string;
   dishNumber: string | null;
+  volume: string | null;
   name: string;
   description: string;
   priceCents: number;
@@ -85,10 +86,11 @@ export default function ItemDetailPage() {
           {item.dishNumber && <span className="text-ink-muted">{item.dishNumber} · </span>}
           {item.name}
         </h1>
+        {item.volume && <p className="mt-1 text-sm text-ink-muted">{item.volume}</p>}
         <p className="mt-2 text-2xl font-semibold">{formatMoney(item.priceCents)}</p>
       </header>
 
-      <p className="text-ink-muted">{item.description}</p>
+      {item.description && <p className="text-ink-muted">{item.description}</p>}
 
       {relevant.length > 0 && (
         <section className="card p-3">

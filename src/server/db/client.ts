@@ -48,4 +48,8 @@ export function createPostgresDatabase(connectionString: string) {
 }
 
 /** Grants (0001) are applied separately in production; see docs/DEPLOYMENT.md. */
-export const MIGRATION_FILES = ['0000_init.sql', '0002_auth_sessions.sql'] as const;
+export const MIGRATION_FILES = [
+  '0000_init.sql',
+  '0002_auth_sessions.sql',
+  '0003_menu_item_volume.sql',
+] as const;

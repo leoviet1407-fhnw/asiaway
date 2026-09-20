@@ -19,7 +19,7 @@ export interface TestContext {
  */
 export async function createTestDatabase(): Promise<TestContext> {
   const client = new PGlite();
-  for (const file of ['0000_init.sql', '0002_auth_sessions.sql']) {
+  for (const file of ['0000_init.sql', '0002_auth_sessions.sql', '0003_menu_item_volume.sql']) {
     await client.exec(readFileSync(resolve(process.cwd(), 'migrations', file), 'utf8'));
   }
   const db = drizzle(client, { schema });

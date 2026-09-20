@@ -96,6 +96,8 @@ export const menuItems = pgTable(
       .notNull()
       .references(() => menuCategories.id),
     dishNumber: text('dish_number'),
+    /** Serving size as printed on the drinks menu, e.g. "50 cl". NULL for food. */
+    volume: text('volume'),
     externalKey: text('external_key').notNull().unique(),
     nameEn: text('name_en').notNull(),
     nameDe: text('name_de').notNull(),

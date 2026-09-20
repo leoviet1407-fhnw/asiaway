@@ -7,6 +7,7 @@ import type { Db } from './order-service';
 export interface LocalisedMenuItem {
   readonly id: string;
   readonly dishNumber: string | null;
+  readonly volume: string | null;
   readonly name: string;
   readonly description: string;
   readonly priceCents: number;
@@ -59,6 +60,7 @@ export async function getMenu(db: Db, locale: Locale): Promise<LocalisedCategory
       .map((item) => ({
         id: item.id,
         dishNumber: item.dishNumber,
+        volume: item.volume,
         name: pick(item, 'name', locale),
         description: pick(item, 'description', locale),
         priceCents: item.priceCents,
@@ -86,6 +88,7 @@ export async function getMenuItem(
   return {
     id: row.item.id,
     dishNumber: row.item.dishNumber,
+    volume: row.item.volume,
     name: pick(row.item, 'name', locale),
     description: pick(row.item, 'description', locale),
     priceCents: row.item.priceCents,
@@ -149,6 +152,7 @@ export async function getAvailabilityList(db: Db) {
     .select({
       id: menuItems.id,
       dishNumber: menuItems.dishNumber,
+      volume: menuItems.volume,
       nameEn: menuItems.nameEn,
       nameDe: menuItems.nameDe,
       nameVi: menuItems.nameVi,

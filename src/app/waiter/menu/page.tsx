@@ -7,6 +7,7 @@ import { formatMoney } from '../../../lib/format';
 interface AvailabilityRow {
   id: string;
   dishNumber: string | null;
+  volume: string | null;
   nameEn: string;
   priceCents: number;
   isAvailable: boolean;
@@ -104,6 +105,7 @@ export default function WaiterMenuPage() {
               <p className="font-medium">
                 {row.dishNumber && <span className="text-ink-muted">{row.dishNumber} · </span>}
                 {row.nameEn}
+                {row.volume && <span className="text-ink-muted"> · {row.volume}</span>}
               </p>
               <p className="text-sm text-ink-muted">
                 {row.categoryName} · {formatMoney(row.priceCents)}
