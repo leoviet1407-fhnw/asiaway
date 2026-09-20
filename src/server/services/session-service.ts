@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { transitionSession } from '../../domain/session/status';
 import {
@@ -376,7 +376,9 @@ export async function closeIdleSessions(db: Db, idleHours = idleTimeoutHours()):
   const stale = await db
     .select()
     .from(diningSessions)
-    .where(and(ne(diningSessions.status, 'CLOSED'), sql`${diningSessions.lastActivityAt} < ${cutoff}`));
+    // Typed operator, not a raw template: a Date in a raw template reaches the
+    // driver without column context and postgres-js cannot serialise it.
+    .where(and(ne(diningSessions.status, 'CLOSED'), lt(diningSessions.lastActivityAt, cutoff)));
 
   for (const session of stale) {
     await db.transaction(async (tx: Db) => {

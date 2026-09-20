@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../db/client';
 import { auditEvents, authSessions, loginAttempts, users } from '../db/schema';
 import { verifyPassword } from './password';
@@ -45,14 +45,22 @@ async function recentFailures(
   ipHash: string | null,
 ): Promise<number> {
   const since = new Date(Date.now() - LOGIN_WINDOW_MINUTES * 60_000);
+
+  // Built from typed operators rather than a raw SQL template. A Date
+  // interpolated into a raw template reaches the driver with no column context,
+  // and postgres-js cannot serialise it — which took sign-in down in production
+  // while every local test passed, because PGlite accepts a Date there.
   const rows = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(loginAttempts)
     .where(
-      sql`${loginAttempts.succeeded} = false
-          and ${loginAttempts.attemptedAt} > ${since}
-          and (${loginAttempts.emailLower} = ${emailLower}
-               or (${ipHash}::text is not null and ${loginAttempts.ipHash} = ${ipHash}))`,
+      and(
+        eq(loginAttempts.succeeded, false),
+        gt(loginAttempts.attemptedAt, since),
+        ipHash
+          ? or(eq(loginAttempts.emailLower, emailLower), eq(loginAttempts.ipHash, ipHash))
+          : eq(loginAttempts.emailLower, emailLower),
+      ),
     );
   return rows[0]?.n ?? 0;
 }
@@ -82,7 +90,7 @@ export async function signIn(
   const [user] = await db
     .select()
     .from(users)
-    .where(sql`lower(${users.email}) = ${emailLower}`);
+    .where(sql`lower(${users.email}) = ${emailLower}`); // string param: safe
 
   const ok = user ? await verifyPassword(input.password, user.passwordHash) : false;
 
