@@ -1,13 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { and, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { transitionSession } from '../../domain/session/status';
 import {
+  resolveAnchorTable,
   resolveScanTarget,
   type TableGroupPolicy,
   type TableRef,
 } from '../../domain/session/table-group';
 import { isWellFormedQrToken } from '../../domain/session/qr-token';
+import { isConnectedSelection } from '../../config/floor-plan';
 import { sha256 } from '../auth/session';
 import {
   auditEvents,
@@ -565,3 +567,243 @@ export async function openSessionForTable(
 }
 
 export { isNull };
+
+/**
+ * Pushing tables together.
+ *
+ * Restaurant rules (E4 and its follow-ups):
+ *  - Only BEFORE anyone has ordered. Merging is a seating decision, not a way
+ *    to combine two bills mid-meal. A table with orders on it is refused, so
+ *    no order is ever moved between sessions and no bill is rewritten.
+ *  - Only neighbouring tables, and only in one connected run — you cannot push
+ *    a table through a divider or across the room.
+ *  - The lowest-numbered table anchors the group, and any member's QR reaches
+ *    the shared session, so a guest at the far end never hunts for the right
+ *    code.
+ */
+export async function mergeTables(
+  db: Db,
+  input: { tableIds: readonly string[]; userId: string },
+): Promise<{ groupId: string; anchorTableNumber: string; memberTableNumbers: string[] }> {
+  if (input.tableIds.length < 2) {
+    throw domainError('VALIDATION_FAILED', 'Choose at least two tables to push together');
+  }
+
+  return db.transaction(async (tx: Db) => {
+    const tables = await tx
+      .select()
+      .from(restaurantTables)
+      .where(inArray(restaurantTables.id, [...input.tableIds]));
+
+    if (tables.length !== input.tableIds.length) {
+      throw domainError('VALIDATION_FAILED', 'One of those tables no longer exists');
+    }
+
+    const numbers = tables.map((t) => t.tableNumber);
+
+    if (!isConnectedSelection(numbers)) {
+      throw domainError(
+        'VALIDATION_FAILED',
+        'Those tables are not next to each other. Tables can only be joined if they touch, and not across a divider.',
+        { tables: numbers },
+      );
+    }
+
+    // Already joined to something else? The partial unique index would catch it,
+    // but a clear message beats a constraint violation.
+    const existing = await tx
+      .select({ tableId: tableGroupMembers.tableId })
+      .from(tableGroupMembers)
+      .innerJoin(tableGroups, eq(tableGroups.id, tableGroupMembers.tableGroupId))
+      .where(
+        and(
+          inArray(tableGroupMembers.tableId, [...input.tableIds]),
+          isNull(tableGroupMembers.leftAt),
+          eq(tableGroups.status, 'ACTIVE'),
+        ),
+      );
+    if (existing.length > 0) {
+      const names = tables
+        .filter((t) => existing.some((e) => e.tableId === t.id))
+        .map((t) => t.tableNumber);
+      throw domainError('VALIDATION_FAILED', `Already joined to another table: ${names.join(', ')}`, {
+        tables: names,
+      });
+    }
+
+    // The heart of the restaurant's rule: nothing may have been ordered yet.
+    const withOrders = await tx
+      .select({ tableId: orders.tableId, n: sql<number>`count(*)::int` })
+      .from(orders)
+      .innerJoin(diningSessions, eq(diningSessions.id, orders.sessionId))
+      .where(
+        and(
+          inArray(orders.tableId, [...input.tableIds]),
+          ne(diningSessions.status, 'CLOSED'),
+          ne(orders.status, 'CANCELLED'),
+        ),
+      )
+      .groupBy(orders.tableId);
+
+    if (withOrders.length > 0) {
+      const names = tables
+        .filter((t) => withOrders.some((w) => w.tableId === t.id))
+        .map((t) => t.tableNumber);
+      throw domainError(
+        'VALIDATION_FAILED',
+        `Table ${names.join(', ')} already has orders. Tables can only be joined before anyone has ordered.`,
+        { tables: names },
+      );
+    }
+
+    const anchor = resolveAnchorTable(tables.map((t) => ({ id: t.id, tableNumber: t.tableNumber })));
+
+    const [group] = await tx
+      .insert(tableGroups)
+      .values({
+        status: 'ACTIVE',
+        qrPolicy: 'ANY_MEMBER',
+        anchorTableId: anchor.id,
+        createdBy: input.userId,
+        groupName: `Tables ${numbers.slice().sort((a, b) => Number(a) - Number(b)).join(' + ')}`,
+      })
+      .returning();
+
+    await tx
+      .insert(tableGroupMembers)
+      .values(tables.map((t) => ({ tableGroupId: group!.id, tableId: t.id })));
+
+    // Any open session on a non-anchor table is closed. Safe, because we have
+    // just proved none of them carries an order; the next scan opens one shared
+    // session on the anchor.
+    const openSessions = await tx
+      .select()
+      .from(diningSessions)
+      .where(
+        and(
+          inArray(diningSessions.primaryTableId, [...input.tableIds]),
+          ne(diningSessions.status, 'CLOSED'),
+        ),
+      );
+
+    for (const session of openSessions) {
+      if (session.primaryTableId === anchor.id) {
+        await tx
+          .update(diningSessions)
+          .set({ tableGroupId: group!.id })
+          .where(eq(diningSessions.id, session.id));
+        continue;
+      }
+      await tx
+        .update(diningSessions)
+        .set({
+          status: 'CLOSED',
+          closedAt: new Date(),
+          closedBy: input.userId,
+          closeReason: `table joined to ${anchor.tableNumber}`,
+        })
+        .where(eq(diningSessions.id, session.id));
+    }
+
+    await tx.insert(auditEvents).values({
+      actorType: 'WAITER',
+      actorUserId: input.userId,
+      action: 'TABLE_GROUP_CREATED',
+      entityType: 'TABLE_GROUP',
+      entityId: group!.id,
+      tableId: anchor.id,
+      afterValue: { anchor: anchor.tableNumber, members: numbers },
+      metadata: { qrPolicy: 'ANY_MEMBER' },
+    });
+
+    return {
+      groupId: group!.id,
+      anchorTableNumber: anchor.tableNumber,
+      memberTableNumbers: numbers.slice().sort((a, b) => Number(a) - Number(b)),
+    };
+  });
+}
+
+/**
+ * Separating tables again.
+ *
+ * The open session stays with the anchor, because the party is still sitting
+ * there; the other tables simply become free. Their history is untouched.
+ */
+export async function unmergeTables(
+  db: Db,
+  input: { groupId: string; userId: string },
+): Promise<{ freedTableNumbers: string[] }> {
+  return db.transaction(async (tx: Db) => {
+    const [group] = await tx.select().from(tableGroups).where(eq(tableGroups.id, input.groupId));
+    if (!group || group.status !== 'ACTIVE') {
+      throw domainError('VALIDATION_FAILED', 'Those tables are not joined');
+    }
+
+    const members = await tx
+      .select({ tableId: tableGroupMembers.tableId, tableNumber: restaurantTables.tableNumber })
+      .from(tableGroupMembers)
+      .innerJoin(restaurantTables, eq(restaurantTables.id, tableGroupMembers.tableId))
+      .where(and(eq(tableGroupMembers.tableGroupId, group.id), isNull(tableGroupMembers.leftAt)));
+
+    const now = new Date();
+    await tx
+      .update(tableGroupMembers)
+      .set({ leftAt: now })
+      .where(and(eq(tableGroupMembers.tableGroupId, group.id), isNull(tableGroupMembers.leftAt)));
+
+    await tx
+      .update(tableGroups)
+      .set({ status: 'DISSOLVED', dissolvedAt: now })
+      .where(eq(tableGroups.id, group.id));
+
+    // The session keeps running on the anchor; it just stops being shared.
+    await tx
+      .update(diningSessions)
+      .set({ tableGroupId: null })
+      .where(eq(diningSessions.tableGroupId, group.id));
+
+    await tx.insert(auditEvents).values({
+      actorType: 'WAITER',
+      actorUserId: input.userId,
+      action: 'TABLE_GROUP_DISSOLVED',
+      entityType: 'TABLE_GROUP',
+      entityId: group.id,
+      tableId: group.anchorTableId,
+      beforeValue: { members: members.map((m) => m.tableNumber) },
+      metadata: {},
+    });
+
+    return { freedTableNumbers: members.map((m) => m.tableNumber) };
+  });
+}
+
+/** Active groups, for the dashboard. */
+export async function getActiveTableGroups(db: Db) {
+  const rows = await db
+    .select({
+      groupId: tableGroups.id,
+      anchorTableId: tableGroups.anchorTableId,
+      tableId: tableGroupMembers.tableId,
+      tableNumber: restaurantTables.tableNumber,
+    })
+    .from(tableGroups)
+    .innerJoin(tableGroupMembers, eq(tableGroupMembers.tableGroupId, tableGroups.id))
+    .innerJoin(restaurantTables, eq(restaurantTables.id, tableGroupMembers.tableId))
+    .where(and(eq(tableGroups.status, 'ACTIVE'), isNull(tableGroupMembers.leftAt)));
+
+  const groups = new Map<string, { groupId: string; anchorTableId: string | null; tables: string[] }>();
+  for (const row of rows) {
+    const existing = groups.get(row.groupId) ?? {
+      groupId: row.groupId,
+      anchorTableId: row.anchorTableId,
+      tables: [],
+    };
+    existing.tables.push(row.tableNumber);
+    groups.set(row.groupId, existing);
+  }
+  return [...groups.values()].map((g) => ({
+    ...g,
+    tables: g.tables.sort((a, b) => Number(a) - Number(b)),
+  }));
+}

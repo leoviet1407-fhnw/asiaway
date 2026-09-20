@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
 import { db } from '../../../../server/db/index';
 import { orders } from '../../../../server/db/schema';
-import { getPendingNotifications, getTableOverview } from '../../../../server/services/session-service';
+import {
+  getActiveTableGroups,
+  getPendingNotifications,
+  getTableOverview,
+} from '../../../../server/services/session-service';
 import { tableDisplayState } from '../../../../domain/session/status';
 import { handleApiError, withWaiter } from '../../../../server/http/api';
 
@@ -13,9 +17,10 @@ export async function GET() {
   try {
     return (await withWaiter(async () => {
       const database = await db();
-      const [tables, pending] = await Promise.all([
+      const [tables, pending, groups] = await Promise.all([
         getTableOverview(database),
         getPendingNotifications(database),
+        getActiveTableGroups(database),
       ]);
 
       const counts = await database
@@ -48,6 +53,7 @@ export async function GET() {
             sessionTotalCents: stats?.total ?? 0,
           };
         }),
+        groups,
         newOrderCount: pending.filter((n) => n.type === 'NEW_ORDER').length,
         checkoutRequestCount: pending.filter((n) => n.type === 'CHECKOUT_REQUESTED').length,
       });

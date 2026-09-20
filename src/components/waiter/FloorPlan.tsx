@@ -1,13 +1,21 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import {
   FLOOR_COLUMNS,
   FLOOR_FIXTURES,
   FLOOR_ROW_KINDS,
+  isConnectedSelection,
   positionFor,
 } from '../../config/floor-plan';
 import { formatElapsed, formatMoney } from '../../lib/format';
+
+export interface TableGroup {
+  groupId: string;
+  anchorTableId: string | null;
+  tables: string[];
+}
 
 export interface FloorTable {
   tableId: string;
@@ -43,15 +51,27 @@ function href(table: FloorTable): string {
     : `/waiter/order?tableId=${table.tableId}`;
 }
 
-function Tile({ table }: { table: FloorTable }) {
-  return (
-    <Link
-      href={href(table)}
-      aria-label={`Table ${table.tableNumber}, ${table.state.replace('_', ' ').toLowerCase()}`}
-      className={`flex h-full min-h-16 flex-col justify-center rounded-xl border px-1 py-1
-                  text-center transition-colors ${STATE_STYLE[table.state]}`}
-    >
+function Tile({
+  table,
+  groupLabel,
+  selectable,
+  selected,
+  onSelect,
+}: {
+  table: FloorTable;
+  groupLabel?: string | null;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (table: FloorTable) => void;
+}) {
+  const body = (
+    <>
       <span className="text-lg font-bold leading-none">{table.tableNumber}</span>
+      {groupLabel && (
+        <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+          {groupLabel}
+        </span>
+      )}
       {table.pendingOrders > 0 ? (
         <span className="mt-0.5 text-[11px] font-semibold leading-tight text-warn-500">
           {table.pendingOrders} waiting
@@ -62,6 +82,34 @@ function Tile({ table }: { table: FloorTable }) {
           {table.openedAt && <> · {formatElapsed(table.openedAt)}</>}
         </span>
       ) : null}
+    </>
+  );
+
+  const shell = `flex h-full min-h-16 w-full flex-col justify-center rounded-xl border px-1 py-1
+                 text-center transition-colors`;
+
+  if (selectable) {
+    return (
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={() => onSelect?.(table)}
+        className={`${shell} ${
+          selected ? 'border-brand-600 bg-brand-600 text-white' : STATE_STYLE[table.state]
+        }`}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={href(table)}
+      aria-label={`Table ${table.tableNumber}, ${table.state.replace('_', ' ').toLowerCase()}`}
+      className={`${shell} ${STATE_STYLE[table.state]}`}
+    >
+      {body}
     </Link>
   );
 }
@@ -73,7 +121,82 @@ function Tile({ table }: { table: FloorTable }) {
  * the room and see the same thing. Colour carries state, exactly as in the
  * list, so nothing new has to be learned.
  */
-export function FloorPlan({ tables }: { tables: FloorTable[] }) {
+export function FloorPlan({
+  tables,
+  groups = [],
+  onChanged,
+}: {
+  tables: FloorTable[];
+  groups?: TableGroup[];
+  onChanged?: () => void;
+}) {
+  const [merging, setMerging] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const groupOf = (tableNumber: string) =>
+    groups.find((g) => g.tables.includes(tableNumber)) ?? null;
+
+  const selectedNumbers = selected
+    .map((id) => tables.find((t) => t.tableId === id)?.tableNumber)
+    .filter((n): n is string => Boolean(n));
+
+  const connected = isConnectedSelection(selectedNumbers);
+
+  const toggle = (table: FloorTable) => {
+    setError(null);
+    setSelected((current) =>
+      current.includes(table.tableId)
+        ? current.filter((id) => id !== table.tableId)
+        : [...current, table.tableId],
+    );
+  };
+
+  async function merge() {
+    if (busy || selected.length < 2) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/waiter/table-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableIds: selected }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data?.error?.message ?? 'Those tables could not be joined.');
+        return;
+      }
+      setSelected([]);
+      setMerging(false);
+      onChanged?.();
+    } catch {
+      setError('No connection. Nothing was changed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function separate(groupId: string) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/waiter/table-groups/${groupId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data?.error?.message ?? 'Those tables could not be separated.');
+        return;
+      }
+      onChanged?.();
+    } catch {
+      setError('No connection. Nothing was changed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const placed = tables.filter((t) => positionFor(t.tableNumber));
   const outside = tables.filter((t) => t.area === 'OUTSIDE');
   // Anything neither placed nor outside must still be reachable.
@@ -83,6 +206,64 @@ export function FloorPlan({ tables }: { tables: FloorTable[] }) {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className={merging ? 'btn-primary px-3 py-2 text-sm' : 'btn-secondary px-3 py-2 text-sm'}
+          onClick={() => {
+            setMerging((m) => !m);
+            setSelected([]);
+            setError(null);
+          }}
+        >
+          {merging ? 'Cancel' : 'Join tables'}
+        </button>
+
+        {merging && (
+          <>
+            <span className="text-sm text-ink-muted">
+              {selected.length === 0
+                ? 'Tap the tables that are pushed together.'
+                : `${selectedNumbers.sort((a, b) => Number(a) - Number(b)).join(' + ')}`}
+            </span>
+            <button
+              type="button"
+              className="btn-primary px-3 py-2 text-sm"
+              disabled={busy || selected.length < 2 || !connected}
+              onClick={() => void merge()}
+            >
+              {selected.length < 2
+                ? 'Pick two or more'
+                : !connected
+                  ? 'Must be next to each other'
+                  : `Join ${selected.length} tables`}
+            </button>
+          </>
+        )}
+
+        {groups.map((group) => (
+          <span key={group.groupId} className="flex items-center gap-1">
+            <span className="chip bg-brand-50 text-brand-700">
+              Joined: {group.tables.join(' + ')}
+            </span>
+            <button
+              type="button"
+              className="min-h-tap px-2 text-sm font-semibold text-brand-700"
+              disabled={busy}
+              onClick={() => void separate(group.groupId)}
+            >
+              Separate
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {error && (
+        <p className="rounded-xl bg-danger-50 p-3 text-sm text-danger-500" role="alert">
+          {error}
+        </p>
+      )}
+
       <section aria-label="Dining room plan">
         <div className="overflow-x-auto pb-1">
           <div
@@ -122,7 +303,17 @@ export function FloorPlan({ tables }: { tables: FloorTable[] }) {
                   key={table.tableId}
                   style={{ gridColumn: pos.col, gridRow: pos.row + 1 }}
                 >
-                  <Tile table={table} />
+                  <Tile
+                    table={table}
+                    groupLabel={(() => {
+                      const g = groupOf(table.tableNumber);
+                      if (!g) return null;
+                      return g.anchorTableId === table.tableId ? 'joined ·' : 'joined';
+                    })()}
+                    selectable={merging}
+                    selected={selected.includes(table.tableId)}
+                    onSelect={toggle}
+                  />
                 </div>
               );
             })}

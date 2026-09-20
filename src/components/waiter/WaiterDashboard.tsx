@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useWaiterEvents } from './useWaiterEvents';
-import { FloorPlan } from './FloorPlan';
+import { FloorPlan, type TableGroup } from './FloorPlan';
 import { formatElapsed, formatMoney, formatTime } from '../../lib/format';
 
 interface TableTile {
@@ -56,6 +56,7 @@ export function WaiterDashboard({ userName }: { userName: string }) {
   const { notifications, connection, newOrderCount, checkoutCount, refresh } =
     useWaiterEvents(soundEnabled);
   const [tables, setTables] = useState<TableTile[] | null>(null);
+  const [groups, setGroups] = useState<TableGroup[]>([]);
 
   const loadTables = useCallback(async () => {
     try {
@@ -63,6 +64,7 @@ export function WaiterDashboard({ userName }: { userName: string }) {
       if (!response.ok) return;
       const data = await response.json();
       setTables(data.tables);
+      setGroups(data.groups ?? []);
     } catch {
       // Keep the last known grid on screen rather than blanking it.
     }
@@ -217,7 +219,9 @@ export function WaiterDashboard({ userName }: { userName: string }) {
       {/* The room as it actually is, from the restaurant's own floor sketch, so
           a waiter can look at the tablet and at the room and see the same
           thing. Colour carries state exactly as the list did. */}
-      {tables && tables.length > 0 && <FloorPlan tables={tables} />}
+      {tables && tables.length > 0 && (
+        <FloorPlan tables={tables} groups={groups} onChanged={() => void loadTables()} />
+      )}
 
       <div className="mt-6">
         <button className="btn-secondary text-sm" onClick={() => void refresh()}>

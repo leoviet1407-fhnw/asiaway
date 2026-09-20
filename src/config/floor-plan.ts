@@ -93,3 +93,66 @@ export const FLOOR_FIXTURES: readonly FloorFixture[] = [
 export function positionFor(tableNumber: string): FloorPosition | null {
   return TABLE_POSITIONS[tableNumber] ?? null;
 }
+
+/**
+ * Whether two tables can be pushed together.
+ *
+ * Neighbours share an edge on the plan: side by side in the same row, or one
+ * behind the other in the same column. A thin divider row counts as a gap
+ * rather than a separation, so two tables either side of empty space are still
+ * neighbours — but a table is NOT a neighbour of one on the far side of a
+ * physical divider, because you cannot push a table through a screen.
+ *
+ * Diagonals do not count. Two tables meeting at a corner are not pushed
+ * together in practice, and allowing it would make "neighbouring" mean very
+ * little.
+ */
+export function areNeighbours(a: string, b: string): boolean {
+  const posA = positionFor(a);
+  const posB = positionFor(b);
+  if (!posA || !posB || a === b) return false;
+
+  // Side by side.
+  if (posA.row === posB.row) return Math.abs(posA.col - posB.col) === 1;
+
+  // One behind the other, allowing a thin divider row to sit between them.
+  if (posA.col !== posB.col) return false;
+  const [top, bottom] = posA.row < posB.row ? [posA, posB] : [posB, posA];
+  if (bottom.row - top.row > 2) return false;
+
+  // Every row strictly between them must be empty of a divider in this column.
+  for (let row = top.row + 1; row < bottom.row; row += 1) {
+    if (FLOOR_ROW_KINDS[row] === 'tables') return false; // a table row we skipped
+    const blocked = FLOOR_FIXTURES.some(
+      (f) =>
+        f.kind === 'divider' &&
+        f.row === row &&
+        posA.col >= f.col &&
+        posA.col <= f.col + (f.colSpan ?? 1) - 1,
+    );
+    if (blocked) return false;
+  }
+  return true;
+}
+
+/**
+ * A selection is mergeable when it forms one connected run — every table
+ * touching at least one other in the set. Without this, a waiter could select
+ * two pairs at opposite ends of the room and call it one table.
+ */
+export function isConnectedSelection(tableNumbers: readonly string[]): boolean {
+  if (tableNumbers.length < 2) return false;
+  const remaining = new Set(tableNumbers.slice(1));
+  const reached = [tableNumbers[0]!];
+
+  while (reached.length > 0) {
+    const current = reached.pop()!;
+    for (const candidate of [...remaining]) {
+      if (areNeighbours(current, candidate)) {
+        remaining.delete(candidate);
+        reached.push(candidate);
+      }
+    }
+  }
+  return remaining.size === 0;
+}
