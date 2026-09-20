@@ -312,6 +312,13 @@ export async function POST(request: Request) {
       tables: createdTables,
       deactivated,
       userCreated,
+      // Reported so that "no photos configured" and "the manifest never
+      // reached this function" stop looking identical. A silent zero here sent
+      // me hunting once already.
+      photosApplied: [...food.items, ...drinks.items].filter((i) =>
+        photoFor(photos, i.dishNumber),
+      ).length,
+      photosInManifest: Object.keys(photos.photos).length,
     });
   } catch (error) {
     console.error('[setup] failed', error);
