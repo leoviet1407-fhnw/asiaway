@@ -1,0 +1,65 @@
+import { NextResponse } from 'next/server';
+import { asc, eq, inArray } from 'drizzle-orm';
+import { db } from '../../../../server/db/index';
+import { diningSessions, orderItems, orderNotes, orders, restaurantTables } from '../../../../server/db/schema';
+import { handleApiError, withWaiter } from '../../../../server/http/api';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/** The pending queue: submitted and in-review orders, oldest first. */
+export async function GET() {
+  try {
+    return (await withWaiter(async () => {
+      const database = await db();
+
+      const rows = await database
+        .select({ order: orders, table: restaurantTables, session: diningSessions })
+        .from(orders)
+        .innerJoin(restaurantTables, eq(restaurantTables.id, orders.tableId))
+        .innerJoin(diningSessions, eq(diningSessions.id, orders.sessionId))
+        .where(inArray(orders.status, ['SUBMITTED', 'EMPLOYEE_REVIEW']))
+        .orderBy(asc(orders.submittedAt));
+
+      const detailed = await Promise.all(
+        rows.map(async ({ order, table }) => {
+          const items = await database
+            .select()
+            .from(orderItems)
+            .where(eq(orderItems.orderId, order.id))
+            .orderBy(asc(orderItems.sortIndex));
+          const notes = await database
+            .select()
+            .from(orderNotes)
+            .where(eq(orderNotes.orderId, order.id))
+            .orderBy(asc(orderNotes.createdAt));
+
+          return {
+            id: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            tableNumber: table.tableNumber,
+            tableLabel: table.displayName,
+            sessionId: order.sessionId,
+            submittedAt: order.submittedAt.toISOString(),
+            totalCents: order.totalCents,
+            itemCount: items.reduce((n, i) => n + i.quantity, 0),
+            customerNote: notes.find((n) => n.source === 'CUSTOMER')?.noteText ?? null,
+            items: items.map((i) => ({
+              menuItemId: i.menuItemId,
+              dishNumber: i.dishNumber,
+              name: i.nameEn,
+              quantity: i.quantity,
+              unitPriceCents: i.unitPriceCents,
+              lineTotalCents: i.lineTotalCents,
+            })),
+          };
+        }),
+      );
+
+      return NextResponse.json({ orders: detailed });
+    })) as NextResponse;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}

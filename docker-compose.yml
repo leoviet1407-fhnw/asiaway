@@ -1,0 +1,40 @@
+# Local / staging stack: the app plus PostgreSQL.
+#
+# Production should normally use a managed PostgreSQL with automated backups
+# rather than the database container below.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: asiaway
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-env}
+      POSTGRES_DB: asiaway
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U asiaway']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '5432:5432'
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://asiaway:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/asiaway
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      CUSTOMER_COOKIE_SECRET: ${CUSTOMER_COOKIE_SECRET:?CUSTOMER_COOKIE_SECRET is required}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_RESTAURANT_TIMEZONE: ${NEXT_PUBLIC_RESTAURANT_TIMEZONE:-Europe/Zurich}
+      SESSION_IDLE_TIMEOUT_HOURS: ${SESSION_IDLE_TIMEOUT_HOURS:-4}
+    ports:
+      - '3000:3000'
+
+volumes:
+  db-data:

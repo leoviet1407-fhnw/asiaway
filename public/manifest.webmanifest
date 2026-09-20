@@ -1,0 +1,9 @@
+{
+  "name": "Asiaway",
+  "short_name": "Asiaway",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f5f2",
+  "theme_color": "#3f7d58",
+  "icons": []
+}

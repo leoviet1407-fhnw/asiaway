@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  @apply bg-surface-sunken text-ink antialiased;
+  /* Mobile-first: never allow a sideways scroll on a phone. */
+  overflow-x: hidden;
+}
+
+/* Every interactive control meets the 44px minimum tap target. */
+@layer components {
+  .btn {
+    @apply inline-flex min-h-tap items-center justify-center rounded-xl px-5 py-3
+           text-base font-semibold transition-colors
+           focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+           focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border border-ink/15 bg-surface text-ink hover:bg-surface-sunken;
+  }
+  .btn-danger {
+    @apply btn bg-danger-500 text-white hover:opacity-90;
+  }
+  .card {
+    @apply rounded-2xl border border-ink/10 bg-surface;
+  }
+  .field {
+    @apply w-full rounded-xl border border-ink/20 bg-surface px-4 py-3 text-base
+           focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/30;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full bg-surface-sunken px-2 py-0.5
+           text-xs font-medium text-ink-muted;
+  }
+}

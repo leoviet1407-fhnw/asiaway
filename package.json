@@ -1,0 +1,50 @@
+{
+  "name": "asiaway-qr",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:watch": "vitest",
+    "menu:preview": "tsx scripts/import-menu.ts --dry-run",
+    "menu:import": "tsx scripts/import-menu.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "node .next/standalone/server.js",
+    "seed": "tsx scripts/seed.ts",
+    "qr": "tsx scripts/generate-qr.ts",
+    "user:create": "tsx scripts/create-user.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
+    "csv-parse": "^5.6.0",
+    "drizzle-orm": "^0.38.3",
+    "hash-wasm": "^4.12.0",
+    "next": "^15.5.25",
+    "postgres": "^3.4.5",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.6.1",
+    "drizzle-kit": "^0.30.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
