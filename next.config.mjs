@@ -17,6 +17,12 @@ const nextConfig = {
   outputFileTracingExcludes: {
     '*': ['node_modules/@electric-sql/pglite/**'],
   },
+
+  // The provisioning route reads the migration SQL and the menu CSVs at runtime,
+  // so they must travel with that function. Nothing else needs them.
+  outputFileTracingIncludes: {
+    '/api/admin/setup': ['./migrations/**', './data/**'],
+  },
   async headers() {
     return [
       {

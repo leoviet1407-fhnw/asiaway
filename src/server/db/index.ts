@@ -14,16 +14,21 @@ import { createPostgresDatabase, type AppDatabase } from './client';
  * static import would pull 23 MB of WebAssembly into every production bundle
  * and cold start for code that production never runs.
  */
-const globalRef = globalThis as unknown as {
-  __asiawayDb?: Promise<{ db: AppDatabase; mode: 'postgres' | 'pglite' }>;
-};
+export interface DatabaseHandle {
+  readonly db: AppDatabase;
+  readonly mode: 'postgres' | 'pglite';
+  /** Runs multi-statement SQL through the driver's raw path. See migrator.ts. */
+  readonly executeMultiple: (sqlText: string) => Promise<unknown>;
+}
 
-async function create(): Promise<{ db: AppDatabase; mode: 'postgres' | 'pglite' }> {
+const globalRef = globalThis as unknown as { __asiawayDb?: Promise<DatabaseHandle> };
+
+async function create(): Promise<DatabaseHandle> {
   const url = process.env.DATABASE_URL;
 
   if (url) {
-    const { db } = createPostgresDatabase(url);
-    return { db, mode: 'postgres' };
+    const { db, client } = createPostgresDatabase(url);
+    return { db, mode: 'postgres', executeMultiple: (text) => client.unsafe(text) };
   }
 
   if (process.env.NODE_ENV === 'production') {
@@ -44,10 +49,10 @@ async function create(): Promise<{ db: AppDatabase; mode: 'postgres' | 'pglite' 
   }
 
   const { db } = createPgliteDatabase(client);
-  return { db, mode: 'pglite' };
+  return { db, mode: 'pglite', executeMultiple: (text) => client.exec(text) };
 }
 
-export function getDatabase(): Promise<{ db: AppDatabase; mode: 'postgres' | 'pglite' }> {
+export function getDatabase(): Promise<DatabaseHandle> {
   return (globalRef.__asiawayDb ??= create());
 }
 
