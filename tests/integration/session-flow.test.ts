@@ -8,6 +8,7 @@ import {
   menuCategories,
   menuItems,
   notifications,
+  orders,
   restaurantTables,
   tableGroupMembers,
   tableGroups,
@@ -369,6 +370,96 @@ describe('closing a session', () => {
       .from(notifications)
       .where(eq(notifications.status, 'PENDING'));
     expect(pending).toHaveLength(0);
+  });
+});
+
+describe('a table that turned over without anyone asking for the bill', () => {
+  it('gives the next guests a clean session instead of the last party\'s bill', async () => {
+    const firstParty = await resolveScan(db, { qrToken: fx.t11.token });
+    await submitOrder(db, {
+      sessionId: firstParty.sessionId,
+      deviceId: firstParty.deviceId,
+      lines: [{ menuItemId: fx.pho, quantity: 2 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+
+    // They leave. Nobody presses anything.
+    await db
+      .update(diningSessions)
+      .set({ lastActivityAt: new Date(Date.now() - 5 * 3600_000) })
+      .where(eq(diningSessions.id, firstParty.sessionId));
+
+    // New guests sit down and scan the same code.
+    const secondParty = await resolveScan(db, { qrToken: fx.t11.token });
+
+    expect(secondParty.isNewSession).toBe(true);
+    expect(secondParty.sessionId).not.toBe(firstParty.sessionId);
+
+    // Crucially, they see none of the previous party's orders.
+    const theirOrders = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.sessionId, secondParty.sessionId));
+    expect(theirOrders).toHaveLength(0);
+
+    const [old] = await db
+      .select()
+      .from(diningSessions)
+      .where(eq(diningSessions.id, firstParty.sessionId));
+    expect(old!.status).toBe('CLOSED');
+  });
+
+  it('records who closed it and why', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    await db
+      .update(diningSessions)
+      .set({ lastActivityAt: new Date(Date.now() - 5 * 3600_000) })
+      .where(eq(diningSessions.id, scan.sessionId));
+
+    await resolveScan(db, { qrToken: fx.t11.token });
+
+    const events = await db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.sessionId, scan.sessionId));
+    const closed = events.find((e) => e.action === 'SESSION_CLOSED')!;
+    expect(closed.actorType).toBe('SYSTEM');
+    expect((closed.metadata as any).trigger).toBe('scan');
+  });
+
+  it('does NOT disturb a session that is merely quiet between courses', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    await db
+      .update(diningSessions)
+      .set({ lastActivityAt: new Date(Date.now() - 45 * 60_000) })
+      .where(eq(diningSessions.id, scan.sessionId));
+
+    const again = await resolveScan(db, { qrToken: fx.t11.token });
+    expect(again.isNewSession).toBe(false);
+    expect(again.sessionId).toBe(scan.sessionId);
+  });
+
+  it('keeps the abandoned orders and their history intact', async () => {
+    const firstParty = await resolveScan(db, { qrToken: fx.t11.token });
+    const order = await submitOrder(db, {
+      sessionId: firstParty.sessionId,
+      deviceId: firstParty.deviceId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+    await db
+      .update(diningSessions)
+      .set({ lastActivityAt: new Date(Date.now() - 5 * 3600_000) })
+      .where(eq(diningSessions.id, firstParty.sessionId));
+
+    await resolveScan(db, { qrToken: fx.t11.token });
+
+    // The restaurant still needs this: the food may well have been served.
+    const kept = await db.select().from(orders).where(eq(orders.id, order.orderId));
+    expect(kept).toHaveLength(1);
+    expect(kept[0]!.totalCents).toBe(2450);
   });
 });
 

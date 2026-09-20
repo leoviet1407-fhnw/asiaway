@@ -21,6 +21,16 @@ import {
 } from '../db/schema';
 import type { Db } from './order-service';
 
+/** Hours a session may sit untouched before it is considered abandoned. */
+export function idleTimeoutHours(): number {
+  const raw = Number(process.env.SESSION_IDLE_TIMEOUT_HOURS ?? 4);
+  return Number.isFinite(raw) && raw > 0 ? raw : 4;
+}
+
+export function isSessionStale(lastActivityAt: Date, now: Date = new Date()): boolean {
+  return now.getTime() - lastActivityAt.getTime() > idleTimeoutHours() * 3600_000;
+}
+
 export interface ScanResult {
   readonly sessionId: string;
   readonly tableId: string;
@@ -109,6 +119,42 @@ export async function resolveScan(
 
     let session = openSession;
     let isNewSession = false;
+
+    // A party that left without asking for the bill leaves its session open. If
+    // the next guests scan that table, they would inherit the previous party's
+    // orders and their bill — the worst failure this system can have.
+    //
+    // Checking here, at the scan, rather than only on a timer is what actually
+    // closes the hole: a sweep every hour still misses a table that turns over
+    // ten minutes after it ran, and this is the exact moment the harm would
+    // occur. The scheduled sweep remains useful only for tidying tables nobody
+    // scans again.
+    if (session && isSessionStale(session.lastActivityAt)) {
+      const closedAt = new Date();
+      await tx
+        .update(diningSessions)
+        .set({
+          status: 'CLOSED',
+          closedAt,
+          closeReason: `auto-closed on re-scan after ${idleTimeoutHours()}h idle`,
+        })
+        .where(eq(diningSessions.id, session.id));
+
+      await tx.insert(auditEvents).values({
+        actorType: 'SYSTEM',
+        action: 'SESSION_CLOSED',
+        entityType: 'SESSION',
+        entityId: session.id,
+        tableId: anchorTable.id,
+        sessionId: session.id,
+        beforeValue: { status: session.status },
+        afterValue: { status: 'CLOSED' },
+        metadata: { auto: true, trigger: 'scan', idleHours: idleTimeoutHours() },
+      });
+
+      // Fall through and open a clean session for the new guests.
+      session = undefined;
+    }
 
     if (!session) {
       const [created] = await tx
@@ -325,10 +371,7 @@ export async function closeSession(
  * Guards against the worst failure mode in the whole system: a party leaves
  * without asking for the bill and the next party inherits their open session.
  */
-export async function closeIdleSessions(
-  db: Db,
-  idleHours = Number(process.env.SESSION_IDLE_TIMEOUT_HOURS ?? 4),
-): Promise<number> {
+export async function closeIdleSessions(db: Db, idleHours = idleTimeoutHours()): Promise<number> {
   const cutoff = new Date(Date.now() - idleHours * 3600_000);
   const stale = await db
     .select()
