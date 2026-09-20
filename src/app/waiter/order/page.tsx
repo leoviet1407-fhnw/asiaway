@@ -15,6 +15,12 @@ interface TableRow {
   orderCount: number;
 }
 
+interface Group {
+  groupId: string;
+  anchorTableId: string | null;
+  tables: string[];
+}
+
 interface Line {
   menuItemId: string;
   dishNumber: string | null;
@@ -34,6 +40,7 @@ function OrderPad() {
   const params = useSearchParams();
 
   const [tables, setTables] = useState<TableRow[] | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [dishes, setDishes] = useState<SearchableDish[]>([]);
   const [tableId, setTableId] = useState<string>(params.get('tableId') ?? '');
   const [lines, setLines] = useState<Line[]>([]);
@@ -49,7 +56,11 @@ function OrderPad() {
   useEffect(() => {
     void fetch('/api/waiter/dashboard')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setTables(d.tables))
+      .then((d) => {
+        if (!d) return;
+        setTables(d.tables);
+        setGroups(d.groups ?? []);
+      })
       .catch(() => undefined);
 
     void fetch('/api/waiter/menu-items')
@@ -60,6 +71,14 @@ function OrderPad() {
 
   const total = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
   const table = tables?.find((t) => t.tableId === tableId);
+
+  // Tapping a table that is pushed together with others puts the order on the
+  // party's one shared bill. Saying so here stops a waiter wondering why the
+  // total they just added does not appear under the table they tapped.
+  const group = table ? groups.find((g) => g.tables.includes(table.tableNumber)) ?? null : null;
+  const anchorNumber = group
+    ? tables?.find((t) => t.tableId === group.anchorTableId)?.tableNumber ?? null
+    : null;
 
   const add = useCallback((dish: SearchableDish) => {
     setLines((current) => {
@@ -140,6 +159,11 @@ function OrderPad() {
           <p className="text-ink-muted">
             Table {table?.tableNumber} · {formatMoney(done.totalCents)}
           </p>
+          {group && anchorNumber && anchorNumber !== table?.tableNumber && (
+            <p className="text-sm text-ink-muted">
+              On the shared bill for {group.tables.join(' + ')}, at table {anchorNumber}.
+            </p>
+          )}
           <p className="pt-2 text-sm text-ink-muted">Now enter it into the POS.</p>
         </div>
         <button className="btn-primary w-full" onClick={() => setDone(null)}>
@@ -178,12 +202,22 @@ function OrderPad() {
         </div>
 
         {table && !pickingTable && (
-          <p className="text-2xl font-bold">
-            {table.tableNumber}
-            <span className="ml-2 text-sm font-normal text-ink-muted">
-              {table.area === 'OUTSIDE' ? 'outside' : table.area === 'INSIDE' ? 'inside' : ''}
-            </span>
-          </p>
+          <>
+            <p className="text-2xl font-bold">
+              {table.tableNumber}
+              <span className="ml-2 text-sm font-normal text-ink-muted">
+                {table.area === 'OUTSIDE' ? 'outside' : table.area === 'INSIDE' ? 'inside' : ''}
+              </span>
+            </p>
+            {group && (
+              <p className="mt-1 text-sm font-semibold text-brand-700">
+                Joined with {group.tables.filter((n) => n !== table.tableNumber).join(' + ')} —
+                this goes on the shared bill
+                {anchorNumber && anchorNumber !== table.tableNumber ? ` at table ${anchorNumber}` : ''}
+                .
+              </p>
+            )}
+          </>
         )}
 
         {!tables && pickingTable && <p className="text-sm text-ink-muted">Loading…</p>}

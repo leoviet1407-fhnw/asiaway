@@ -37,6 +37,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
           currentRevisionNumber: o.currentRevisionNumber,
         })),
         totalCents: detail.totalCents,
+        joinedTables: detail.joinedTables,
       });
     })) as NextResponse;
   } catch (error) {

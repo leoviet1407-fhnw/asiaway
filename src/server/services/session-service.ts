@@ -154,6 +154,20 @@ export async function resolveScan(
         metadata: { auto: true, trigger: 'scan', idleHours: idleTimeoutHours() },
       });
 
+      if (session.tableGroupId) {
+        await dissolveGroup(
+          tx,
+          session.tableGroupId,
+          {
+            userId: null,
+            auto: true,
+            reason: 'abandoned session closed on re-scan',
+            sessionId: session.id,
+          },
+          { clearSessionLinks: false },
+        );
+      }
+
       // Fall through and open a clean session for the new guests.
       session = undefined;
     }
@@ -305,7 +319,7 @@ export async function requestCheckout(
 export async function closeSession(
   db: Db,
   input: { sessionId: string; userId: string; force?: boolean; reason?: string | null },
-): Promise<{ closedAt: Date }> {
+): Promise<{ closedAt: Date; separatedTableNumbers: string[] }> {
   return db.transaction(async (tx: Db) => {
     const [session] = await tx
       .select()
@@ -363,7 +377,20 @@ export async function closeSession(
       metadata: { reason: input.reason ?? null, unresolvedOrders: pendingCount },
     });
 
-    return { closedAt };
+    // The party has paid and left, so the tables go back to being separate.
+    // Leaving them joined would silently pull the next guests at ANY of those
+    // tables into one shared bill.
+    let separatedTableNumbers: string[] = [];
+    if (session.tableGroupId) {
+      separatedTableNumbers = await dissolveGroup(
+        tx,
+        session.tableGroupId,
+        { userId: input.userId, auto: true, reason: 'session closed', sessionId: session.id },
+        { clearSessionLinks: false },
+      );
+    }
+
+    return { closedAt, separatedTableNumbers };
   });
 }
 
@@ -401,6 +428,20 @@ export async function closeIdleSessions(db: Db, idleHours = idleTimeoutHours()):
         afterValue: { status: 'CLOSED' },
         metadata: { auto: true, idleHours },
       });
+
+      if (session.tableGroupId) {
+        await dissolveGroup(
+          tx,
+          session.tableGroupId,
+          {
+            userId: null,
+            auto: true,
+            reason: `auto-closed after ${idleHours}h idle`,
+            sessionId: session.id,
+          },
+          { clearSessionLinks: false },
+        );
+      }
     });
   }
 
@@ -456,7 +497,32 @@ export async function getSessionDetail(db: Db, sessionId: string) {
     .filter((o) => o.status !== 'CANCELLED')
     .reduce((sum, o) => sum + o.totalCents, 0);
 
-  return { session, table, orders: sessionOrders, totalCents };
+  // A waiter closing this bill needs to know it covers more than one table —
+  // and that closing sends those tables back to serving separately.
+  let joinedTables: string[] = [];
+  if (session.tableGroupId) {
+    const [group] = await db
+      .select()
+      .from(tableGroups)
+      .where(eq(tableGroups.id, session.tableGroupId));
+    if (group?.status === 'ACTIVE') {
+      const members = await db
+        .select({ tableNumber: restaurantTables.tableNumber })
+        .from(tableGroupMembers)
+        .innerJoin(restaurantTables, eq(restaurantTables.id, tableGroupMembers.tableId))
+        .where(
+          and(
+            eq(tableGroupMembers.tableGroupId, group.id),
+            isNull(tableGroupMembers.leftAt),
+          ),
+        );
+      joinedTables = members
+        .map((m) => m.tableNumber)
+        .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+    }
+  }
+
+  return { session, table, orders: sessionOrders, totalCents, joinedTables };
 }
 
 /** Audit history for a session, order or table. */
@@ -567,6 +633,65 @@ export async function openSessionForTable(
 }
 
 export { isNull };
+
+/**
+ * Ends a table group.
+ *
+ * `clearSessionLinks` is false when a session is closing: a finished session
+ * should keep recording that it WAS a joined-table session, because that is how
+ * the bill came to cover several tables. Clearing it would quietly rewrite why
+ * the history looks the way it does. When staff separate tables mid-service the
+ * session is still running, so the link is cleared and it stops being shared.
+ */
+async function dissolveGroup(
+  tx: Db,
+  groupId: string,
+  actor: { userId: string | null; auto: boolean; reason: string; sessionId?: string },
+  options: { clearSessionLinks: boolean },
+): Promise<string[]> {
+  const [group] = await tx.select().from(tableGroups).where(eq(tableGroups.id, groupId));
+  if (!group || group.status !== 'ACTIVE') return [];
+
+  const members = await tx
+    .select({ tableNumber: restaurantTables.tableNumber })
+    .from(tableGroupMembers)
+    .innerJoin(restaurantTables, eq(restaurantTables.id, tableGroupMembers.tableId))
+    .where(and(eq(tableGroupMembers.tableGroupId, groupId), isNull(tableGroupMembers.leftAt)));
+
+  const now = new Date();
+  await tx
+    .update(tableGroupMembers)
+    .set({ leftAt: now })
+    .where(and(eq(tableGroupMembers.tableGroupId, groupId), isNull(tableGroupMembers.leftAt)));
+
+  await tx
+    .update(tableGroups)
+    .set({ status: 'DISSOLVED', dissolvedAt: now })
+    .where(eq(tableGroups.id, groupId));
+
+  if (options.clearSessionLinks) {
+    await tx
+      .update(diningSessions)
+      .set({ tableGroupId: null })
+      .where(eq(diningSessions.tableGroupId, groupId));
+  }
+
+  await tx.insert(auditEvents).values({
+    actorType: actor.auto ? 'SYSTEM' : 'WAITER',
+    actorUserId: actor.userId,
+    action: 'TABLE_GROUP_DISSOLVED',
+    entityType: 'TABLE_GROUP',
+    entityId: groupId,
+    tableId: group.anchorTableId,
+    // Tie it to the bill when a closing session caused it, so the separation
+    // shows up in that session's history rather than only in the global log.
+    sessionId: actor.sessionId ?? null,
+    beforeValue: { members: members.map((m) => m.tableNumber) },
+    metadata: { auto: actor.auto, reason: actor.reason },
+  });
+
+  return members.map((m) => m.tableNumber);
+}
 
 /**
  * Pushing tables together.
@@ -740,41 +865,15 @@ export async function unmergeTables(
       throw domainError('VALIDATION_FAILED', 'Those tables are not joined');
     }
 
-    const members = await tx
-      .select({ tableId: tableGroupMembers.tableId, tableNumber: restaurantTables.tableNumber })
-      .from(tableGroupMembers)
-      .innerJoin(restaurantTables, eq(restaurantTables.id, tableGroupMembers.tableId))
-      .where(and(eq(tableGroupMembers.tableGroupId, group.id), isNull(tableGroupMembers.leftAt)));
-
-    const now = new Date();
-    await tx
-      .update(tableGroupMembers)
-      .set({ leftAt: now })
-      .where(and(eq(tableGroupMembers.tableGroupId, group.id), isNull(tableGroupMembers.leftAt)));
-
-    await tx
-      .update(tableGroups)
-      .set({ status: 'DISSOLVED', dissolvedAt: now })
-      .where(eq(tableGroups.id, group.id));
-
     // The session keeps running on the anchor; it just stops being shared.
-    await tx
-      .update(diningSessions)
-      .set({ tableGroupId: null })
-      .where(eq(diningSessions.tableGroupId, group.id));
+    const freed = await dissolveGroup(
+      tx,
+      group.id,
+      { userId: input.userId, auto: false, reason: 'separated by staff' },
+      { clearSessionLinks: true },
+    );
 
-    await tx.insert(auditEvents).values({
-      actorType: 'WAITER',
-      actorUserId: input.userId,
-      action: 'TABLE_GROUP_DISSOLVED',
-      entityType: 'TABLE_GROUP',
-      entityId: group.id,
-      tableId: group.anchorTableId,
-      beforeValue: { members: members.map((m) => m.tableNumber) },
-      metadata: {},
-    });
-
-    return { freedTableNumbers: members.map((m) => m.tableNumber) };
+    return { freedTableNumbers: freed };
   });
 }
 

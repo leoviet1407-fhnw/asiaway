@@ -12,6 +12,7 @@ import { buildSnapshot, type OrderSnapshot } from '../../domain/order/snapshot';
 import { planRevision } from '../../domain/order/revision';
 import { transitionOrder, isOrderEditable } from '../../domain/order/status';
 import { transitionSession } from '../../domain/session/status';
+import { activeGroupForTable } from './table-group-lookup';
 import {
   auditEvents,
   customerDevices,
@@ -694,19 +695,32 @@ export async function createOrderForTable(
       throw domainError('REQUEST_IN_FLIGHT', 'This order is already being created');
     }
 
-    // Find the table's open session, or open one. A party seated and ordering
+    // Tables pushed together share one bill, so the order belongs to the
+    // group's anchor — exactly as it would if the guests had scanned a QR code
+    // at any of those tables. Without this, tapping a member table on the floor
+    // plan would open a second session and split the party's bill in two.
+    const group = await activeGroupForTable(tx, input.tableId);
+    const sessionTableId = group?.anchorTableId ?? input.tableId;
+
+    // Find that table's open session, or open one. A party seated and ordering
     // through a waiter still gets a session, so their bill accumulates exactly
     // as it would if they had scanned.
     const [openSession] = await tx
       .select()
       .from(diningSessions)
-      .where(and(eq(diningSessions.primaryTableId, input.tableId), ne(diningSessions.status, 'CLOSED')));
+      .where(and(eq(diningSessions.primaryTableId, sessionTableId), ne(diningSessions.status, 'CLOSED')));
 
     let session = openSession;
     if (!session) {
       const [created] = await tx
         .insert(diningSessions)
-        .values({ primaryTableId: input.tableId, status: 'OCCUPIED' })
+        .values({
+          primaryTableId: sessionTableId,
+          // Carrying the group means closing this bill separates the tables
+          // again, the same as for a session opened by a scan.
+          tableGroupId: group?.groupId ?? null,
+          status: 'OCCUPIED',
+        })
         .returning();
       session = created!;
       await tx.insert(auditEvents).values({
@@ -715,11 +729,24 @@ export async function createOrderForTable(
         action: 'SESSION_OPENED',
         entityType: 'SESSION',
         entityId: session.id,
-        tableId: input.tableId,
+        tableId: sessionTableId,
         sessionId: session.id,
         afterValue: { status: 'OCCUPIED' },
-        metadata: { openedByStaff: true, reason: 'waiter took an order at the table' },
+        metadata: {
+          openedByStaff: true,
+          reason: 'waiter took an order at the table',
+          ...(group
+            ? { combined: true, tappedTable: input.tableId, joinedTables: group.memberTableNumbers }
+            : {}),
+        },
       });
+    } else if (group && !session.tableGroupId) {
+      // The session was opened before the tables were pushed together.
+      await tx
+        .update(diningSessions)
+        .set({ tableGroupId: group.groupId })
+        .where(eq(diningSessions.id, session.id));
+      session = { ...session, tableGroupId: group.groupId };
     }
 
     const requestedIds = [...new Set(input.lines.map((l) => l.menuItemId))];

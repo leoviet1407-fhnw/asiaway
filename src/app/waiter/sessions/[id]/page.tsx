@@ -27,6 +27,8 @@ interface SessionDetail {
   table: { id: string; tableNumber: string; displayName: string } | null;
   orders: SessionOrder[];
   totalCents: number;
+  /** Table numbers this bill covers, when the tables are pushed together. */
+  joinedTables?: string[];
 }
 
 interface AuditEvent {
@@ -119,6 +121,9 @@ export default function WaiterSessionPage() {
 
   const pending = detail.orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'EMPLOYEE_REVIEW');
   const isClosed = detail.session.status === 'CLOSED';
+  // A stale bundle talking to a newer server (or the reverse) must not blank
+  // the tablet in the middle of service.
+  const joinedTables = detail.joinedTables ?? [];
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 px-4 py-4">
@@ -134,6 +139,11 @@ export default function WaiterSessionPage() {
         <p className="mt-1 text-sm text-ink-muted">
           Opened {formatDateTime(detail.session.openedAt)} · {formatElapsed(detail.session.openedAt)} ago
         </p>
+        {joinedTables.length > 1 && (
+          <p className="mt-1 text-sm font-semibold text-brand-700">
+            Joined tables — this bill covers {joinedTables.join(' + ')}
+          </p>
+        )}
         {detail.session.checkoutRequestedAt && (
           <p className="mt-1 font-semibold text-danger-500">
             Bill requested {formatDateTime(detail.session.checkoutRequestedAt)}
@@ -216,8 +226,19 @@ export default function WaiterSessionPage() {
             <>
               <p className="text-sm">
                 Confirm that payment of <strong>{formatMoney(detail.totalCents)}</strong> has been
-                taken at the POS for table {detail.table?.tableNumber}.
+                taken at the POS for{' '}
+                {joinedTables.length > 1
+                  ? `tables ${joinedTables.join(' + ')}`
+                  : `table ${detail.table?.tableNumber}`}
+                .
               </p>
+
+              {joinedTables.length > 1 && (
+                <p className="text-sm text-ink-muted">
+                  Closing separates {joinedTables.join(' + ')} again, so each can take its
+                  own guests.
+                </p>
+              )}
 
               {pending.length > 0 && (
                 <div className="space-y-2 rounded-xl bg-warn-50 p-3">

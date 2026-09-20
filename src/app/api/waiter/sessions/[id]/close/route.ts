@@ -35,7 +35,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
 
       publishWaiterEvent('order_updated', { sessionClosed: id });
-      return NextResponse.json({ closedAt: result.closedAt.toISOString() });
+      return NextResponse.json({
+        closedAt: result.closedAt.toISOString(),
+        separatedTableNumbers: result.separatedTableNumbers,
+      });
     })) as NextResponse;
   } catch (error) {
     return handleApiError(error);
