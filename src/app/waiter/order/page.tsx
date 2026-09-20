@@ -42,6 +42,9 @@ function OrderPad() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ orderNumber: number; totalCents: number } | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
+  // The table is normally already chosen, because the way in is tapping it on
+  // the floor plan. Only show the picker when something is genuinely undecided.
+  const [pickingTable, setPickingTable] = useState(!params.get('tableId'));
 
   useEffect(() => {
     void fetch('/api/waiter/dashboard')
@@ -161,9 +164,30 @@ function OrderPad() {
       </p>
 
       <section className="card p-4">
-        <h2 className="mb-2 h-label">Table</h2>
-        {!tables && <p className="text-sm text-ink-muted">Loading…</p>}
-        {grouped.map(([area, group]) => (
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <h2 className="h-label">Table</h2>
+          {table && !pickingTable && (
+            <button
+              type="button"
+              className="min-h-tap text-sm font-semibold text-brand-700"
+              onClick={() => setPickingTable(true)}
+            >
+              Change
+            </button>
+          )}
+        </div>
+
+        {table && !pickingTable && (
+          <p className="text-2xl font-bold">
+            {table.tableNumber}
+            <span className="ml-2 text-sm font-normal text-ink-muted">
+              {table.area === 'OUTSIDE' ? 'outside' : table.area === 'INSIDE' ? 'inside' : ''}
+            </span>
+          </p>
+        )}
+
+        {!tables && pickingTable && <p className="text-sm text-ink-muted">Loading…</p>}
+        {pickingTable && grouped.map(([area, group]) => (
           <div key={area ?? 'none'} className="mb-3">
             <p className="mb-1 text-xs uppercase tracking-wide text-ink-muted">
               {area === 'OUTSIDE' ? 'Outside' : area === 'INSIDE' ? 'Inside' : 'Tables'}
@@ -174,7 +198,10 @@ function OrderPad() {
                   key={t.tableId}
                   type="button"
                   aria-pressed={t.tableId === tableId}
-                  onClick={() => setTableId(t.tableId)}
+                  onClick={() => {
+                    setTableId(t.tableId);
+                    setPickingTable(false);
+                  }}
                   className={`min-h-tap min-w-tap rounded-xl border px-4 text-base font-semibold ${
                     t.tableId === tableId
                       ? 'border-brand-600 bg-brand-600 text-white'

@@ -133,10 +133,6 @@ export function WaiterDashboard({ userName }: { userName: string }) {
             {soundEnabled ? 'Sound on' : 'Sound off'}
           </button>
 
-          <Link href="/waiter/order" className="btn-primary px-3 py-2 text-sm">
-            Take an order
-          </Link>
-
           <Link href="/waiter/menu" className="btn-secondary px-3 py-2 text-sm">
             Sold out
           </Link>
