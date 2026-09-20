@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   FLOOR_COLUMNS,
+  FLOOR_FIXTURES,
   FLOOR_ROWS,
+  FLOOR_ROW_KINDS,
   TABLE_POSITIONS,
   positionFor,
 } from '../../src/config/floor-plan';
@@ -55,6 +57,43 @@ describe('floor plan', () => {
     expect(new Set(strip.map((p) => p.row)).size).toBe(1);
     for (let i = 1; i < strip.length; i += 1) {
       expect(strip[i]!.col).toBeGreaterThan(strip[i - 1]!.col);
+    }
+  });
+
+  it('puts 13 beside 14, in the same row', () => {
+    const t13 = positionFor('13')!;
+    const t14 = positionFor('14')!;
+    expect(t13.row).toBe(t14.row);
+    expect(Math.abs(t13.col - t14.col)).toBe(1);
+  });
+
+  it('puts a divider between the 13/14 row and the 11/10 row', () => {
+    const above = positionFor('14')!.row;
+    const below = positionFor('11')!.row;
+    const divider = FLOOR_FIXTURES.find(
+      (f) => f.kind === 'divider' && f.row > above && f.row < below,
+    );
+    expect(divider, 'no divider between 13/14 and 11/10').toBeDefined();
+    // It has to actually span those tables' columns to read as a screen.
+    expect(divider!.col).toBeLessThanOrEqual(positionFor('14')!.col);
+    expect(divider!.col + (divider!.colSpan ?? 1) - 1).toBeGreaterThanOrEqual(
+      positionFor('13')!.col,
+    );
+  });
+
+  it('puts a divider between 15 and 12', () => {
+    const above = positionFor('15')!.row;
+    const below = positionFor('12')!.row;
+    const divider = FLOOR_FIXTURES.find(
+      (f) => f.kind === 'divider' && f.row > above && f.row < below,
+    );
+    expect(divider, 'no divider between 15 and 12').toBeDefined();
+    expect(divider!.col).toBe(positionFor('12')!.col);
+  });
+
+  it('never places a table on a divider row', () => {
+    for (const [table, pos] of Object.entries(TABLE_POSITIONS)) {
+      expect(FLOOR_ROW_KINDS[pos.row], `${table} sits on a divider row`).toBe('tables');
     }
   });
 

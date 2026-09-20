@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {
   FLOOR_COLUMNS,
   FLOOR_FIXTURES,
-  FLOOR_ROWS,
+  FLOOR_ROW_KINDS,
   positionFor,
 } from '../../config/floor-plan';
 import { formatElapsed, formatMoney } from '../../lib/format';
@@ -31,7 +31,8 @@ const STATE_STYLE: Record<FloorTable['state'], string> = {
 const FIXTURE_STYLE: Record<string, string> = {
   buffet: 'rounded-full border border-dashed border-ink/25 bg-surface-sunken text-ink-muted',
   entrance: 'rounded-xl border border-dashed border-ink/25 text-ink-muted',
-  partition: 'border-t-2 border-ink/25',
+  // A room divider is a solid screen between two runs of tables.
+  divider: 'self-center h-1 w-full rounded-full bg-ink/30',
 };
 
 function href(table: FloorTable): string {
@@ -88,7 +89,11 @@ export function FloorPlan({ tables }: { tables: FloorTable[] }) {
             className="grid min-w-[36rem] gap-1.5"
             style={{
               gridTemplateColumns: `repeat(${FLOOR_COLUMNS}, minmax(3.25rem, 1fr))`,
-              gridTemplateRows: `repeat(${FLOOR_ROWS + 1}, minmax(3.5rem, auto))`,
+              // Divider rows are thin, so a screen sits between two rows of
+              // tables rather than taking a table's worth of space.
+              gridTemplateRows: FLOOR_ROW_KINDS.map((kind) =>
+                kind === 'divider' ? '0.75rem' : 'minmax(3.5rem, auto)',
+              ).join(' '),
             }}
           >
             {FLOOR_FIXTURES.map((fixture) => (
