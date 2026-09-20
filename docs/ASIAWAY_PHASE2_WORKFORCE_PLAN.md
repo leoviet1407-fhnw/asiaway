@@ -334,13 +334,25 @@ The exported PDF should keep today's two-page station/person layout. It is a goo
 
 | Phase | Scope | Outcome |
 |---|---|---|
-| **B1** | `MANAGER`/`STAFF` roles, `employments`, `stations`, `roster_periods`, availability capture, staff login | Availability stops arriving by WhatsApp. Contracts are in the system. |
-| **B2** | `shift_templates`, `shifts`, roster grid, the rule validator, publish + acknowledge, PDF export | One source of truth. F1, F2, F3, F6, F7 fixed structurally. |
+| **B1** ✅ | `MANAGER`/`STAFF` roles, `employments`, `stations`, `roster_periods`, availability capture, staff login | Availability stops arriving by WhatsApp. Contracts are in the system. |
+| **B2** ✅ | `shift_templates`, `shifts`, roster grid, the rule validator, publish + acknowledge | One source of truth. F1, F2, F3, F6, F7 fixed structurally. *(PDF export still outstanding.)* |
 | **B3** | `time_entries`, corrections with revision history, approvals, monthly hours report | Actual vs. planned, per person per month. **No pay, no balance, no export.** |
 | **B4** *(optional)* | Clock-in from the waiter tablet; demand forecasting from `orders` volume per hour | Staffing driven by the order data the app already collects. |
 | **B5** *(deferred)* | Pay rates, balance settlement, carry-over, payroll export | Deliberately not now — see Part 9. |
 
 Sequenced so that each phase is independently useful — B1 alone replaces the availability-gathering that currently happens in chat.
+
+**Delivered so far** (branch `workforce-planning-b1`, migrations `0007`–`0010`): contracts and the corridor, availability capture with its two weights, the weekly skeleton, generation, the eleven-rule validator, the manager grid, publish, and acknowledgement. 417 tests pass.
+
+**Outstanding in B1/B2**, each deliberate rather than overlooked:
+
+| Gap | Why it matters |
+|---|---|
+| A manager cannot enter availability for someone else | Generating a month moves it to `PLANNING`, which closes submissions. An *Aushilfe* who offers hours late cannot be rostered at all, because their availability is the only thing that puts them on the plan. **The most important of these.** |
+| No screen to create or open a roster period | `npm run workforce:seed` does it today. |
+| Absences have a table but no UI | The validator already blocks a shift during approved leave; nothing can record one. |
+| No PDF export of the two-page plan | The team still reads paper on the wall. |
+| R2–R5 thresholds are provisional | Seeded placeholders, flagged as such, pending the L-GAV reading (Q4). |
 
 **Migrations** continue the existing numbering from `0006_`, one concern per file, with the commented header style used in `0002_auth_sessions.sql` and `0004_table_area.sql`. `tests/integration/schema-drift.test.ts` keeps the Drizzle definitions honest.
 
