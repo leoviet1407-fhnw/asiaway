@@ -87,18 +87,21 @@ export default function ManagerRosterPage() {
     }
   }
 
-  /** Violations indexed by the shift they touch, so a cell can show its own. */
-  const worstByShift = useMemo(() => {
-    const map = new Map<string, Violation['severity']>();
+  /**
+   * Only blocking findings mark a cell.
+   *
+   * The validator also reports warnings — every unfilled shift is one — and on
+   * a fresh month that is hundreds of amber cells, which reads as "everything
+   * is wrong" rather than as information. What stops a publish is worth
+   * showing; the rest is noise on a plan still being filled in.
+   */
+  const blockedShifts = useMemo(() => {
+    const ids = new Set<string>();
     for (const violation of grid?.violations ?? []) {
-      for (const id of violation.shiftIds) {
-        const current = map.get(id);
-        if (!current || (current !== 'BLOCK' && violation.severity === 'BLOCK')) {
-          map.set(id, violation.severity);
-        }
-      }
+      if (violation.severity !== 'BLOCK') continue;
+      for (const id of violation.shiftIds) ids.add(id);
     }
-    return map;
+    return ids;
   }, [grid]);
 
   /**
@@ -140,7 +143,6 @@ export default function ManagerRosterPage() {
 
   const dates = grid.dates.slice(weekStart, weekStart + DAYS_SHOWN);
   const blocking = grid.violations.filter((v) => v.severity === 'BLOCK');
-  const warnings = grid.violations.filter((v) => v.severity === 'WARN');
   const visibleStations = grid.stations.filter((s) => s.policy !== 'CLOSED');
   const nameOf = (id: string | null): string =>
     grid.people.find((p) => p.id === id)?.name ?? '';
@@ -261,13 +263,9 @@ export default function ManagerRosterPage() {
                         <span className="text-xs text-ink-muted">—</span>
                       )}
                       {cells.map((cell) => {
-                        const severity = worstByShift.get(cell.id);
-                        const border =
-                          severity === 'BLOCK'
-                            ? 'border-danger-500'
-                            : severity === 'WARN'
-                              ? 'border-warn-500'
-                              : 'border-surface-sunken';
+                        const border = blockedShifts.has(cell.id)
+                          ? 'border-danger-500'
+                          : 'border-surface-sunken';
                         return (
                           <div key={cell.id} className={`mb-1 border-l-2 ${border} bg-surface-sunken p-1`}>
                             <p className="text-xs text-ink-muted">
@@ -311,31 +309,20 @@ export default function ManagerRosterPage() {
         </table>
       </div>
 
-      <section className="mt-8">
-        <h2 className="font-display text-lg text-ink">
-          Findings
-          <span className="ml-2 text-sm font-normal text-ink-muted">
-            {blocking.length} blocking · {warnings.length} to look at
-          </span>
-        </h2>
-        {grid.violations.length === 0 ? (
-          <p className="mt-2 text-sm text-ink-muted">Nothing to flag.</p>
-        ) : (
+      {blocking.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg text-ink">
+            Publishing is blocked
+            <span className="ml-2 text-sm font-normal text-ink-muted">
+              {blocking.length} to fix
+            </span>
+          </h2>
           <ul className="mt-2 space-y-1 text-sm">
-            {grid.violations.slice(0, 60).map((violation, index) => (
+            {blocking.map((violation, index) => (
               <li
                 key={`${violation.code}-${index}`}
-                className={`border-l-2 p-2 ${
-                  violation.severity === 'BLOCK'
-                    ? 'border-danger-500 bg-danger-50 text-danger-500'
-                    : violation.severity === 'WARN'
-                      ? 'border-warn-500 bg-warn-50 text-ink'
-                      : 'border-surface-sunken bg-surface-sunken text-ink-muted'
-                }`}
+                className="border-l-2 border-danger-500 bg-danger-50 p-2 text-danger-500"
               >
-                <span className="mr-2 text-xs uppercase tracking-section opacity-70">
-                  {violation.code}
-                </span>
                 {violation.message}
                 {(violation.code === 'R8A_ON_CALL_OUTSIDE' ||
                   violation.code === 'R8B_AGAINST_PREF') &&
@@ -359,13 +346,8 @@ export default function ManagerRosterPage() {
               </li>
             ))}
           </ul>
-        )}
-        {grid.violations.length > 60 && (
-          <p className="mt-2 text-sm text-ink-muted">
-            …and {grid.violations.length - 60} more.
-          </p>
-        )}
-      </section>
+        </section>
+      )}
     </main>
   );
 }

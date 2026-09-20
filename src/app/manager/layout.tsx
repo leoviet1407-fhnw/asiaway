@@ -2,13 +2,17 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * The smallest manager surface that makes the staff screens useful: open a
+ * month, fill the grid, publish.
+ *
+ * The rest — the printable plan, month close, absence approvals and timesheet
+ * review — is built, tested and still reachable by URL, just not linked. Add a
+ * line here to bring one back.
+ */
 const LINKS = [
   { href: '/manager/roster', label: 'Roster' },
-  { href: '/manager/roster/print', label: 'Print' },
   { href: '/manager/periods', label: 'Months' },
-  { href: '/manager/timesheet', label: 'Hours' },
-  { href: '/manager/month-close', label: 'Month close' },
-  { href: '/manager/approvals', label: 'Time off' },
 ];
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {

@@ -142,7 +142,7 @@ export async function signIn(
   });
 
   return {
-    user: { id: user.id, displayName: user.displayName, email: user.email, role: 'WAITER' },
+    user: { id: user.id, displayName: user.displayName, email: user.email, role: user.role },
     token,
     expiresAt,
   };

@@ -143,6 +143,13 @@ export function WaiterDashboard({ userName }: { userName: string }) {
             Saturday dish
           </Link>
 
+          {/* A waiter still lands on this tablet at sign-in, because during
+              service that is the job. Their own shifts and hours are one tap
+              away rather than somewhere they have to know the URL for. */}
+          <Link href="/staff/schedule" className="btn-secondary px-3 py-2 text-sm">
+            My shifts
+          </Link>
+
           <form action="/api/waiter/auth/signout" method="post">
             <button
               className="btn-secondary px-3 py-2 text-sm"
