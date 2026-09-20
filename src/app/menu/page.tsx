@@ -58,7 +58,7 @@ export default function MenuPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold">{t('menu.title')}</h1>
+      <h1 className="h-section">{t('menu.title')}</h1>
 
       <div className="flex gap-2" role="tablist">
         {(['FOOD', 'DRINK'] as const).map((kind) => (
@@ -104,7 +104,7 @@ export default function MenuPage() {
 
       {shown.map((category) => (
         <section key={category.id} className="space-y-2">
-          <h2 className="pt-2 text-base font-semibold">{category.name}</h2>
+          <h2 className="h-label pt-2">{category.name}</h2>
           <ul className="space-y-2">
             {category.items.map((item) => (
               <li key={item.id} className="card p-3">

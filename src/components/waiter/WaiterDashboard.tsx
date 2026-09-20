@@ -188,7 +188,7 @@ export function WaiterDashboard({ userName }: { userName: string }) {
         </section>
       )}
 
-      <h2 className="mb-2 text-base font-semibold">Tables</h2>
+      <h2 className="h-label mb-2">Tables</h2>
 
       {!tables && <p className="text-sm text-ink-muted">Loading…</p>}
       {tables && tables.length === 0 && (

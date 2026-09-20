@@ -77,7 +77,7 @@ export default function WaiterMenuPage() {
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Availability</h1>
+        <h1 className="h-section">Availability</h1>
         <span className="chip">{soldOutCount} sold out</span>
       </div>
 

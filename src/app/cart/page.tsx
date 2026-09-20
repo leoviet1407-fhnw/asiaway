@@ -101,7 +101,7 @@ export default function CartPage() {
   if (cart.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">{t('cart.title')}</h1>
+        <h1 className="h-section">{t('cart.title')}</h1>
         <p className="card p-4 text-sm text-ink-muted">{t('cart.empty')}</p>
         <Link href="/menu" className="btn-primary w-full">
           {t('cart.browse')}
@@ -112,7 +112,7 @@ export default function CartPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{t('cart.title')}</h1>
+      <h1 className="h-section">{t('cart.title')}</h1>
 
       {soldOutNames.length > 0 && (
         <p className="rounded-xl bg-warn-50 p-3 text-sm text-warn-500" role="alert">

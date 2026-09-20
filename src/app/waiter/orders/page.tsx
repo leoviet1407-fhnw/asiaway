@@ -41,7 +41,7 @@ export default function WaiterQueuePage() {
       <Link href="/waiter" className="inline-flex min-h-tap items-center text-sm text-ink-muted">
         ← Dashboard
       </Link>
-      <h1 className="text-xl font-semibold">Orders waiting</h1>
+      <h1 className="h-section">Orders waiting</h1>
 
       {!orders && <p className="text-sm text-ink-muted">Loading…</p>}
       {orders && orders.length === 0 && (

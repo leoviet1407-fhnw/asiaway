@@ -8,16 +8,33 @@
 
 html,
 body {
-  @apply bg-surface-sunken text-ink antialiased;
+  @apply bg-surface text-ink antialiased;
   /* Mobile-first: never allow a sideways scroll on a phone. */
   overflow-x: hidden;
+}
+
+@layer base {
+  /* asiaway.ch sets body copy in the Thai cut at a light weight over generous
+     leading. 300 rather than the site's 200: a menu is read in low light on a
+     phone, not on a desktop marketing page. */
+  body {
+    @apply font-sans text-[17px] font-light leading-relaxed;
+  }
+
+  /* Headings switch to Plex Sans and the brand ink, as on the site. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display font-semibold text-ink;
+  }
 }
 
 /* Every interactive control meets the 44px minimum tap target. */
 @layer components {
   .btn {
-    @apply inline-flex min-h-tap items-center justify-center rounded-xl px-5 py-3
-           text-base font-semibold transition-colors
+    @apply inline-flex min-h-tap items-center justify-center px-6 py-3
+           font-display text-base font-semibold transition-colors
            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
            focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -25,20 +42,33 @@ body {
     @apply btn bg-brand-600 text-white hover:bg-brand-700;
   }
   .btn-secondary {
-    @apply btn border border-ink/15 bg-surface text-ink hover:bg-surface-sunken;
+    @apply btn border border-ink/20 bg-surface text-ink hover:bg-surface-sunken;
   }
+  /* Outlined, never filled: a solid red destructive button would be
+     indistinguishable from the brand-red primary. */
   .btn-danger {
-    @apply btn bg-danger-500 text-white hover:opacity-90;
+    @apply btn border border-danger-500 bg-surface text-danger-500
+           hover:bg-danger-50 focus-visible:outline-danger-500;
   }
   .card {
-    @apply rounded-2xl border border-ink/10 bg-surface;
+    @apply border border-ink/10 bg-surface;
   }
   .field {
-    @apply w-full rounded-xl border border-ink/20 bg-surface px-4 py-3 text-base
-           focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/30;
+    @apply w-full border border-ink/25 bg-surface px-4 py-3 text-base
+           focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25;
   }
   .chip {
-    @apply inline-flex items-center rounded-full bg-surface-sunken px-2 py-0.5
+    @apply inline-flex items-center bg-surface-sunken px-2 py-0.5
            text-xs font-medium text-ink-muted;
+  }
+
+  /* asiaway.ch sets every section header in uppercase Plex Sans with a little
+     tracking. Applied to structural labels only — never to dish names, table
+     numbers or sentences, which would just read as shouting. */
+  .h-section {
+    @apply font-display text-xl font-semibold uppercase tracking-section text-ink;
+  }
+  .h-label {
+    @apply font-display text-sm font-semibold uppercase tracking-section text-ink-muted;
   }
 }

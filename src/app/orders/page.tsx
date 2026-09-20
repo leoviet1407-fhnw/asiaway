@@ -60,7 +60,7 @@ export default function OrdersPage() {
   if (orders.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">{t('orders.title')}</h1>
+        <h1 className="h-section">{t('orders.title')}</h1>
         <p className="card p-4 text-sm text-ink-muted">{t('orders.empty')}</p>
         <Link href="/menu" className="btn-primary w-full">
           {t('cart.browse')}
@@ -71,7 +71,7 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{t('orders.title')}</h1>
+      <h1 className="h-section">{t('orders.title')}</h1>
 
       {orders.map((order) => (
         <section key={order.orderNumber} className="card space-y-2 p-3">

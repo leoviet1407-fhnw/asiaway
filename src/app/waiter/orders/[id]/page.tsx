@@ -218,7 +218,7 @@ export default function WaiterOrderPage() {
           single easiest thing to miss and the most annoying to get wrong. */}
       {order.customerNote && (
         <section className="card border-warn-500/50 bg-warn-50 p-4">
-          <h2 className="text-sm font-semibold">Special request from the guest</h2>
+          <h2 className="h-label">Special request from the guest</h2>
           <p className="mt-1 text-lg">“{order.customerNote}”</p>
         </section>
       )}
@@ -230,7 +230,7 @@ export default function WaiterOrderPage() {
       )}
 
       <section className="card p-4">
-        <h2 className="mb-2 text-sm font-semibold">Items</h2>
+        <h2 className="h-label mb-2">Items</h2>
         <ul className="space-y-2">
           {lines.map((line) => (
             <li key={line.menuItemId} className="flex items-center gap-3 border-b border-ink/5 pb-2">
@@ -362,7 +362,7 @@ export default function WaiterOrderPage() {
 
       {order.originalSubmission && order.currentRevisionNumber > 0 && (
         <section className="card p-4">
-          <h2 className="text-sm font-semibold">What the guest originally sent</h2>
+          <h2 className="h-label">What the guest originally sent</h2>
           <ul className="mt-2 space-y-1 text-sm text-ink-muted">
             {order.originalSubmission.items.map((item, index) => (
               <li key={index} className="flex justify-between">

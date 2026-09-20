@@ -147,7 +147,7 @@ export default function WaiterSessionPage() {
       </header>
 
       <section className="card p-4">
-        <h2 className="mb-2 text-sm font-semibold">Orders in this session</h2>
+        <h2 className="h-label mb-2">Orders in this session</h2>
         {detail.orders.length === 0 && <p className="text-sm text-ink-muted">No orders yet.</p>}
         <ul className="space-y-2">
           {detail.orders.map((order) => (

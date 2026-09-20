@@ -57,7 +57,7 @@ export default function CheckoutPage() {
           <p className="text-3xl" aria-hidden="true">
             ✓
           </p>
-          <h1 className="text-xl font-semibold">{t('checkout.requested.title')}</h1>
+          <h1 className="h-section">{t('checkout.requested.title')}</h1>
           <p className="text-sm text-ink-muted">
             {t('checkout.requested.body', { time: formatTime(requestedAt) })}
           </p>
@@ -74,7 +74,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{t('checkout.title')}</h1>
+      <h1 className="h-section">{t('checkout.title')}</h1>
       <p className="text-sm text-ink-muted">{t('checkout.body')}</p>
 
       {total !== null && orderCount > 0 && (

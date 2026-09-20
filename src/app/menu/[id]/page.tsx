@@ -92,7 +92,7 @@ export default function ItemDetailPage() {
 
       {relevant.length > 0 && (
         <section className="card p-3">
-          <h2 className="text-sm font-semibold">{t('menu.allergens')}</h2>
+          <h2 className="h-label">{t('menu.allergens')}</h2>
           <ul className="mt-1.5 space-y-1 text-sm text-ink-muted">
             {relevant.map((entry) => (
               <li key={entry.code}>
