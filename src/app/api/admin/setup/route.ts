@@ -59,6 +59,11 @@ const Body = z.object({
     })
     .optional(),
   baseUrl: z.string().url().optional(),
+  /**
+   * Retire any active table NOT in `tables`. Opt-in, because a partial list
+   * would otherwise take real tables out of service.
+   */
+  deactivateMissing: z.boolean().optional(),
   /** Exercise the sign-in path and report the real error. Diagnostic only. */
   selfTest: z.boolean().optional(),
 });
@@ -254,6 +259,23 @@ export async function POST(request: Request) {
       });
     }
 
+    // Retire tables that are no longer in the list. Deactivated, never deleted,
+    // so their past orders and audit history still resolve.
+    let deactivated: string[] = [];
+    if (body.deactivateMissing && (body.tables?.length ?? 0) > 0) {
+      const keep = new Set((body.tables ?? []).map((t) => t.tableNumber));
+      const all = await database.select().from(restaurantTables);
+      for (const row of all) {
+        if (!keep.has(row.tableNumber) && row.isActive) {
+          await database
+            .update(restaurantTables)
+            .set({ isActive: false })
+            .where(eq(restaurantTables.id, row.id));
+          deactivated.push(row.tableNumber);
+        }
+      }
+    }
+
     // --- first staff account ---------------------------------------------
     let userCreated = false;
     if (body.user) {
@@ -284,6 +306,7 @@ export async function POST(request: Request) {
       foodItems: food.items.length,
       drinkItems: drinks.items.length,
       tables: createdTables,
+      deactivated,
       userCreated,
     });
   } catch (error) {

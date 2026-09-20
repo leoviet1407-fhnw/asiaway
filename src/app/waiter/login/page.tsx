@@ -25,10 +25,18 @@ export default function WaiterLoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Distinguish a genuine credential failure from a server fault. Showing
+        // "incorrect password" for a 500 sends people hunting for a typo that
+        // does not exist.
+        const code = data?.error?.code;
         setError(
-          data?.error?.code === 'RATE_LIMITED'
+          code === 'RATE_LIMITED'
             ? 'Too many attempts. Please wait a few minutes.'
-            : 'Email or password is incorrect.',
+            : code === 'INVALID_CREDENTIALS'
+              ? 'Email or password is incorrect.'
+              : code === 'ACCOUNT_DISABLED'
+                ? 'This account is disabled. Please ask your manager.'
+                : 'Sign-in is temporarily unavailable. This is a problem on our side, not your password.',
         );
         return;
       }
