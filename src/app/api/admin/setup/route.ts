@@ -59,6 +59,8 @@ const Body = z.object({
     })
     .optional(),
   baseUrl: z.string().url().optional(),
+  /** Exercise the sign-in path and report the real error. Diagnostic only. */
+  selfTest: z.boolean().optional(),
 });
 
 function authorised(request: Request): boolean {
@@ -84,6 +86,52 @@ export async function POST(request: Request) {
   try {
     const body = Body.parse(await request.json().catch(() => ({})));
     const { db: database, executeMultiple } = await getDatabase();
+
+    // Diagnostic: the sign-in route deliberately returns a generic message, so
+    // a server fault there is indistinguishable from a wrong password. This
+    // runs the same path and reports what actually broke, behind the same
+    // authentication as the rest of this endpoint.
+    if (body.selfTest) {
+      const steps: Record<string, string> = {};
+      const attempt = async (name: string, fn: () => Promise<unknown>) => {
+        try {
+          const value = await fn();
+          steps[name] = `ok: ${JSON.stringify(value)?.slice(0, 200)}`;
+        } catch (e) {
+          steps[name] = `FAILED: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`;
+        }
+      };
+
+      await attempt('countUsers', async () => {
+        const r = await database.select({ n: sql<number>`count(*)::int` }).from(users);
+        return r[0]?.n;
+      });
+      await attempt('findUserByEmail', async () => {
+        const r = await database
+          .select({ email: users.email })
+          .from(users)
+          .where(sql`lower(${users.email}) = ${'1@1.ch'}`);
+        return r[0]?.email ?? null;
+      });
+      await attempt('loginAttemptsQuery', async () => {
+        const { signIn } = await import('../../../../server/auth/session');
+        try {
+          await signIn(database, { email: 'probe@nowhere.test', password: 'x'.repeat(12) });
+          return 'unexpectedly signed in';
+        } catch (e) {
+          // An AuthError here is the CORRECT outcome; anything else is the bug.
+          return `${e instanceof Error ? e.name : typeof e}: ${
+            e instanceof Error ? e.message : String(e)
+          }`;
+        }
+      });
+      await attempt('hashPassword', async () => {
+        const h = await hashPassword('probe-password-1234');
+        return h.slice(0, 16);
+      });
+
+      return NextResponse.json({ selfTest: steps });
+    }
 
     // --- schema ----------------------------------------------------------
     const migrations = await runMigrations(database, executeMultiple);
