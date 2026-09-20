@@ -294,6 +294,16 @@ export async function assignShift(
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId));
   if (!shift) throw domainError('VALIDATION_FAILED', 'That shift does not exist.');
 
+  // A locked month is settled. Changing who worked it after the fact is a
+  // timesheet correction, with its own trail, not a quiet edit to the plan.
+  const [period] = await db
+    .select({ state: rosterPeriods.state })
+    .from(rosterPeriods)
+    .where(eq(rosterPeriods.id, shift.periodId));
+  if (period?.state === 'LOCKED') {
+    throw domainError('INVALID_PERIOD', 'That month is locked.');
+  }
+
   await db
     .update(shifts)
     .set({

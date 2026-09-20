@@ -29,6 +29,7 @@ export type DomainErrorCode =
   | 'INVALID_PENSUM'
   | 'INVALID_WORK_TIME_POLICY'
   | 'INVALID_PERIOD'
+  | 'ILLEGAL_TIME_ENTRY_TRANSITION'
   | 'VALIDATION_FAILED';
 
 export class DomainError extends Error {

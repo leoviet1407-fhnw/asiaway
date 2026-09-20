@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 const LINKS = [
   { href: '/staff/schedule', label: 'My shifts' },
+  { href: '/staff/timesheet', label: 'My hours' },
   { href: '/staff/availability', label: 'Availability' },
   { href: '/staff/absences', label: 'Time off' },
 ];

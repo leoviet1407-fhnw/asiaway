@@ -622,6 +622,93 @@ export const rosterRules = pgTable('roster_rules', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const timeEntrySource = pgEnum('time_entry_source', ['CLOCK', 'MANAGER', 'IMPORTED']);
+export const timeEntryState = pgEnum('time_entry_state', [
+  'OPEN',
+  'SUBMITTED',
+  'APPROVED',
+  'DISPUTED',
+]);
+
+/**
+ * What was actually worked, against what was planned.
+ *
+ * No rate, no wage, no balance: pay is deferred (Part 9 of the plan). The
+ * facts a pay run would need are all here at full fidelity, so the rule can be
+ * chosen later and applied to months already recorded.
+ */
+export const timeEntries = pgTable(
+  'time_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** NULL for work nobody planned. */
+    shiftId: uuid('shift_id').references(() => shifts.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    businessDate: date('business_date').notNull(),
+    clockInAt: timestamp('clock_in_at', { withTimezone: true }).notNull(),
+    /** NULL exactly while the entry is OPEN. */
+    clockOutAt: timestamp('clock_out_at', { withTimezone: true }),
+    breakMinutes: smallint('break_minutes').notNull().default(0),
+    source: timeEntrySource('source').notNull(),
+    state: timeEntryState('state').notNull().default('OPEN'),
+    note: text('note'),
+    approvedBy: uuid('approved_by').references(() => users.id),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    personIdx: index('time_entries_person_idx').on(t.userId, t.businessDate),
+  }),
+);
+
+/** Append-only, full snapshots. Corrections are new rows, never edits. */
+export const timeEntryRevisions = pgTable(
+  'time_entry_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    timeEntryId: uuid('time_entry_id')
+      .notNull()
+      .references(() => timeEntries.id),
+    revisionNumber: integer('revision_number').notNull(),
+    actorUserId: uuid('actor_user_id').references(() => users.id),
+    reason: text('reason'),
+    beforeSnapshot: jsonb('before_snapshot'),
+    afterSnapshot: jsonb('after_snapshot').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    entryRev: uniqueIndex('time_entry_revisions_unique').on(t.timeEntryId, t.revisionNumber),
+  }),
+);
+
+/** Hours for a closed month. Deliberately no balance: that needs a pay rule. */
+export const monthlyStatements = pgTable(
+  'monthly_statements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    periodId: uuid('period_id')
+      .notNull()
+      .references(() => rosterPeriods.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** NULL for an Aushilfe, who is owed no hours. */
+    targetMinMinutes: integer('target_min_minutes'),
+    targetMaxMinutes: integer('target_max_minutes'),
+    plannedMinutes: integer('planned_minutes').notNull(),
+    workedMinutes: integer('worked_minutes').notNull(),
+    absenceDays: integer('absence_days').notNull().default(0),
+    closedAt: timestamp('closed_at', { withTimezone: true }).notNull().defaultNow(),
+    closedBy: uuid('closed_by').references(() => users.id),
+  },
+  (t) => ({
+    unique: uniqueIndex('monthly_statements_unique').on(t.periodId, t.userId),
+  }),
+);
+
 export const schema = {
   users,
   allergens,
@@ -651,4 +738,7 @@ export const schema = {
   shiftTemplates,
   shifts,
   rosterRules,
+  timeEntries,
+  timeEntryRevisions,
+  monthlyStatements,
 };

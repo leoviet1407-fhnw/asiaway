@@ -336,7 +336,7 @@ The exported PDF should keep today's two-page station/person layout. It is a goo
 |---|---|---|
 | **B1** ✅ | `MANAGER`/`STAFF` roles, `employments`, `stations`, `roster_periods`, availability capture, staff login | Availability stops arriving by WhatsApp. Contracts are in the system. |
 | **B2** ✅ | `shift_templates`, `shifts`, roster grid, the rule validator, publish + acknowledge, printable plan | One source of truth. F1, F2, F3, F6, F7 fixed structurally. |
-| **B3** | `time_entries`, corrections with revision history, approvals, monthly hours report | Actual vs. planned, per person per month. **No pay, no balance, no export.** |
+| **B3** ✅ | `time_entries`, corrections with revision history, approvals, monthly hours report, CSV | Actual vs. planned, per person per month. **No pay, no balance.** |
 | **B4** *(optional)* | Clock-in from the waiter tablet; demand forecasting from `orders` volume per hour | Staffing driven by the order data the app already collects. |
 | **B5** *(deferred)* | Pay rates, balance settlement, carry-over, payroll export | Deliberately not now — see Part 9. |
 
@@ -354,7 +354,11 @@ Sequenced so that each phase is independently useful — B1 alone replaces the a
 | No export of the two-page plan | `/manager/roster/print` renders both pages from the one table and prints to PDF through the browser, so no PDF library enters the bundle. |
 | R2–R5 thresholds are provisional | **Still open**, and not something code can settle — it needs the L-GAV reading (Q4). The values are seeded, flagged provisional, and changeable without a deployment. |
 
-The one remaining phase is **B3**: time recording, actual against planned. Pay stays deferred (Part 9).
+**B3 is complete too.** Clock in and out, or a manager records a shift nobody clocked; corrections never overwrite — the previous values are kept in an append-only revision with the reason and the person who made it; staff can dispute; a month closes only once every entry is approved, and closing locks the period and freezes the hours. `migrations/0011`, 472 tests.
+
+Deliberately absent, and enforced by a test that fails if it ever appears: any field matching rate, wage, pay, salary or balance. The month statement carries planned, worked, the corridor and absence days. What anyone is *owed* needs a pay rule, and no pay rule has been chosen.
+
+**Everything in this plan is now built except the pay phase (Part 9) and the legal thresholds (Q4).**
 
 **Migrations** continue the existing numbering from `0006_`, one concern per file, with the commented header style used in `0002_auth_sessions.sql` and `0004_table_area.sql`. `tests/integration/schema-drift.test.ts` keeps the Drizzle definitions honest.
 

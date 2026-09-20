@@ -59,4 +59,5 @@ export const MIGRATION_FILES = [
   '0008_workforce_planning.sql',
   '0009_roster_shifts.sql',
   '0010_shift_staffing_policy.sql',
+  '0011_time_entries.sql',
 ] as const;

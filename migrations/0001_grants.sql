@@ -55,3 +55,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON shift_templates, shifts TO asiaway_app;
 -- the limit it is being judged against.
 GRANT SELECT ON roster_rules TO asiaway_app;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON roster_rules FROM asiaway_app;
+
+-- ---------- time recording (0011) ---------------------------------------------
+GRANT SELECT, INSERT, UPDATE ON time_entries TO asiaway_app;
+-- Nothing deletes a recorded hour. A mistake is corrected, and the correction
+-- is a revision naming who made it.
+REVOKE DELETE, TRUNCATE ON time_entries FROM asiaway_app;
+
+-- The correction trail and the closed month are history: insert and read only.
+GRANT SELECT, INSERT ON time_entry_revisions, monthly_statements TO asiaway_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON time_entry_revisions, monthly_statements FROM asiaway_app;

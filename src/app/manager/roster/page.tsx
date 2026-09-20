@@ -26,6 +26,7 @@ interface Grid {
     acknowledged: boolean;
   }[];
   people: { id: string; name: string; employmentType: string; pensumPercent: number | null }[];
+  periods?: { id: string; startsOn: string; endsOn: string; state: string }[];
   violations: Violation[];
   canPublish: boolean;
   published?: boolean;
@@ -41,8 +42,11 @@ export default function ManagerRosterPage() {
   const [weekStart, setWeekStart] = useState(0);
   const [fixing, setFixing] = useState<{ userId: string; onDate: string } | null>(null);
 
-  const load = useCallback(async () => {
-    const response = await fetch('/api/manager/roster', { cache: 'no-store' });
+  const load = useCallback(async (periodId?: string) => {
+    const response = await fetch(
+      periodId ? `/api/manager/roster?period=${periodId}` : '/api/manager/roster',
+      { cache: 'no-store' },
+    );
     if (response.status === 401) {
       window.location.href = '/waiter/login';
       return;
@@ -76,7 +80,8 @@ export default function ManagerRosterPage() {
         setError(payload?.error?.message ?? 'That did not work.');
         return;
       }
-      setGrid(payload);
+      // An action returns the grid it acted on, without the selector list.
+      setGrid((previous) => ({ ...payload, periods: payload.periods ?? previous?.periods }));
     } finally {
       setBusy(false);
     }
@@ -150,6 +155,19 @@ export default function ManagerRosterPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {(grid.periods?.length ?? 0) > 1 && (
+            <select
+              value={grid.period.id}
+              onChange={(e) => void load(e.target.value)}
+              className="min-h-tap border border-ink-muted bg-surface px-2 text-sm text-ink"
+            >
+              {grid.periods!.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.startsOn.slice(0, 7)} · {p.state.toLowerCase().replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+          )}
           {grid.shifts.length === 0 && (
             <button
               type="button"

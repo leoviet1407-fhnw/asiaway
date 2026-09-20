@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '../../../../server/db/index';
 import { rosterPeriods } from '../../../../server/db/schema';
 import {
@@ -23,23 +23,48 @@ export async function GET(request: Request) {
 
       const periodId = requested ?? (await currentPeriodId(database));
       if (!periodId) {
-        return NextResponse.json({ period: null });
+        return NextResponse.json({ period: null, periods: [] });
       }
-      return NextResponse.json(await getRosterGrid(database, periodId));
+      // The selector needs every month, not just the one being shown.
+      const periods = await database
+        .select({
+          id: rosterPeriods.id,
+          startsOn: rosterPeriods.startsOn,
+          endsOn: rosterPeriods.endsOn,
+          state: rosterPeriods.state,
+        })
+        .from(rosterPeriods)
+        .orderBy(desc(rosterPeriods.startsOn));
+
+      return NextResponse.json({ ...(await getRosterGrid(database, periodId)), periods });
     })) as NextResponse;
   } catch (error) {
     return handleApiError(error);
   }
 }
 
+/**
+ * The month a manager most likely wants: one still being worked on, earliest
+ * first. Only if none is open does it fall back to the newest published one —
+ * opening on a finished month and wondering why nothing can be edited is a
+ * worse first impression than opening on the one in progress.
+ */
 async function currentPeriodId(database: Awaited<ReturnType<typeof db>>): Promise<string | null> {
-  const [period] = await database
+  const [open] = await database
     .select({ id: rosterPeriods.id })
     .from(rosterPeriods)
-    .where(inArray(rosterPeriods.state, ['PLANNING', 'AVAILABILITY_OPEN', 'PUBLISHED', 'DRAFT']))
+    .where(inArray(rosterPeriods.state, ['DRAFT', 'AVAILABILITY_OPEN', 'PLANNING']))
     .orderBy(asc(rosterPeriods.startsOn))
     .limit(1);
-  return period?.id ?? null;
+  if (open) return open.id;
+
+  const [recent] = await database
+    .select({ id: rosterPeriods.id })
+    .from(rosterPeriods)
+    .where(ne(rosterPeriods.state, 'LOCKED'))
+    .orderBy(desc(rosterPeriods.startsOn))
+    .limit(1);
+  return recent?.id ?? null;
 }
 
 const Action = z.discriminatedUnion('action', [

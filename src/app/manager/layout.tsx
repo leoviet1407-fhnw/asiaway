@@ -6,6 +6,8 @@ const LINKS = [
   { href: '/manager/roster', label: 'Roster' },
   { href: '/manager/roster/print', label: 'Print' },
   { href: '/manager/periods', label: 'Months' },
+  { href: '/manager/timesheet', label: 'Hours' },
+  { href: '/manager/month-close', label: 'Month close' },
   { href: '/manager/approvals', label: 'Time off' },
 ];
 
