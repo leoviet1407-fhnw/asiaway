@@ -35,20 +35,42 @@ async function create(): Promise<DatabaseHandle> {
     throw new Error('DATABASE_URL is required in production');
   }
 
-  const { PGlite, applyMigrations, createPgliteDatabase } = await import('./pglite');
+  const { PGlite, createPgliteDatabase } = await import('./pglite');
+  const { runMigrations } = await import('./migrator');
 
   const dir = resolve(process.cwd(), '.pglite');
   mkdirSync(dir, { recursive: true });
   const client = new PGlite(resolve(dir, 'asiaway'));
 
-  const existing = await client.query<{ n: number }>(
-    "select count(*)::int as n from information_schema.tables where table_name = 'orders'",
+  const { db } = createPgliteDatabase(client);
+
+  // The same ledger-driven migrator production uses, rather than "create the
+  // schema if the orders table is missing". That older check ran once and then
+  // never again, so a migration added later was silently skipped locally and
+  // the app failed on a column that the code and the tests both had.
+  //
+  // A local database created by that older bootstrap has the schema but no
+  // ledger, and 0000_init is not idempotent — replaying it would fail on
+  // half-created types. Say so plainly instead of failing on a missing column
+  // several requests later. Production is unaffected: it has always had the
+  // ledger, because it has always used this migrator.
+  const legacy = await client.query<{ n: number }>(
+    `select count(*)::int as n from information_schema.tables
+     where table_name = 'orders'
+       and not exists (
+         select 1 from information_schema.tables where table_name = 'schema_migrations'
+       )`,
   );
-  if ((existing.rows[0]?.n ?? 0) === 0) {
-    await applyMigrations(client);
+  if ((legacy.rows[0]?.n ?? 0) > 0) {
+    throw new Error(
+      'This local .pglite database predates the migration ledger, so new migrations ' +
+        'cannot be applied to it. Delete the .pglite directory and run `npm run seed` ' +
+        'to rebuild it. Production databases are not affected.',
+    );
   }
 
-  const { db } = createPgliteDatabase(client);
+  await runMigrations(db, (text) => client.exec(text));
+
   return { db, mode: 'pglite', executeMultiple: (text) => client.exec(text) };
 }
 

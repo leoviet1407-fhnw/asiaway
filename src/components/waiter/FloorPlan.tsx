@@ -43,27 +43,40 @@ const FIXTURE_STYLE: Record<string, string> = {
   divider: 'self-center h-1 w-full rounded-full bg-ink/30',
 };
 
-function href(table: FloorTable): string {
+function href(table: FloorTable, shared: FloorTable | null): string {
   // A seated table opens its session; a free one goes straight to the order pad,
   // because a free table is exactly where a waiter is about to take an order.
-  return table.sessionId
-    ? `/waiter/sessions/${table.sessionId}`
-    : `/waiter/order?tableId=${table.tableId}`;
+  //
+  // A table joined to others follows the party's shared bill, so tapping any of
+  // them lands on the same session rather than on an empty pad.
+  const session = table.sessionId ?? shared?.sessionId ?? null;
+  return session ? `/waiter/sessions/${session}` : `/waiter/order?tableId=${table.tableId}`;
 }
 
 function Tile({
   table,
+  shared = null,
   groupLabel,
   selectable,
   selected,
   onSelect,
 }: {
   table: FloorTable;
+  /** The table holding the bill, when this one is joined to others. */
+  shared?: FloorTable | null;
   groupLabel?: string | null;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (table: FloorTable) => void;
 }) {
+  // Joined tables are one party, so they carry one colour. Only the table
+  // holding the bill has a session, so without this the other half of a party
+  // with an order waiting still looks empty.
+  const state = shared?.state ?? table.state;
+  const pendingOrders = shared?.pendingOrders ?? table.pendingOrders;
+  const sessionId = shared?.sessionId ?? table.sessionId;
+  const openedAt = shared?.openedAt ?? table.openedAt;
+  const sessionTotalCents = shared?.sessionTotalCents ?? table.sessionTotalCents;
   const body = (
     <>
       <span className="text-lg font-bold leading-none">{table.tableNumber}</span>
@@ -72,14 +85,16 @@ function Tile({
           {groupLabel}
         </span>
       )}
-      {table.pendingOrders > 0 ? (
+      {pendingOrders > 0 ? (
         <span className="mt-0.5 text-[11px] font-semibold leading-tight text-warn-500">
-          {table.pendingOrders} waiting
+          {pendingOrders} waiting
         </span>
-      ) : table.sessionId ? (
+      ) : sessionId ? (
         <span className="mt-0.5 text-[11px] leading-tight text-ink-muted">
-          {formatMoney(table.sessionTotalCents)}
-          {table.openedAt && <> · {formatElapsed(table.openedAt)}</>}
+          {/* The total is the party's, so it is shown once, on the table that
+              holds the bill, rather than repeated on each joined table. */}
+          {shared ? formatElapsed(openedAt ?? '') : formatMoney(sessionTotalCents)}
+          {!shared && openedAt && <> · {formatElapsed(openedAt)}</>}
         </span>
       ) : null}
     </>
@@ -95,7 +110,7 @@ function Tile({
         aria-pressed={selected}
         onClick={() => onSelect?.(table)}
         className={`${shell} ${
-          selected ? 'border-brand-600 bg-brand-600 text-white' : STATE_STYLE[table.state]
+          selected ? 'border-brand-600 bg-brand-600 text-white' : STATE_STYLE[state]
         }`}
       >
         {body}
@@ -105,9 +120,11 @@ function Tile({
 
   return (
     <Link
-      href={href(table)}
-      aria-label={`Table ${table.tableNumber}, ${table.state.replace('_', ' ').toLowerCase()}`}
-      className={`${shell} ${STATE_STYLE[table.state]}`}
+      href={href(table, shared)}
+      aria-label={`Table ${table.tableNumber}, ${state.replace('_', ' ').toLowerCase()}${
+        shared ? `, joined with table ${shared.tableNumber}` : ''
+      }`}
+      className={`${shell} ${STATE_STYLE[state]}`}
     >
       {body}
     </Link>
@@ -137,6 +154,16 @@ export function FloorPlan({
 
   const groupOf = (tableNumber: string) =>
     groups.find((g) => g.tables.includes(tableNumber)) ?? null;
+
+  /**
+   * The table carrying a joined party's bill, for any table that is not itself
+   * that table. Null when the table stands alone, so it keeps its own state.
+   */
+  const sharedWith = (table: FloorTable): FloorTable | null => {
+    const group = groupOf(table.tableNumber);
+    if (!group || group.anchorTableId === table.tableId) return null;
+    return tables.find((t) => t.tableId === group.anchorTableId) ?? null;
+  };
 
   const selectedNumbers = selected
     .map((id) => tables.find((t) => t.tableId === id)?.tableNumber)
@@ -305,6 +332,7 @@ export function FloorPlan({
                 >
                   <Tile
                     table={table}
+                    shared={sharedWith(table)}
                     groupLabel={(() => {
                       const g = groupOf(table.tableNumber);
                       if (!g) return null;

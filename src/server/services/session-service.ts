@@ -21,6 +21,7 @@ import {
   tableGroupMembers,
   tableGroups,
 } from '../db/schema';
+import { finaliseOpenWindowsForSession } from './order-service';
 import type { Db } from './order-service';
 
 /** Hours a session may sit untouched before it is considered abandoned. */
@@ -319,7 +320,7 @@ export async function requestCheckout(
 export async function closeSession(
   db: Db,
   input: { sessionId: string; userId: string; force?: boolean; reason?: string | null },
-): Promise<{ closedAt: Date; separatedTableNumbers: string[] }> {
+): Promise<{ closedAt: Date; separatedTableNumbers: string[]; finalisedOnClose: number[] }> {
   return db.transaction(async (tx: Db) => {
     const [session] = await tx
       .select()
@@ -330,6 +331,11 @@ export async function closeSession(
     if (session.status === 'CLOSED') {
       throw domainError('SESSION_CLOSED', 'This session is already closed');
     }
+
+    // A guest who is paying has finished ordering, so anything still inside its
+    // edit window counts now. Left open it would strand an order on a closed
+    // session and surface later as a notification for a cleared table.
+    const finalisedOnClose = await finaliseOpenWindowsForSession(tx, session.id);
 
     const unresolved = await tx
       .select({ n: sql<number>`count(*)::int` })
@@ -374,7 +380,11 @@ export async function closeSession(
       sessionId: session.id,
       beforeValue: { status: session.status },
       afterValue: { status: 'CLOSED' },
-      metadata: { reason: input.reason ?? null, unresolvedOrders: pendingCount },
+      metadata: {
+        reason: input.reason ?? null,
+        unresolvedOrders: pendingCount,
+        ordersFinalisedOnClose: finalisedOnClose,
+      },
     });
 
     // The party has paid and left, so the tables go back to being separate.
@@ -390,7 +400,7 @@ export async function closeSession(
       );
     }
 
-    return { closedAt, separatedTableNumbers };
+    return { closedAt, separatedTableNumbers, finalisedOnClose };
   });
 }
 
@@ -566,6 +576,42 @@ export async function getPendingNotifications(db: Db) {
     .leftJoin(restaurantTables, eq(restaurantTables.id, notifications.tableId))
     .where(eq(notifications.status, 'PENDING'))
     .orderBy(notifications.createdAt);
+}
+
+/**
+ * Clears an order from the waiter's queue.
+ *
+ * With orders confirming themselves, "done with this" no longer means
+ * confirming it — it means the waiter has seen it and entered it into the POS.
+ * That is what the queue is now showing, so that is what has to be clearable.
+ */
+export async function acknowledgeOrder(
+  db: Db,
+  input: { orderId: string; userId: string },
+): Promise<{ acknowledged: number }> {
+  return db.transaction(async (tx: Db) => {
+    const rows = await tx
+      .update(notifications)
+      .set({ status: 'ACKNOWLEDGED', acknowledgedAt: new Date(), acknowledgedBy: input.userId })
+      .where(and(eq(notifications.orderId, input.orderId), eq(notifications.status, 'PENDING')))
+      .returning();
+
+    for (const row of rows) {
+      await tx.insert(auditEvents).values({
+        actorType: 'WAITER',
+        actorUserId: input.userId,
+        action: 'NOTIFICATION_ACKNOWLEDGED',
+        entityType: 'NOTIFICATION',
+        entityId: row.id,
+        sessionId: row.sessionId,
+        orderId: row.orderId,
+        tableId: row.tableId,
+        metadata: { viaOrder: true },
+      });
+    }
+
+    return { acknowledged: rows.length };
+  });
 }
 
 export async function acknowledgeNotification(

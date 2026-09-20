@@ -71,6 +71,8 @@ export default function WaiterOrderPage() {
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reopening, setReopening] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
   const [showHistory, setShowHistory] = useState(false);
 
   const load = useCallback(async () => {
@@ -150,6 +152,51 @@ export default function WaiterOrderPage() {
     } catch {
       setError('No connection. The change was not saved.');
       return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Clears the order from the queue once it is in the POS. */
+  async function acknowledge() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/waiter/orders/${order!.id}/ack`, { method: 'POST' });
+      if (!response.ok) {
+        setError('The order could not be marked as done.');
+        return;
+      }
+      router.push('/waiter/orders');
+      router.refresh();
+    } catch {
+      setError('No connection. Nothing was changed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** The guest has asked for a change after their own window closed. */
+  async function reopen() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/waiter/orders/${order!.id}/reopen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reopenReason.trim() || null }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data?.error?.message ?? 'The order could not be reopened.');
+        return;
+      }
+      setReopening(false);
+      await load();
+    } catch {
+      setError('No connection. Nothing was changed.');
     } finally {
       setBusy(false);
     }
@@ -410,7 +457,7 @@ export default function WaiterOrderPage() {
         </Link>
       </section>
 
-      {order.status !== 'CONFIRMED' && (
+      {order.status !== 'CONFIRMED' ? (
         <div className="fixed inset-x-0 bottom-0 mx-auto flex max-w-3xl gap-3 border-t border-ink/10 bg-surface p-4">
           <button className="btn-secondary flex-1" onClick={() => void save()} disabled={busy || !dirty}>
             Save changes
@@ -418,6 +465,60 @@ export default function WaiterOrderPage() {
           <button className="btn-primary flex-[2]" onClick={() => void confirm()} disabled={busy}>
             Confirm order · {formatMoney(total)}
           </button>
+        </div>
+      ) : (
+        /* The guest confirmed this themselves. A waiter's job here is to enter
+           it into the POS and clear it — or, if the guest has asked for a
+           change, to take it back. */
+        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-3xl space-y-2 border-t border-ink/10 bg-surface p-4">
+          {reopening ? (
+            <>
+              <label htmlFor="reopen-reason" className="block h-label">
+                Why is this being changed?
+              </label>
+              <input
+                id="reopen-reason"
+                className="field"
+                maxLength={200}
+                placeholder="e.g. guest asked to remove a dish"
+                value={reopenReason}
+                onChange={(e) => setReopenReason(e.target.value)}
+              />
+              <div className="flex gap-3">
+                <button
+                  className="btn-secondary flex-1"
+                  onClick={() => setReopening(false)}
+                  disabled={busy}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary flex-1"
+                  onClick={() => void reopen()}
+                  disabled={busy || reopenReason.trim().length === 0}
+                >
+                  Reopen this order
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                className="btn-secondary flex-1"
+                onClick={() => setReopening(true)}
+                disabled={busy}
+              >
+                Guest wants a change
+              </button>
+              <button
+                className="btn-primary flex-[2]"
+                onClick={() => void acknowledge()}
+                disabled={busy}
+              >
+                Entered into the POS · {formatMoney(total)}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </main>

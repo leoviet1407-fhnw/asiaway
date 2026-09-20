@@ -45,7 +45,7 @@
   "order.sent.title": "Order received",
   "order.sent.number": "Order #{number}",
   "order.sent.time": "Sent at {time}",
-  "order.sent.body": "A member of our team will come to your table to confirm your order.",
+  "order.sent.body": "Your order goes to the kitchen in a moment. You can still change it until then.",
   "order.sent.continue": "Continue browsing",
   "orders.title": "Your orders",
   "orders.empty": "You have not ordered anything yet.",
@@ -65,5 +65,18 @@
   "menu.allergens.none": "Allergens not declared — please ask your waiter",
   "menu.allergens.declared": "Contains",
   "menu.highlights": "A look at our dishes",
-  "menu.highlights.hint": "Swipe to browse · tap for details"
+  "menu.highlights.hint": "Swipe to browse · tap for details",
+  "order.window.title": "You can still change this order",
+  "order.window.countdown": "{seconds}s left",
+  "order.window.change": "Change my order",
+  "order.window.send": "Send to the kitchen now",
+  "order.window.sending": "Sending…",
+  "order.window.closed": "This order has gone to the kitchen. Please ask a member of our team if you need to change it.",
+  "order.window.sentTitle": "With the kitchen",
+  "cart.editing": "Changing order #{number}",
+  "cart.editing.save": "Save changes",
+  "cart.editing.saving": "Saving…",
+  "cart.editing.cancel": "Leave the order as it was",
+  "cart.editing.saved": "Your changes are saved.",
+  "cart.editing.empty": "An order needs at least one dish. Remove it by asking a member of our team."
 }

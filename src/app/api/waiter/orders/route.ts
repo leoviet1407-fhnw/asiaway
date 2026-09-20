@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, exists, inArray, or, sql } from 'drizzle-orm';
 import { db } from '../../../../server/db/index';
-import { diningSessions, orderItems, orderNotes, orders, restaurantTables } from '../../../../server/db/schema';
+import {
+  diningSessions,
+  notifications,
+  orderItems,
+  orderNotes,
+  orders,
+  restaurantTables,
+} from '../../../../server/db/schema';
 import { z } from 'zod';
-import { createOrderForTable } from '../../../../server/services/order-service';
+import { createOrderForTable, finaliseExpiredOrders } from '../../../../server/services/order-service';
 import { publishWaiterEvent } from '../../../../server/notifications/hub';
 import { apiError, handleApiError, withWaiter } from '../../../../server/http/api';
 
@@ -15,13 +22,36 @@ export async function GET() {
   try {
     return (await withWaiter(async () => {
       const database = await db();
+      await finaliseExpiredOrders(database);
 
+      // What a waiter still has to do something about. Orders confirm
+      // themselves now, so "waiting" can no longer mean "not yet confirmed":
+      // it means an order has arrived and nobody has dealt with it — which is
+      // exactly what the unacknowledged notification records, and exactly what
+      // the dashboard counts. Without this the dashboard would say two new
+      // orders and this page would say none.
       const rows = await database
         .select({ order: orders, table: restaurantTables, session: diningSessions })
         .from(orders)
         .innerJoin(restaurantTables, eq(restaurantTables.id, orders.tableId))
         .innerJoin(diningSessions, eq(diningSessions.id, orders.sessionId))
-        .where(inArray(orders.status, ['SUBMITTED', 'EMPLOYEE_REVIEW']))
+        .where(
+          or(
+            inArray(orders.status, ['SUBMITTED', 'EMPLOYEE_REVIEW']),
+            exists(
+              database
+                .select({ one: sql`1` })
+                .from(notifications)
+                .where(
+                  and(
+                    eq(notifications.orderId, orders.id),
+                    eq(notifications.type, 'NEW_ORDER'),
+                    eq(notifications.status, 'PENDING'),
+                  ),
+                ),
+            ),
+          ),
+        )
         .orderBy(asc(orders.submittedAt));
 
       const detailed = await Promise.all(

@@ -33,6 +33,8 @@ export const sessionStatus = pgEnum('session_status', [
   'CLOSED',
 ]);
 export const orderStatus = pgEnum('order_status', [
+  /** The guest may still change this order; the waiter cannot see it yet. */
+  'AWAITING_CUSTOMER',
   'SUBMITTED',
   'EMPLOYEE_REVIEW',
   'CONFIRMED',
@@ -41,6 +43,7 @@ export const orderStatus = pgEnum('order_status', [
 export const noteSource = pgEnum('note_source', ['CUSTOMER', 'WAITER']);
 export const revisionType = pgEnum('revision_type', [
   'ORIGINAL_SUBMISSION',
+  'CUSTOMER_EDIT',
   'WAITER_EDIT',
   'FINAL_CONFIRMED',
   'CANCELLATION',
@@ -214,6 +217,8 @@ export const orders = pgTable(
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelledBy: uuid('cancelled_by').references(() => users.id),
     cancelReason: text('cancel_reason'),
+    /** When the guest's own edit window closes. NULL for staff-taken orders. */
+    customerWindowExpiresAt: timestamp('customer_window_expires_at', { withTimezone: true }),
     totalCents: integer('total_cents').notNull(),
     currentRevisionNumber: integer('current_revision_number').notNull().default(0),
   },

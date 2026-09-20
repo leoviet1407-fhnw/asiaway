@@ -7,6 +7,7 @@ import {
   getPendingNotifications,
   getTableOverview,
 } from '../../../../server/services/session-service';
+import { finaliseExpiredOrders } from '../../../../server/services/order-service';
 import { tableDisplayState } from '../../../../domain/session/status';
 import { handleApiError, withWaiter } from '../../../../server/http/api';
 
@@ -17,6 +18,12 @@ export async function GET() {
   try {
     return (await withWaiter(async () => {
       const database = await db();
+
+      // Close any guest window that has run out. Nothing schedules this on a
+      // serverless host, so the waiter's own screen is what drives it — the
+      // same approach as expiring a stale session at scan time.
+      await finaliseExpiredOrders(database);
+
       const [tables, pending, groups] = await Promise.all([
         getTableOverview(database),
         getPendingNotifications(database),
@@ -27,8 +34,10 @@ export async function GET() {
         .select({
           sessionId: orders.sessionId,
           pending: sql<number>`count(*) filter (where ${orders.status} in ('SUBMITTED','EMPLOYEE_REVIEW'))::int`,
-          total: sql<number>`coalesce(sum(${orders.totalCents}) filter (where ${orders.status} <> 'CANCELLED'), 0)::int`,
-          orderCount: sql<number>`count(*) filter (where ${orders.status} <> 'CANCELLED')::int`,
+          // An order the guest is still editing is not yet money owed, and
+          // showing a total that then changes would be worse than showing none.
+          total: sql<number>`coalesce(sum(${orders.totalCents}) filter (where ${orders.status} not in ('CANCELLED','AWAITING_CUSTOMER')), 0)::int`,
+          orderCount: sql<number>`count(*) filter (where ${orders.status} not in ('CANCELLED','AWAITING_CUSTOMER'))::int`,
         })
         .from(orders)
         .groupBy(orders.sessionId);

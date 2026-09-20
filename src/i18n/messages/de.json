@@ -45,7 +45,7 @@
   "order.sent.title": "Bestellung erhalten",
   "order.sent.number": "Bestellung #{number}",
   "order.sent.time": "Gesendet um {time}",
-  "order.sent.body": "Ein Mitglied unseres Teams kommt zur Bestätigung an Ihren Tisch.",
+  "order.sent.body": "Ihre Bestellung geht gleich in die Küche. Bis dahin können Sie sie noch ändern.",
   "order.sent.continue": "Weiter ansehen",
   "orders.title": "Ihre Bestellungen",
   "orders.empty": "Sie haben noch nichts bestellt.",
@@ -65,5 +65,18 @@
   "menu.allergens.none": "Allergene nicht deklariert — bitte fragen Sie Ihre Bedienung",
   "menu.allergens.declared": "Enthält",
   "menu.highlights": "Ein Blick auf unsere Gerichte",
-  "menu.highlights.hint": "Wischen zum Blättern · tippen für Details"
+  "menu.highlights.hint": "Wischen zum Blättern · tippen für Details",
+  "order.window.title": "Sie können diese Bestellung noch ändern",
+  "order.window.countdown": "noch {seconds}s",
+  "order.window.change": "Bestellung ändern",
+  "order.window.send": "Jetzt an die Küche senden",
+  "order.window.sending": "Wird gesendet…",
+  "order.window.closed": "Diese Bestellung ist in der Küche. Bitte wenden Sie sich an unser Team, wenn Sie sie ändern möchten.",
+  "order.window.sentTitle": "In der Küche",
+  "cart.editing": "Bestellung #{number} ändern",
+  "cart.editing.save": "Änderungen speichern",
+  "cart.editing.saving": "Wird gespeichert…",
+  "cart.editing.cancel": "Bestellung unverändert lassen",
+  "cart.editing.saved": "Ihre Änderungen sind gespeichert.",
+  "cart.editing.empty": "Eine Bestellung braucht mindestens ein Gericht. Zum Stornieren wenden Sie sich bitte an unser Team."
 }

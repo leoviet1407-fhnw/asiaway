@@ -23,7 +23,11 @@ import {
   resolveScan,
 } from '../../src/server/services/session-service';
 import { setAvailability } from '../../src/server/services/menu-service';
-import { submitOrder, confirmOrder } from '../../src/server/services/order-service';
+import {
+  submitOrder,
+  confirmOrder,
+  openOrderForReview,
+} from '../../src/server/services/order-service';
 import { generateQrToken } from '../../src/domain/session/qr-token';
 import type { Db } from '../../src/server/services/order-service';
 
@@ -284,28 +288,52 @@ describe('checkout request', () => {
 describe('closing a session', () => {
   it('refuses while an order still awaits the waiter', async () => {
     const scan = await resolveScan(db, { qrToken: fx.t11.token });
-    await submitOrder(db, {
+    const order = await submitOrder(db, {
       sessionId: scan.sessionId,
       deviceId: scan.deviceId,
       lines: [{ menuItemId: fx.pho, quantity: 1 }],
       note: null,
       idempotencyKey: randomUUID(),
     });
+    // Orders confirm themselves now, so the only way one still awaits a waiter
+    // is that a waiter took it over and has not finished with it.
+    await openOrderForReview(db, { orderId: order.orderId, userId: fx.waiterId });
 
     await expect(
       closeSession(db, { sessionId: scan.sessionId, userId: fx.waiterId }),
     ).rejects.toMatchObject({ code: 'SESSION_HAS_UNRESOLVED_ORDERS' });
   });
 
-  it('allows a forced close with a reason, and records it', async () => {
+  it('closes a bill that still has an order inside its edit window', async () => {
+    // The guest pays while their minute is still running. The order has to be
+    // counted and closed here, not left to surface later against a table that
+    // has already been cleared.
     const scan = await resolveScan(db, { qrToken: fx.t11.token });
-    await submitOrder(db, {
+    const order = await submitOrder(db, {
       sessionId: scan.sessionId,
       deviceId: scan.deviceId,
       lines: [{ menuItemId: fx.pho, quantity: 1 }],
       note: null,
       idempotencyKey: randomUUID(),
     });
+
+    const result = await closeSession(db, { sessionId: scan.sessionId, userId: fx.waiterId });
+    expect(result.finalisedOnClose).toEqual([order.orderNumber]);
+
+    const [row] = await db.select().from(orders).where(eq(orders.id, order.orderId));
+    expect(row!.status).toBe('CONFIRMED');
+  });
+
+  it('allows a forced close with a reason, and records it', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    const order = await submitOrder(db, {
+      sessionId: scan.sessionId,
+      deviceId: scan.deviceId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+    await openOrderForReview(db, { orderId: order.orderId, userId: fx.waiterId });
 
     await closeSession(db, {
       sessionId: scan.sessionId,

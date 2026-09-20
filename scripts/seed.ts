@@ -16,7 +16,8 @@ import { resolve } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
 import { createPostgresDatabase, type AppDatabase } from '../src/server/db/client';
-import { applyMigrations, createPgliteDatabase } from '../src/server/db/pglite';
+import { createPgliteDatabase } from '../src/server/db/pglite';
+import { runMigrations } from '../src/server/db/migrator';
 import {
   allergens,
   menuCategories,
@@ -193,11 +194,10 @@ async function main(): Promise<void> {
   } else {
     mkdirSync(resolve(process.cwd(), '.pglite'), { recursive: true });
     const client = new PGlite(resolve(process.cwd(), '.pglite/asiaway'));
-    const has = await client.query<{ n: number }>(
-      "select count(*)::int as n from information_schema.tables where table_name = 'orders'",
-    );
-    if ((has.rows[0]?.n ?? 0) === 0) await applyMigrations(client);
     db = createPgliteDatabase(client).db;
+    // Ledger-driven, so a migration added after this database was first created
+    // still gets applied. Checking for one table only ever worked once.
+    await runMigrations(db, (text) => client.exec(text));
     close = async () => client.close();
   }
 

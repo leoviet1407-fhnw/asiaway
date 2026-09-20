@@ -35,6 +35,47 @@ Status: accepted · Date: 2026-09-20
 
 **Status-only changes are audited but create no revision.** Otherwise the revision chain fills with "opened for review" noise and stops being a usable record of what was ordered. Confirmation always writes a revision, even with no content change.
 
+## E13 — the guest's 60-second window replaces the waiter's confirmation step
+
+**Requested by the restaurant on 2026-09-20.** This overrides three things the
+master spec marked *Fixed*, so it is recorded here rather than absorbed quietly:
+
+| Master spec | Now |
+|---|---|
+| "A customer cannot cancel a submitted order through the customer interface" | The guest may change a submitted order for 60 seconds. Still no cancel: an order must keep at least one dish, and removing it altogether needs staff. |
+| "Customer cancellation: **No. Fixed**: no cancel before waiter confirmation" | Superseded for edits, as above. |
+| "A waiter must review/confirm submitted orders before the order is considered confirmed" | The order confirms itself when the window closes. A waiter no longer confirms; they read the order and enter it into the POS. |
+
+**Why the restaurant asked:** to cut the number of orders staff have to open and
+confirm by hand. A guest who mis-taps currently interrupts a waiter; now they fix
+it themselves and the waiter sees one settled order instead of an order plus a
+correction.
+
+**What this costs, stated plainly:** nobody checks an order before it is
+prepared. The spec's review step was also the moment a human noticed an obviously
+wrong order. That check is gone by choice.
+
+**What was kept:**
+
+- Revision 0 is still the immutable original submission. A guest's change writes
+  a `CUSTOMER_EDIT` revision with before and after values, so the trail survives
+  the loss of the review step — it is now the *only* record of what the guest
+  asked for.
+- Self-confirmation is attributed to `SYSTEM`, never to a waiter. Putting a
+  waiter's name against a decision no person made would corrupt the audit trail.
+- A waiter can still take an order over mid-window, and can reopen a confirmed
+  order with a recorded reason. That is the guest's only route to a correction
+  once their minute has passed, and the restaurant asked for it explicitly.
+- Closing a bill finalises any window still open on it, so a guest paying early
+  cannot strand an order on a closed session.
+
+**Why no scheduled job:** the window closes lazily, on waiter screen reads,
+because the Hobby plan has no sub-daily cron (see the cron decision above). The
+dashboard polls frequently enough that an order surfaces within seconds. The
+guest's own countdown closes it immediately in the normal case.
+
+**The window length** is 60 seconds, from `CUSTOMER_EDIT_WINDOW_SECONDS`.
+
 ## Deviations from the approved plan, and why
 
 | Planned | Built | Reason |

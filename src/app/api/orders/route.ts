@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { db } from '../../../server/db/index';
 import { submitOrder } from '../../../server/services/order-service';
 import { orderItems, orderNotes, orderRevisions, orders } from '../../../server/db/schema';
-import { publishWaiterEvent } from '../../../server/notifications/hub';
 import {
   enforceRateLimit,
   handleApiError,
@@ -58,19 +57,16 @@ export async function POST(request: Request) {
       idempotencyKey,
     });
 
-    if (!result.replayed) {
-      publishWaiterEvent('new_order', {
-        orderId: result.orderId,
-        orderNumber: result.orderNumber,
-        totalCents: result.totalCents,
-      });
-    }
+    // Deliberately no waiter event here. The guest still owns this order for
+    // the next minute; the waiter is told when that window closes.
 
     return NextResponse.json(
       {
+        orderId: result.orderId,
         orderNumber: result.orderNumber,
         totalCents: result.totalCents,
         submittedAt: result.submittedAt.toISOString(),
+        customerWindowExpiresAt: result.customerWindowExpiresAt?.toISOString() ?? null,
         replayed: result.replayed,
       },
       { status: result.replayed ? 200 : 201 },
@@ -116,15 +112,28 @@ export async function GET() {
           .from(orderRevisions)
           .where(and(eq(orderRevisions.orderId, order.id), eq(orderRevisions.revisionNumber, 0)));
 
+        // The stored status only changes when something sweeps it, which
+        // happens on a waiter's screen. Reporting EDITABLE for a window that
+        // has already run out would invite a change the server would refuse.
+        const windowOpen =
+          !!order.customerWindowExpiresAt && order.customerWindowExpiresAt.getTime() > Date.now();
+        const state = toCustomerVisibleState(order.status);
+
         return {
+          // The guest needs this to change or send their own order.
+          id: order.id,
           orderNumber: order.orderNumber,
-          state: toCustomerVisibleState(order.status),
+          state: state === 'EDITABLE' && !windowOpen ? 'RECEIVED' : state,
+          customerWindowExpiresAt: order.customerWindowExpiresAt?.toISOString() ?? null,
           submittedAt: order.submittedAt.toISOString(),
           totalCents: order.totalCents,
           wasAdjustedByStaff: order.currentRevisionNumber > 0 && original?.total !== order.totalCents,
           note: notes[0]?.noteText ?? null,
           items: items.map((i) => ({
             name: { en: i.nameEn, de: i.nameDe, vi: i.nameVi },
+            // Needed to put the order back into the cart when the guest
+            // changes it inside their window.
+            menuItemId: i.menuItemId,
             dishNumber: i.dishNumber,
             quantity: i.quantity,
             unitPriceCents: i.unitPriceCents,

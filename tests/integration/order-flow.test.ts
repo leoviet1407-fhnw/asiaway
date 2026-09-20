@@ -19,7 +19,11 @@ import {
   confirmOrder,
   createOrderForTable,
   editOrder,
+  editOrderAsCustomer,
+  finaliseExpiredOrders,
   openOrderForReview,
+  reopenOrder,
+  sendOrderNow,
   submitOrder,
 } from '../../src/server/services/order-service';
 import type { Db } from '../../src/server/services/order-service';
@@ -191,22 +195,50 @@ describe('order submission', () => {
     expect((revs[0]!.afterSnapshot as any).totalCents).toBe(5400);
   });
 
-  it('writes an audit event and a pending waiter notification in the same transaction', async () => {
-    const { orderId, orderNumber } = await submit();
+  it('audits the submission but tells no waiter yet', async () => {
+    const { orderId } = await submit();
     const events = await db.select().from(auditEvents).where(eq(auditEvents.orderId, orderId));
     expect(events.map((e) => e.action)).toEqual(['ORDER_SUBMITTED']);
     expect(events[0]!.actorType).toBe('CUSTOMER');
+
+    // The guest still owns this order. Notifying now would put something the
+    // guest is still changing into the waiter's queue.
+    const notes = await db.select().from(notifications).where(eq(notifications.orderId, orderId));
+    expect(notes).toHaveLength(0);
+  });
+
+  it('notifies the waiter once the guest sends it', async () => {
+    const { orderId, orderNumber } = await submit();
+    await sendOrderNow(db, { orderId, deviceId: fx.deviceId });
 
     const notes = await db.select().from(notifications).where(eq(notifications.orderId, orderId));
     expect(notes).toHaveLength(1);
     expect(notes[0]!.status).toBe('PENDING');
     expect((notes[0]!.payload as any).orderNumber).toBe(orderNumber);
+    expect((notes[0]!.payload as any).autoConfirmed).toBe(true);
   });
 
-  it('moves the session to ORDER_PENDING', async () => {
+  it('leaves the session alone while the guest still holds the order', async () => {
     await submit();
     const [session] = await db.select().from(diningSessions).where(eq(diningSessions.id, fx.sessionId));
-    expect(session!.status).toBe('ORDER_PENDING');
+    // Nothing is waiting on a waiter yet, so the table must not read as one
+    // that needs attention.
+    expect(session!.status).toBe('OCCUPIED');
+  });
+
+  it('confirms itself when the guest sends it, with no waiter involved', async () => {
+    const { orderId } = await submit();
+    await sendOrderNow(db, { orderId, deviceId: fx.deviceId });
+
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(order!.status).toBe('CONFIRMED');
+    expect(order!.confirmedBy, 'nobody on staff confirmed this').toBeNull();
+
+    const events = await db.select().from(auditEvents).where(eq(auditEvents.orderId, orderId));
+    const auto = events.find((e) => e.action === 'ORDER_AUTO_CONFIRMED');
+    expect(auto).toBeDefined();
+    expect(auto!.actorType).toBe('SYSTEM');
+    expect((auto!.metadata as any).trigger).toBe('sent_by_guest');
   });
 
   it('stores the free-text special request', async () => {
@@ -352,6 +384,9 @@ describe('waiter review, edit and confirmation', () => {
 
   it('records one audit event per individual change, with before and after values', async () => {
     const { orderId } = await submit();
+    // A waiter must take the order over before editing it, which is itself
+    // recorded — the guest's window is not something staff edit behind.
+    await openOrderForReview(db, { orderId, userId: fx.waiterId });
     await editOrder(db, {
       orderId,
       userId: fx.waiterId,
@@ -381,6 +416,7 @@ describe('waiter review, edit and confirmation', () => {
 
   it('rejects a stale edit from a second device', async () => {
     const { orderId } = await submit();
+    await openOrderForReview(db, { orderId, userId: fx.waiterId });
     await editOrder(db, {
       orderId,
       userId: fx.waiterId,
@@ -399,6 +435,7 @@ describe('waiter review, edit and confirmation', () => {
 
   it('creates no revision when an edit changes nothing', async () => {
     const { orderId } = await submit();
+    await openOrderForReview(db, { orderId, userId: fx.waiterId });
     const res = await editOrder(db, {
       orderId,
       userId: fx.waiterId,
@@ -426,8 +463,14 @@ describe('waiter review, edit and confirmation', () => {
   });
 
   it('confirming clears the order from the pending notification queue', async () => {
+    // The notification only exists once the order has left the guest's hands.
     const { orderId } = await submit();
+    await sendOrderNow(db, { orderId, deviceId: fx.deviceId });
+
+    // An emergency correction: the guest calls someone over after sending.
+    await reopenOrder(db, { orderId, userId: fx.waiterId, reason: 'guest changed their mind' });
     await confirmOrder(db, { orderId, userId: fx.waiterId });
+
     const notes = await db.select().from(notifications).where(eq(notifications.orderId, orderId));
     expect(notes[0]!.status).toBe('ACKNOWLEDGED');
     expect(notes[0]!.acknowledgedBy).toBe(fx.waiterId);
@@ -640,7 +683,12 @@ describe('session status follows the orders', () => {
     // Regression: confirming an order used to leave the session in ORDER_PENDING
     // forever, so the dashboard kept showing "order waiting" on a table with
     // nothing waiting, and closing the session was refused.
+    //
+    // Reaching ORDER_PENDING now takes a waiter taking an order over, because
+    // an order that confirms itself never waits on anybody.
     const { orderId } = await submit();
+    await openOrderForReview(db, { orderId, userId: fx.waiterId });
+
     let [session] = await db.select().from(diningSessions).where(eq(diningSessions.id, fx.sessionId));
     expect(session!.status).toBe('ORDER_PENDING');
 
@@ -652,7 +700,9 @@ describe('session status follows the orders', () => {
 
   it('stays ORDER_PENDING while a second order is still waiting', async () => {
     const first = await submit();
-    await submit();
+    const second = await submit();
+    await openOrderForReview(db, { orderId: first.orderId, userId: fx.waiterId });
+    await openOrderForReview(db, { orderId: second.orderId, userId: fx.waiterId });
     await confirmOrder(db, { orderId: first.orderId, userId: fx.waiterId });
 
     const [session] = await db.select().from(diningSessions).where(eq(diningSessions.id, fx.sessionId));

@@ -1,18 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCustomer } from '../../components/customer/CustomerProvider';
+import { OrderWindow } from '../../components/customer/OrderWindow';
 import { formatMoney, formatTime } from '../../lib/format';
 
 interface OrderLine {
   name: { en: string; de: string; vi: string };
+  menuItemId: string;
   dishNumber: string | null;
   quantity: number;
+  unitPriceCents: number;
   lineTotalCents: number;
 }
 
 interface CustomerOrder {
+  id: string;
+  state: 'EDITABLE' | 'RECEIVED' | 'CONFIRMED' | 'CANCELLED';
+  customerWindowExpiresAt: string | null;
   orderNumber: number;
   submittedAt: string;
   totalCents: number;
@@ -29,12 +36,13 @@ interface CustomerOrder {
  * There is no live status here by design.
  */
 export default function OrdersPage() {
-  const { t, locale } = useCustomer();
+  const { t, locale, startEditingOrder } = useCustomer();
+  const router = useRouter();
   const [orders, setOrders] = useState<CustomerOrder[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch('/api/orders')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('orders'))))
       .then((data) => {
@@ -43,6 +51,10 @@ export default function OrdersPage() {
       })
       .catch(() => setError(true));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (error) {
     return <p className="card p-4 text-sm">{t('common.error')}</p>;
@@ -103,6 +115,35 @@ export default function OrdersPage() {
             <span>{t('cart.total')}</span>
             <span>{formatMoney(order.totalCents)}</span>
           </div>
+
+          {/* Still the guest's to change — reachable from here too, because a
+              guest who browsed on after ordering has left the cart screen
+              behind and this is where they come looking. */}
+          {order.state === 'EDITABLE' && (
+            <OrderWindow
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+              expiresAt={order.customerWindowExpiresAt}
+              onClosed={load}
+              onEdit={() => {
+                startEditingOrder(
+                  {
+                    orderId: order.id,
+                    orderNumber: order.orderNumber,
+                    expiresAt: order.customerWindowExpiresAt ?? new Date().toISOString(),
+                  },
+                  order.items.map((item) => ({
+                    menuItemId: item.menuItemId,
+                    name: item.name[locale],
+                    dishNumber: item.dishNumber,
+                    unitPriceCents: item.unitPriceCents,
+                    quantity: item.quantity,
+                  })),
+                );
+                router.push('/cart');
+              }}
+            />
+          )}
         </section>
       ))}
 

@@ -151,11 +151,19 @@ describe('pushing tables together', () => {
       idempotencyKey: randomUUID(),
     });
 
+    // The claim is one bill, so assert the bill — not the session's workflow
+    // status, which no longer moves on submission.
     const open = await db
       .select()
       .from(diningSessions)
-      .where(eq(diningSessions.status, 'ORDER_PENDING'));
+      .where(ne(diningSessions.status, 'CLOSED'));
     expect(open).toHaveLength(1);
+    expect(open[0]!.id).toBe(a.sessionId);
+    expect(b.sessionId).toBe(a.sessionId);
+
+    const detail = await getSessionDetail(db, a.sessionId);
+    expect(detail.orders).toHaveLength(2);
+    expect(detail.totalCents).toBe(2450 * 3);
   });
 
   it('records the merge in the audit trail', async () => {

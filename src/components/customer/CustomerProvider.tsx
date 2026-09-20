@@ -28,6 +28,17 @@ export interface CartLine {
   readonly quantity: number;
 }
 
+/**
+ * An order the guest has sent but is still allowed to change. Held here rather
+ * than in the cart page so that walking back to the menu to add a dish does not
+ * lose track of which order is being changed.
+ */
+export interface EditingOrder {
+  readonly orderId: string;
+  readonly orderNumber: number;
+  readonly expiresAt: string;
+}
+
 interface CustomerState {
   locale: Locale;
   setLocale: (locale: Locale) => void;
@@ -42,12 +53,16 @@ interface CustomerState {
   /** Reused across retries so a network hiccup cannot create a second order. */
   idempotencyKey: string;
   rotateIdempotencyKey: () => void;
+  editingOrder: EditingOrder | null;
+  startEditingOrder: (order: EditingOrder, lines: CartLine[]) => void;
+  stopEditingOrder: () => void;
 }
 
 const Context = createContext<CustomerState | null>(null);
 
 const LOCALE_KEY = 'aw.locale';
 const CART_KEY = 'aw.cart';
+const EDITING_KEY = 'aw.editingOrder';
 const KEY_KEY = 'aw.idemKey';
 
 function read<T>(key: string, fallback: T): T {
@@ -79,6 +94,7 @@ function newKey(): string {
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [editingOrder, setEditingOrder] = useState<EditingOrder | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState<string>('pending');
   const [hydrated, setHydrated] = useState(false);
 
@@ -86,6 +102,17 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     const storedLocale = read<string>(LOCALE_KEY, DEFAULT_LOCALE);
     if (isLocale(storedLocale)) setLocaleState(storedLocale);
     setCart(read<CartLine[]>(CART_KEY, []));
+
+    // Each route mounts its own provider, so this state only survives a
+    // navigation by being written down. A window that has since run out is
+    // dropped rather than restored: the order is with the kitchen by then.
+    const storedEditing = read<EditingOrder | null>(EDITING_KEY, null);
+    if (storedEditing && new Date(storedEditing.expiresAt).getTime() > Date.now()) {
+      setEditingOrder(storedEditing);
+    } else if (storedEditing) {
+      write(EDITING_KEY, null);
+    }
+
     const storedKey = read<string>(KEY_KEY, '');
     setIdempotencyKey(storedKey || newKey());
     setHydrated(true);
@@ -98,6 +125,10 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) write(KEY_KEY, idempotencyKey);
   }, [idempotencyKey, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) write(EDITING_KEY, editingOrder);
+  }, [editingOrder, hydrated]);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
@@ -136,6 +167,18 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(() => setCart([]), []);
   const rotateIdempotencyKey = useCallback(() => setIdempotencyKey(newKey()), []);
 
+  /** Loads a sent order back into the cart so the guest can change it. */
+  const startEditingOrder = useCallback((order: EditingOrder, lines: CartLine[]) => {
+    setEditingOrder(order);
+    setCart(lines);
+  }, []);
+
+  /** Leaves the order as it stands and empties the working cart. */
+  const stopEditingOrder = useCallback(() => {
+    setEditingOrder(null);
+    setCart([]);
+  }, []);
+
   const value = useMemo<CustomerState>(
     () => ({
       locale,
@@ -150,8 +193,24 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
       cartTotalCents: cart.reduce((n, l) => n + l.unitPriceCents * l.quantity, 0),
       idempotencyKey,
       rotateIdempotencyKey,
+      editingOrder,
+      startEditingOrder,
+      stopEditingOrder,
     }),
-    [locale, setLocale, cart, addToCart, setQuantity, removeFromCart, clearCart, idempotencyKey, rotateIdempotencyKey],
+    [
+      locale,
+      setLocale,
+      cart,
+      addToCart,
+      setQuantity,
+      removeFromCart,
+      clearCart,
+      idempotencyKey,
+      rotateIdempotencyKey,
+      editingOrder,
+      startEditingOrder,
+      stopEditingOrder,
+    ],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;

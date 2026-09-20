@@ -45,7 +45,7 @@
   "order.sent.title": "Đã nhận đơn",
   "order.sent.number": "Đơn #{number}",
   "order.sent.time": "Gửi lúc {time}",
-  "order.sent.body": "Nhân viên sẽ đến bàn của bạn để xác nhận đơn.",
+  "order.sent.body": "Đơn của bạn sẽ được chuyển vào bếp ngay. Từ giờ đến lúc đó bạn vẫn có thể sửa.",
   "order.sent.continue": "Tiếp tục xem",
   "orders.title": "Đơn của bạn",
   "orders.empty": "Bạn chưa gọi món nào.",
@@ -65,5 +65,18 @@
   "menu.allergens.none": "Chưa khai báo chất gây dị ứng — vui lòng hỏi nhân viên",
   "menu.allergens.declared": "Chứa",
   "menu.highlights": "Hình ảnh món ăn",
-  "menu.highlights.hint": "Vuốt để xem · chạm để biết chi tiết"
+  "menu.highlights.hint": "Vuốt để xem · chạm để biết chi tiết",
+  "order.window.title": "Bạn vẫn có thể sửa đơn này",
+  "order.window.countdown": "còn {seconds}s",
+  "order.window.change": "Sửa đơn của tôi",
+  "order.window.send": "Gửi vào bếp ngay",
+  "order.window.sending": "Đang gửi…",
+  "order.window.closed": "Đơn này đã được chuyển vào bếp. Nếu cần thay đổi, vui lòng báo nhân viên.",
+  "order.window.sentTitle": "Đã vào bếp",
+  "cart.editing": "Đang sửa đơn #{number}",
+  "cart.editing.save": "Lưu thay đổi",
+  "cart.editing.saving": "Đang lưu…",
+  "cart.editing.cancel": "Giữ nguyên đơn",
+  "cart.editing.saved": "Đã lưu thay đổi của bạn.",
+  "cart.editing.empty": "Đơn phải có ít nhất một món. Nếu muốn huỷ, vui lòng báo nhân viên."
 }

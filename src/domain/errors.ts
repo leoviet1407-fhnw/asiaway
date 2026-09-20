@@ -10,6 +10,10 @@ export type DomainErrorCode =
   | 'SESSION_ALREADY_OPEN'
   | 'ORDER_NOT_FOUND'
   | 'ORDER_NOT_EDITABLE'
+  /** The guest's 60-second window has closed; only staff can change it now. */
+  | 'ORDER_WINDOW_CLOSED'
+  /** This device has no claim on the order it is trying to change. */
+  | 'FORBIDDEN'
   | 'ILLEGAL_ORDER_TRANSITION'
   | 'ILLEGAL_SESSION_TRANSITION'
   | 'ITEMS_UNAVAILABLE'

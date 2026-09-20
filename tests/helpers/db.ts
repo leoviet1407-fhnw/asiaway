@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { schema } from '../../src/server/db/schema';
+import { MIGRATION_FILES } from '../../src/server/db/client';
 
 export type TestDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -19,7 +20,9 @@ export interface TestContext {
  */
 export async function createTestDatabase(): Promise<TestContext> {
   const client = new PGlite();
-  for (const file of ['0000_init.sql', '0002_auth_sessions.sql', '0003_menu_item_volume.sql', '0004_table_area.sql']) {
+  // The real migration list, not a copy of it. A hand-maintained list here
+  // silently stops testing whatever was added last.
+  for (const file of MIGRATION_FILES) {
     await client.exec(readFileSync(resolve(process.cwd(), 'migrations', file), 'utf8'));
   }
   const db = drizzle(client, { schema });

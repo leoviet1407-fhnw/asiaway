@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, lte, ne, sql } from 'drizzle-orm';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 import { domainError } from '../../domain/errors';
 import {
@@ -10,7 +10,12 @@ import {
 import { validateCart, type CartLineRequest, type MenuItemRecord } from '../../domain/order/cart';
 import { buildSnapshot, type OrderSnapshot } from '../../domain/order/snapshot';
 import { planRevision } from '../../domain/order/revision';
-import { transitionOrder, isOrderEditable } from '../../domain/order/status';
+import {
+  transitionOrder,
+  isOrderEditable,
+  isCustomerEditable,
+  type OrderStatus,
+} from '../../domain/order/status';
 import { transitionSession } from '../../domain/session/status';
 import { activeGroupForTable } from './table-group-lookup';
 import {
@@ -42,6 +47,8 @@ export interface SubmitOrderResult {
   readonly orderNumber: number;
   readonly totalCents: number;
   readonly submittedAt: Date;
+  /** When the guest loses the ability to change this order themselves. */
+  readonly customerWindowExpiresAt: Date | null;
   readonly replayed: boolean;
 }
 
@@ -140,11 +147,20 @@ export async function submitOrder(db: Db, input: SubmitOrderInput): Promise<Subm
         const body = existing.responseBody as Omit<SubmitOrderResult, 'replayed'> & {
           submittedAt: string;
         };
+        // Read the window from the order rather than the stored response: it
+        // has been ticking down since, and a phone retrying a submit needs to
+        // know how long is actually left, not how long there was at first.
+        const [live] = await tx
+          .select({ expiresAt: orders.customerWindowExpiresAt })
+          .from(orders)
+          .where(eq(orders.id, body.orderId));
+
         return {
           orderId: body.orderId,
           orderNumber: body.orderNumber,
           totalCents: body.totalCents,
           submittedAt: new Date(body.submittedAt),
+          customerWindowExpiresAt: live?.expiresAt ?? null,
           replayed: true,
         };
       }
@@ -198,7 +214,10 @@ export async function submitOrder(db: Db, input: SubmitOrderInput): Promise<Subm
       .values({
         sessionId: session.id,
         tableId: session.primaryTableId,
-        status: 'SUBMITTED',
+        // The guest keeps this order for the next minute; the waiter cannot
+        // see it yet.
+        status: 'AWAITING_CUSTOMER',
+        customerWindowExpiresAt: new Date(Date.now() + customerWindowSeconds() * 1000),
         submittedByDeviceId: input.deviceId,
         totalCents: snapshot.totalCents,
         currentRevisionNumber: 0,
@@ -245,12 +264,11 @@ export async function submitOrder(db: Db, input: SubmitOrderInput): Promise<Subm
       totalCentsAfter: snapshot.totalCents,
     });
 
+    // The session stays as it is: nothing is waiting on a waiter until the
+    // guest's window closes. resolveSessionStatus moves it then.
     await tx
       .update(diningSessions)
-      .set({
-        status: transitionSession(session.status, 'ORDER_SUBMITTED'),
-        lastActivityAt: new Date(),
-      })
+      .set({ lastActivityAt: new Date() })
       .where(eq(diningSessions.id, session.id));
 
     await writeAuditEvents(tx, [
@@ -268,24 +286,17 @@ export async function submitOrder(db: Db, input: SubmitOrderInput): Promise<Subm
       },
     ]);
 
-    await tx.insert(notifications).values({
-      type: 'NEW_ORDER',
-      status: 'PENDING',
-      sessionId: session.id,
-      orderId: order.id,
-      tableId: session.primaryTableId,
-      payload: {
-        orderNumber: order.orderNumber,
-        totalCents: snapshot.totalCents,
-        itemCount: snapshot.items.reduce((n, i) => n + i.quantity, 0),
-      },
-    });
+    // No notification yet. The waiter hears about this order when the guest's
+    // window closes — see finaliseWithin. Notifying now would put an order the
+    // guest is still changing into the waiter's queue, which is the traffic
+    // this window exists to remove.
 
     const result = {
       orderId: order.id,
       orderNumber: order.orderNumber,
       totalCents: snapshot.totalCents,
       submittedAt: order.submittedAt,
+      customerWindowExpiresAt: order.customerWindowExpiresAt,
     };
 
     await tx
@@ -327,9 +338,14 @@ async function resolveSessionStatus(tx: Db, sessionId: string): Promise<void> {
           and ${orders.status} in ('SUBMITTED', 'EMPLOYEE_REVIEW')`,
     );
 
-  if ((remaining[0]?.n ?? 0) > 0) return;
-
-  const next = transitionSession(session.status, 'ALL_ORDERS_RESOLVED');
+  // Both directions. A session used to be pushed into ORDER_PENDING the moment
+  // a guest submitted; orders now confirm themselves, so the only thing that
+  // makes a session wait on staff is a waiter taking an order over — and that
+  // has to move the session too, or the dashboard never shows it.
+  const next =
+    (remaining[0]?.n ?? 0) > 0
+      ? transitionSession(session.status, 'ORDER_SUBMITTED')
+      : transitionSession(session.status, 'ALL_ORDERS_RESOLVED');
   if (next !== session.status) {
     await tx.update(diningSessions).set({ status: next }).where(eq(diningSessions.id, sessionId));
   }
@@ -366,6 +382,8 @@ export async function openOrderForReview(
         metadata: { orderNumber: order.orderNumber },
       },
     ]);
+
+    await resolveSessionStatus(tx, order.sessionId);
   });
 }
 
@@ -523,6 +541,416 @@ export async function editOrder(db: Db, input: EditOrderInput): Promise<EditOrde
  * is a single row, distinct from the working head, and acknowledges the
  * order's notification so it leaves the pending queue on every device at once.
  */
+/**
+ * How long the guest keeps control of an order they have just sent.
+ *
+ * Long enough to notice "I meant two, not one" and fix it; short enough that
+ * the kitchen is not kept waiting. The restaurant asked for 60 seconds.
+ */
+export function customerWindowSeconds(): number {
+  const raw = Number(process.env.CUSTOMER_EDIT_WINDOW_SECONDS ?? 60);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 60;
+}
+
+function windowHasExpired(order: { customerWindowExpiresAt: Date | null }, now = new Date()): boolean {
+  return !order.customerWindowExpiresAt || order.customerWindowExpiresAt.getTime() <= now.getTime();
+}
+
+/**
+ * Closes a guest's window: the order confirms itself and only now becomes
+ * visible to the waiter.
+ *
+ * Idempotent, because three things race to call it — the guest's countdown, the
+ * guest pressing send, and any waiter screen that happens to load. An order
+ * already past the window simply reports back what it is.
+ */
+async function finaliseWithin(
+  tx: Db,
+  orderId: string,
+  trigger: 'timer' | 'sent_by_guest' | 'waiter_screen',
+): Promise<{ finalised: boolean; orderNumber: number; sessionId: string } | null> {
+  const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+  if (!order) return null;
+  if (order.status !== 'AWAITING_CUSTOMER') {
+    return { finalised: false, orderNumber: order.orderNumber, sessionId: order.sessionId };
+  }
+
+  const status = transitionOrder(order.status, 'FINALISE');
+  const before = await loadSnapshot(tx, order.id);
+  const after = buildSnapshot({
+    status,
+    items: before.items.map((i) => ({
+      menuItemId: i.menuItemId,
+      dishNumber: i.dishNumber,
+      nameEn: i.nameEn,
+      nameDe: i.nameDe,
+      nameVi: i.nameVi,
+      unitPriceCents: i.unitPriceCents,
+      quantity: i.quantity,
+      allergenCodes: i.allergenCodes,
+    })),
+    customerNote: before.customerNote,
+    waiterNote: before.waiterNote,
+  });
+
+  const revisionNumber = order.currentRevisionNumber + 1;
+  const confirmedAt = new Date();
+
+  await tx.insert(orderRevisions).values({
+    orderId: order.id,
+    revisionNumber,
+    revisionType: 'FINAL_CONFIRMED',
+    // Nobody on staff confirmed this: the system did, when the guest's window
+    // ran out. Attributing it to a waiter would put a name against a decision
+    // no person made.
+    actorType: 'SYSTEM',
+    reason: trigger === 'sent_by_guest' ? 'guest sent the order early' : 'edit window closed',
+    beforeSnapshot: before,
+    afterSnapshot: after,
+    totalCentsBefore: before.totalCents,
+    totalCentsAfter: after.totalCents,
+  });
+
+  await tx
+    .update(orders)
+    .set({
+      status,
+      confirmedAt,
+      confirmedBy: null,
+      currentRevisionNumber: revisionNumber,
+      totalCents: after.totalCents,
+    })
+    .where(eq(orders.id, order.id));
+
+  await writeAuditEvents(tx, [
+    {
+      action: 'ORDER_AUTO_CONFIRMED',
+      actor: { type: 'SYSTEM' },
+      entityType: 'ORDER',
+      entityId: order.id,
+      tableId: order.tableId,
+      sessionId: order.sessionId,
+      orderId: order.id,
+      beforeValue: { status: 'AWAITING_CUSTOMER', totalCents: before.totalCents },
+      afterValue: { status, totalCents: after.totalCents },
+      metadata: { orderNumber: order.orderNumber, revisionNumber, trigger },
+    },
+  ]);
+
+  // The waiter hears about the order now, and only now — one settled order
+  // rather than a submission followed by corrections.
+  await tx.insert(notifications).values({
+    type: 'NEW_ORDER',
+    status: 'PENDING',
+    sessionId: order.sessionId,
+    orderId: order.id,
+    tableId: order.tableId,
+    payload: {
+      orderNumber: order.orderNumber,
+      totalCents: after.totalCents,
+      itemCount: after.items.reduce((n, i) => n + i.quantity, 0),
+      autoConfirmed: true,
+    },
+  });
+
+  await resolveSessionStatus(tx, order.sessionId);
+
+  return { finalised: true, orderNumber: order.orderNumber, sessionId: order.sessionId };
+}
+
+/**
+ * Closes any window that has run out.
+ *
+ * Called on the waiter's own screen reads rather than from a scheduled job. A
+ * guest who closes their phone the second after ordering still has a working
+ * countdown on the server, but nothing in a serverless deployment would run it;
+ * the waiter's dashboard polls every few seconds anyway, so the order surfaces
+ * there. This is the same reasoning as expiring a stale session at scan time.
+ */
+export async function finaliseExpiredOrders(db: Db): Promise<string[]> {
+  const due = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, 'AWAITING_CUSTOMER'),
+        lte(orders.customerWindowExpiresAt, new Date()),
+      ),
+    );
+  if (due.length === 0) return [];
+
+  const finalised: string[] = [];
+  for (const row of due) {
+    // One transaction each: a single order that fails to finalise must not
+    // hold back every other table's orders.
+    const result = await db.transaction((tx: Db) => finaliseWithin(tx, row.id, 'waiter_screen'));
+    if (result?.finalised) finalised.push(row.id);
+  }
+  return finalised;
+}
+
+/**
+ * Closes every open window belonging to one session, inside a caller's
+ * transaction.
+ *
+ * Used when the bill is settled. A guest paying has finished ordering, so an
+ * order still inside its window is final — and leaving it open would strand it
+ * on a closed session, to surface later as a notification for a table that has
+ * already been cleared.
+ */
+export async function finaliseOpenWindowsForSession(
+  tx: Db,
+  sessionId: string,
+): Promise<number[]> {
+  const open = await tx
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.sessionId, sessionId), eq(orders.status, 'AWAITING_CUSTOMER')));
+
+  const numbers: number[] = [];
+  for (const row of open) {
+    const result = await finaliseWithin(tx, row.id, 'timer');
+    if (result?.finalised) numbers.push(result.orderNumber);
+  }
+  return numbers;
+}
+
+/** The guest pressing "send to the kitchen" before their window runs out. */
+export async function sendOrderNow(
+  db: Db,
+  input: { orderId: string; deviceId: string | null },
+): Promise<{ orderNumber: number; alreadySent: boolean }> {
+  return db.transaction(async (tx: Db) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, input.orderId));
+    if (!order) throw domainError('ORDER_NOT_FOUND', 'Order not found');
+    await assertOrderBelongsToDevice(tx, order, input.deviceId);
+
+    if (order.status !== 'AWAITING_CUSTOMER') {
+      return { orderNumber: order.orderNumber, alreadySent: true };
+    }
+    const result = await finaliseWithin(tx, order.id, 'sent_by_guest');
+    return { orderNumber: order.orderNumber, alreadySent: !result?.finalised };
+  });
+}
+
+/**
+ * An order may only be changed from the device that placed it, and only while
+ * it belongs to the session that device is sitting in. Without this, anyone who
+ * learned an order id could edit a stranger's food.
+ */
+async function assertOrderBelongsToDevice(
+  tx: Db,
+  order: { id: string; sessionId: string; submittedByDeviceId: string | null },
+  deviceId: string | null,
+): Promise<void> {
+  if (!deviceId) throw domainError('FORBIDDEN', 'This order cannot be changed from here');
+
+  const [device] = await tx
+    .select()
+    .from(customerDevices)
+    .where(eq(customerDevices.id, deviceId));
+
+  // Same table, same visit. Phones at one table share a session deliberately,
+  // so a couple can fix each other's order; a phone from another table cannot.
+  if (!device || device.sessionId !== order.sessionId) {
+    throw domainError('FORBIDDEN', 'This order cannot be changed from here');
+  }
+}
+
+/**
+ * The guest changing their own order inside the window.
+ *
+ * Written as a revision, never over the top of the original. With no waiter
+ * reviewing the order any more, this trail is the only record of what the guest
+ * actually asked for and when they changed their mind.
+ */
+export async function editOrderAsCustomer(
+  db: Db,
+  input: {
+    orderId: string;
+    deviceId: string | null;
+    lines: CartLineRequest[];
+    note: string | null;
+  },
+): Promise<{ orderNumber: number; totalCents: number; revisionNumber: number; secondsLeft: number }> {
+  // The "window has closed" case reports back rather than throwing from inside
+  // the transaction: it finalises the order, and a throw would roll that back
+  // along with it, leaving the order stranded in a window that has passed.
+  const outcome = await db.transaction(async (tx: Db) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, input.orderId));
+    if (!order) throw domainError('ORDER_NOT_FOUND', 'Order not found');
+    await assertOrderBelongsToDevice(tx, order, input.deviceId);
+
+    if (!isCustomerEditable(order.status)) return { closed: true } as const;
+
+    if (windowHasExpired(order)) {
+      // The timer ran out while they were editing. Close the order properly
+      // instead of leaving it behind, then tell them to ask staff.
+      await finaliseWithin(tx, order.id, 'timer');
+      return { closed: true } as const;
+    }
+
+    const requestedIds = [...new Set(input.lines.map((l) => l.menuItemId))];
+    const records = requestedIds.length
+      ? await tx.select().from(menuItems).where(inArray(menuItems.id, requestedIds))
+      : [];
+    const menuMap = new Map<string, MenuItemRecord>(
+      records.map((r) => [
+        r.id,
+        {
+          id: r.id,
+          dishNumber: r.dishNumber,
+          nameEn: r.nameEn,
+          nameDe: r.nameDe,
+          nameVi: r.nameVi,
+          priceCents: r.priceCents,
+          allergenCodes: r.allergenCodes,
+          isAvailable: r.isAvailable,
+          isActive: r.isActive,
+        },
+      ]),
+    );
+
+    const cart = validateCart(input.lines, menuMap, input.note);
+    const before = await loadSnapshot(tx, order.id);
+    const after = buildSnapshot({
+      status: order.status,
+      items: cart.items,
+      customerNote: cart.note,
+      waiterNote: before.waiterNote,
+    });
+
+    const revisionNumber = order.currentRevisionNumber + 1;
+
+    await tx.insert(orderRevisions).values({
+      orderId: order.id,
+      revisionNumber,
+      revisionType: 'CUSTOMER_EDIT',
+      actorType: 'CUSTOMER',
+      actorDeviceId: input.deviceId,
+      reason: 'changed by the guest inside the edit window',
+      beforeSnapshot: before,
+      afterSnapshot: after,
+      totalCentsBefore: before.totalCents,
+      totalCentsAfter: after.totalCents,
+    });
+
+    await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));
+    await tx.insert(orderItems).values(
+      after.items.map((item, index) => ({
+        orderId: order.id,
+        menuItemId: item.menuItemId,
+        dishNumber: item.dishNumber,
+        nameEn: item.nameEn,
+        nameDe: item.nameDe,
+        nameVi: item.nameVi,
+        unitPriceCents: item.unitPriceCents,
+        quantity: item.quantity,
+        lineTotalCents: item.lineTotalCents,
+        allergenCodes: [...item.allergenCodes],
+        sortIndex: index,
+      })),
+    );
+
+    await tx.delete(orderNotes).where(
+      and(eq(orderNotes.orderId, order.id), eq(orderNotes.source, 'CUSTOMER')),
+    );
+    if (cart.note) {
+      await tx
+        .insert(orderNotes)
+        .values({ orderId: order.id, noteText: cart.note, source: 'CUSTOMER' });
+    }
+
+    await tx
+      .update(orders)
+      .set({ currentRevisionNumber: revisionNumber, totalCents: after.totalCents })
+      .where(eq(orders.id, order.id));
+
+    await writeAuditEvents(tx, [
+      {
+        action: 'ORDER_EDITED_BY_CUSTOMER',
+        actor: { type: 'CUSTOMER', deviceId: input.deviceId },
+        entityType: 'ORDER',
+        entityId: order.id,
+        tableId: order.tableId,
+        sessionId: order.sessionId,
+        orderId: order.id,
+        beforeValue: before,
+        afterValue: after,
+        metadata: { orderNumber: order.orderNumber, revisionNumber },
+      },
+    ]);
+
+    // The window is NOT extended. Otherwise a guest editing repeatedly could
+    // hold an order open indefinitely and the kitchen would never see it.
+    const secondsLeft = Math.max(
+      0,
+      Math.ceil(((order.customerWindowExpiresAt?.getTime() ?? 0) - Date.now()) / 1000),
+    );
+
+    return {
+      closed: false as const,
+      orderNumber: order.orderNumber,
+      totalCents: after.totalCents,
+      revisionNumber,
+      secondsLeft,
+    };
+  });
+
+  if (outcome.closed) {
+    throw domainError(
+      'ORDER_WINDOW_CLOSED',
+      'This order has already gone to the kitchen. Please ask a member of staff.',
+    );
+  }
+
+  return outcome;
+}
+
+/**
+ * A waiter reopening a confirmed order because the guest asked them to.
+ *
+ * With the confirm step gone, this is the emergency route the restaurant asked
+ * for: once the window closes the guest cannot change anything themselves, so
+ * they call someone over. Reopening is recorded, because an order that changes
+ * after the kitchen has seen it is exactly what an audit trail is for.
+ */
+export async function reopenOrder(
+  db: Db,
+  input: { orderId: string; userId: string; reason: string | null },
+): Promise<{ orderNumber: number; status: OrderStatus }> {
+  return db.transaction(async (tx: Db) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, input.orderId));
+    if (!order) throw domainError('ORDER_NOT_FOUND', 'Order not found');
+
+    const status = transitionOrder(order.status, 'REOPEN');
+
+    await tx
+      .update(orders)
+      .set({ status, openedByWaiterAt: new Date(), openedBy: input.userId })
+      .where(eq(orders.id, order.id));
+
+    await writeAuditEvents(tx, [
+      {
+        action: 'ORDER_REOPENED',
+        actor: { type: 'WAITER', userId: input.userId },
+        entityType: 'ORDER',
+        entityId: order.id,
+        tableId: order.tableId,
+        sessionId: order.sessionId,
+        orderId: order.id,
+        beforeValue: { status: order.status },
+        afterValue: { status },
+        metadata: { orderNumber: order.orderNumber, reason: input.reason },
+      },
+    ]);
+
+    await resolveSessionStatus(tx, order.sessionId);
+
+    return { orderNumber: order.orderNumber, status };
+  });
+}
+
 export async function confirmOrder(
   db: Db,
   input: { orderId: string; userId: string },
@@ -533,8 +961,12 @@ export async function confirmOrder(
 
     // Confirming without an explicit open is allowed, but both transitions are
     // recorded so the audit trail always shows the review step.
+    //
+    // AWAITING_CUSTOMER counts here too: a waiter called over mid-window takes
+    // the order out of the guest's hands, and the guest's next edit is then
+    // refused rather than silently overwriting what staff just agreed.
     let status = order.status;
-    if (status === 'SUBMITTED') {
+    if (status === 'SUBMITTED' || status === 'AWAITING_CUSTOMER') {
       status = transitionOrder(status, 'OPEN_FOR_REVIEW');
       await tx
         .update(orders)
@@ -549,7 +981,7 @@ export async function confirmOrder(
           tableId: order.tableId,
           sessionId: order.sessionId,
           orderId: order.id,
-          beforeValue: { status: 'SUBMITTED' },
+          beforeValue: { status: order.status },
           afterValue: { status },
           metadata: { orderNumber: order.orderNumber, implicit: true },
         },
