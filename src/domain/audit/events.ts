@@ -33,6 +33,14 @@ export const AUDIT_ACTIONS = [
   'SATURDAY_SPECIAL_SET',
   'SATURDAY_SPECIAL_UPDATED',
   'NOTIFICATION_ACKNOWLEDGED',
+  /* Workforce planning. */
+  'AVAILABILITY_SET_BY_MANAGER',
+  'AVAILABILITY_CLEARED_BY_MANAGER',
+  'ROSTER_PERIOD_CREATED',
+  'ROSTER_PERIOD_STATE_CHANGED',
+  'ROSTER_PUBLISHED',
+  'ABSENCE_REQUESTED',
+  'ABSENCE_DECIDED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -55,7 +63,10 @@ export type AuditEntityType =
   | 'TABLE'
   | 'TABLE_GROUP'
   | 'USER'
-  | 'NOTIFICATION';
+  | 'NOTIFICATION'
+  | 'AVAILABILITY'
+  | 'ROSTER_PERIOD'
+  | 'ABSENCE';
 
 export interface AuditEventInput {
   readonly action: AuditAction;

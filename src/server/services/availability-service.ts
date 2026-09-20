@@ -12,6 +12,7 @@ import {
   type EmploymentType,
 } from '../../domain/roster/availability';
 import {
+  auditEvents,
   availability,
   employments,
   rosterPeriods,
@@ -180,6 +181,20 @@ function isPastDeadline(deadline: Date | null): boolean {
   return deadline !== null && deadline.getTime() <= Date.now();
 }
 
+/**
+ * Who is writing, which decides which periods are still open to them.
+ *
+ * STAFF may only submit while the month is collecting and before the deadline.
+ * A MANAGER may write at any point up to LOCKED: someone phones in a late
+ * offer, or an Aushilfe has no smartphone, and without this their availability
+ * cannot be recorded at all — which for an Aushilfe means they cannot be
+ * rostered at all, since availability is the only thing that puts them on the
+ * plan.
+ */
+export type AvailabilityActor =
+  | { readonly kind: 'STAFF' }
+  | { readonly kind: 'MANAGER'; readonly managerId: string };
+
 export interface SetDayInput {
   readonly userId: string;
   readonly onDate: string;
@@ -196,8 +211,12 @@ export interface SetDayInput {
  * their mind should not leave two contradictory rows for the planner to
  * reconcile. The audit trail of who said what and when lives in audit_events.
  */
-export async function setDayAvailability(db: AppDatabase, input: SetDayInput): Promise<void> {
-  const period = await openPeriodFor(db, input.onDate);
+export async function setDayAvailability(
+  db: AppDatabase,
+  input: SetDayInput,
+  actor: AvailabilityActor = { kind: 'STAFF' },
+): Promise<void> {
+  const period = await writablePeriodFor(db, input.onDate, actor);
 
   const from = input.kind === 'UNAVAILABLE' ? WHOLE_DAY.from : normaliseTime(input.fromTime);
   const to = input.kind === 'UNAVAILABLE' ? WHOLE_DAY.to : normaliseTime(input.toTime);
@@ -220,6 +239,19 @@ export async function setDayAvailability(db: AppDatabase, input: SetDayInput): P
       kind: input.kind,
       note: input.note?.trim() ? input.note.trim() : null,
     });
+
+    // A manager writing on someone else's behalf is a change to that person's
+    // own statement, so it leaves a trace naming who made it.
+    if (actor.kind === 'MANAGER') {
+      await tx.insert(auditEvents).values({
+        actorType: 'WAITER',
+        actorUserId: actor.managerId,
+        action: 'AVAILABILITY_SET_BY_MANAGER',
+        entityType: 'AVAILABILITY',
+        entityId: input.userId,
+        afterValue: { onDate: input.onDate, kind: input.kind, from, to },
+      });
+    }
   });
 }
 
@@ -228,34 +260,55 @@ export async function clearDayAvailability(
   db: AppDatabase,
   userId: string,
   onDate: string,
+  actor: AvailabilityActor = { kind: 'STAFF' },
 ): Promise<void> {
-  await openPeriodFor(db, onDate);
-  await db
-    .delete(availability)
-    .where(and(eq(availability.userId, userId), eq(availability.onDate, onDate)));
+  await writablePeriodFor(db, onDate, actor);
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(availability)
+      .where(and(eq(availability.userId, userId), eq(availability.onDate, onDate)));
+
+    if (actor.kind === 'MANAGER') {
+      await tx.insert(auditEvents).values({
+        actorType: 'WAITER',
+        actorUserId: actor.managerId,
+        action: 'AVAILABILITY_CLEARED_BY_MANAGER',
+        entityType: 'AVAILABILITY',
+        entityId: userId,
+        afterValue: { onDate },
+      });
+    }
+  });
 }
 
 /**
- * The period a date belongs to, provided it is still accepting submissions.
+ * The period a date belongs to, provided this actor may still write to it.
  *
  * Checked on every write rather than trusted from the client: the screen was
  * rendered before the deadline, and the submission may arrive after it.
  */
-async function openPeriodFor(db: AppDatabase, onDate: string) {
+async function writablePeriodFor(db: AppDatabase, onDate: string, actor: AvailabilityActor) {
   const [period] = await db
     .select()
     .from(rosterPeriods)
     .where(
-      and(
-        eq(rosterPeriods.state, 'AVAILABILITY_OPEN'),
-        lte(rosterPeriods.startsOn, onDate),
-        sql`${rosterPeriods.endsOn} >= ${onDate}`,
-      ),
+      and(lte(rosterPeriods.startsOn, onDate), sql`${rosterPeriods.endsOn} >= ${onDate}`),
     )
     .limit(1);
 
   if (!period) {
-    throw domainError('INVALID_PERIOD', 'That date is not in a month that is collecting availability.');
+    throw domainError('INVALID_PERIOD', 'That date is not in any roster period.');
+  }
+
+  if (actor.kind === 'MANAGER') {
+    if (period.state === 'LOCKED') {
+      throw domainError('INVALID_PERIOD', 'That month is locked.');
+    }
+    return period;
+  }
+
+  if (period.state !== 'AVAILABILITY_OPEN') {
+    throw domainError('INVALID_PERIOD', 'That month is no longer collecting availability.');
   }
   if (isPastDeadline(period.availabilityDeadline)) {
     throw domainError('INVALID_PERIOD', 'The deadline for this month has passed.');

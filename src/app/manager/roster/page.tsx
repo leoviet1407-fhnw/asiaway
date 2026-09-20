@@ -39,6 +39,7 @@ export default function ManagerRosterPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [weekStart, setWeekStart] = useState(0);
+  const [fixing, setFixing] = useState<{ userId: string; onDate: string } | null>(null);
 
   const load = useCallback(async () => {
     const response = await fetch('/api/manager/roster', { cache: 'no-store' });
@@ -94,6 +95,32 @@ export default function ManagerRosterPage() {
     }
     return map;
   }, [grid]);
+
+  /**
+   * Records the hours a person actually offered, from the finding that says
+   * they were not offered. Generating a month closes it to staff, so without
+   * this an Aushilfe who phones in late cannot be rostered at all.
+   */
+  async function recordAvailability(userId: string, onDate: string, from: string, to: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/manager/availability', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId, onDate, kind: 'AVAILABLE', fromTime: from, toTime: to }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setError(payload?.error?.message ?? 'That could not be recorded.');
+        return;
+      }
+      setFixing(null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (error && !grid) return <p className="p-6 text-danger-500">{error}</p>;
   if (!grid) return <p className="p-6 text-ink-muted">Loading…</p>;
@@ -292,6 +319,25 @@ export default function ManagerRosterPage() {
                   {violation.code}
                 </span>
                 {violation.message}
+                {(violation.code === 'R8A_ON_CALL_OUTSIDE' ||
+                  violation.code === 'R8B_AGAINST_PREF') &&
+                  violation.userId &&
+                  violation.onDate && (
+                    <AvailabilityFix
+                      open={
+                        fixing?.userId === violation.userId && fixing?.onDate === violation.onDate
+                      }
+                      busy={busy}
+                      name={nameOf(violation.userId)}
+                      onOpen={() =>
+                        setFixing({ userId: violation.userId!, onDate: violation.onDate! })
+                      }
+                      onCancel={() => setFixing(null)}
+                      onSave={(from, to) =>
+                        void recordAvailability(violation.userId!, violation.onDate!, from, to)
+                      }
+                    />
+                  )}
               </li>
             ))}
           </ul>
@@ -303,5 +349,72 @@ export default function ManagerRosterPage() {
         )}
       </section>
     </main>
+  );
+}
+
+/**
+ * The remedy offered beside the finding that names it.
+ *
+ * A manager entering hours on someone's behalf is a statement about that
+ * person, so the write is audited against the manager who made it.
+ */
+function AvailabilityFix({
+  open,
+  busy,
+  name,
+  onOpen,
+  onCancel,
+  onSave,
+}: {
+  open: boolean;
+  busy: boolean;
+  name: string;
+  onOpen: () => void;
+  onCancel: () => void;
+  onSave: (from: string, to: string) => void;
+}) {
+  const [from, setFrom] = useState('17:30');
+  const [to, setTo] = useState('22:00');
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="ml-2 underline decoration-dotted underline-offset-2"
+      >
+        Record their hours
+      </button>
+    );
+  }
+
+  return (
+    <span className="mt-2 flex flex-wrap items-center gap-2">
+      <span className="text-xs text-ink-muted">{name} can work</span>
+      <input
+        type="time"
+        value={from}
+        onChange={(e) => setFrom(e.target.value)}
+        className="min-h-tap border border-ink-muted bg-surface px-1 text-ink"
+      />
+      <span className="text-xs text-ink-muted">to</span>
+      <input
+        type="time"
+        value={to}
+        onChange={(e) => setTo(e.target.value)}
+        className="min-h-tap border border-ink-muted bg-surface px-1 text-ink"
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onSave(from, to)}
+        className="min-h-tap bg-brand-600 px-3 text-xs text-surface hover:bg-brand-700 disabled:opacity-50"
+      >
+        Save
+      </button>
+      <button type="button" onClick={onCancel} className="text-xs text-ink-muted underline">
+        Cancel
+      </button>
+    </span>
   );
 }

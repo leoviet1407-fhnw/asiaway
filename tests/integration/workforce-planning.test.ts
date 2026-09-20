@@ -28,7 +28,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await exec(
-    'truncate employments, availability, absences, roster_periods, auth_sessions, users cascade;',
+    'truncate employments, availability, absences, roster_periods, auth_sessions, audit_events, users cascade;',
   );
 });
 
@@ -144,7 +144,7 @@ describe('submitting availability', () => {
       setDayAvailability(db(), {
         userId: id, onDate: '2026-11-02', kind: 'AVAILABLE', fromTime: '10:30', toTime: '14:30',
       }),
-    ).rejects.toThrow(/not in a month/i);
+    ).rejects.toThrow(/not in any roster period/i);
   });
 
   it('refuses a submission after the deadline, however the screen was rendered', async () => {
@@ -157,6 +157,76 @@ describe('submitting availability', () => {
         userId: id, onDate: '2026-10-08', kind: 'AVAILABLE', fromTime: '10:30', toTime: '14:30',
       }),
     ).rejects.toThrow(/deadline/i);
+  });
+
+  it('lets a manager record a late offer after submissions have closed', async () => {
+    // Generating a month closes it to staff. An Aushilfe who phones in after
+    // that could otherwise never be rostered, because their availability is
+    // the only thing that puts them on the plan.
+    const dennis = await makeUser('DENNIS2');
+    await exec(`insert into employments (user_id, employment_type, valid_from)
+                values ('${dennis}', 'ON_CALL', date '2026-01-01')`);
+    const xuan = await makeUser('XUAN3', 'MANAGER');
+    const pid = await openMonth();
+    await exec(`update roster_periods set state = 'PLANNING' where id = '${pid}'`);
+
+    await expect(
+      setDayAvailability(db(), {
+        userId: dennis, onDate: '2026-10-09', kind: 'AVAILABLE', fromTime: '18:00', toTime: '22:00',
+      }),
+    ).rejects.toThrow(/no longer collecting/i);
+
+    await setDayAvailability(
+      db(),
+      { userId: dennis, onDate: '2026-10-09', kind: 'AVAILABLE', fromTime: '18:00', toTime: '22:00' },
+      { kind: 'MANAGER', managerId: xuan },
+    );
+    const ws = await getAvailabilityWorkspace(db(), dennis);
+    // The workspace only shows an open month, so read the row directly.
+    const saved = await rows(`select kind, from_time from availability where user_id = '${dennis}'`);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ kind: 'AVAILABLE', from_time: '18:00:00' });
+    expect(ws.period).toBeNull();
+  });
+
+  it('records who entered it, since it is a statement made on someone’s behalf', async () => {
+    const dennis = await makeUser('DENNIS3');
+    await exec(`insert into employments (user_id, employment_type, valid_from)
+                values ('${dennis}', 'ON_CALL', date '2026-01-01')`);
+    const xuan = await makeUser('XUAN4', 'MANAGER');
+    await openMonth();
+
+    await setDayAvailability(
+      db(),
+      { userId: dennis, onDate: '2026-10-10', kind: 'AVAILABLE', fromTime: '18:00', toTime: '22:00' },
+      { kind: 'MANAGER', managerId: xuan },
+    );
+    const audit = await rows(
+      `select action, actor_user_id, entity_id from audit_events where entity_type = 'AVAILABILITY'`,
+    );
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      action: 'AVAILABILITY_SET_BY_MANAGER',
+      actor_user_id: xuan,
+      entity_id: dennis,
+    });
+  });
+
+  it('still refuses a manager on a locked month', async () => {
+    const dennis = await makeUser('DENNIS4');
+    await exec(`insert into employments (user_id, employment_type, valid_from)
+                values ('${dennis}', 'ON_CALL', date '2026-01-01')`);
+    const xuan = await makeUser('XUAN5', 'MANAGER');
+    const pid = await openMonth();
+    await exec(`update roster_periods set state = 'LOCKED' where id = '${pid}'`);
+
+    await expect(
+      setDayAvailability(
+        db(),
+        { userId: dennis, onDate: '2026-10-11', kind: 'AVAILABLE', fromTime: '18:00', toTime: '22:00' },
+        { kind: 'MANAGER', managerId: xuan },
+      ),
+    ).rejects.toThrow(/locked/i);
   });
 
   it('reports no period at all when nothing is being collected', async () => {
