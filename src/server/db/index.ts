@@ -1,17 +1,18 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
-import { applyMigrations, createPgliteDatabase, createPostgresDatabase, type AppDatabase } from './client';
+import { createPostgresDatabase, type AppDatabase } from './client';
 
 /**
  * The application's database handle.
  *
- * With DATABASE_URL set, this is ordinary PostgreSQL — that is production.
+ * With DATABASE_URL set, this is ordinary PostgreSQL — that is production, and
+ * the only path a deployed server ever takes.
  *
- * Without it, the app falls back to a file-backed PGlite database and migrates
- * itself on first use. That is what lets `npm run dev` work on a laptop with no
- * Docker and no database server, which matters a great deal for a demo that the
- * restaurant needs to try before any hosting decision has been made.
+ * Without it, development falls back to a file-backed PGlite database that
+ * migrates itself on first use, so `npm run dev` works on a laptop with no
+ * Docker and no database server. That fallback is imported DYNAMICALLY: a
+ * static import would pull 23 MB of WebAssembly into every production bundle
+ * and cold start for code that production never runs.
  */
 const globalRef = globalThis as unknown as {
   __asiawayDb?: Promise<{ db: AppDatabase; mode: 'postgres' | 'pglite' }>;
@@ -28,6 +29,8 @@ async function create(): Promise<{ db: AppDatabase; mode: 'postgres' | 'pglite' 
   if (process.env.NODE_ENV === 'production') {
     throw new Error('DATABASE_URL is required in production');
   }
+
+  const { PGlite, applyMigrations, createPgliteDatabase } = await import('./pglite');
 
   const dir = resolve(process.cwd(), '.pglite');
   mkdirSync(dir, { recursive: true });

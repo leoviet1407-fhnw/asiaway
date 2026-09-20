@@ -9,7 +9,8 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
-import { createPgliteDatabase, createPostgresDatabase, type AppDatabase } from '../src/server/db/client';
+import { createPostgresDatabase, type AppDatabase } from '../src/server/db/client';
+import { createPgliteDatabase } from '../src/server/db/pglite';
 import { users } from '../src/server/db/schema';
 import { hashPassword } from '../src/server/auth/password';
 

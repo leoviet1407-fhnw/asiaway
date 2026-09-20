@@ -136,11 +136,25 @@ export function useWaiterEvents(soundEnabled: boolean) {
       if (previousIds.current.size > 0) chime();
     }, 30_000);
 
+    // Safety net: reconcile against the server queue on a timer NO MATTER WHAT
+    // the connection claims.
+    //
+    // A stream that connects and then silently delivers nothing is the
+    // dangerous failure — the dashboard would show "Live" while orders piled up
+    // unseen. That happens whenever the process publishing events is not the
+    // process holding this stream (any multi-instance or serverless
+    // deployment), and also behind a proxy that keeps the socket open but eats
+    // the events. Neither produces an error, so neither triggers the fallback
+    // above. Polling every 20 seconds costs one cheap query and removes the
+    // entire class of silent failure.
+    const safetyNet = setInterval(() => void refresh(), 20_000);
+
     return () => {
       closed = true;
       source?.close();
       if (poll) clearInterval(poll);
       clearInterval(nag);
+      clearInterval(safetyNet);
     };
   }, [refresh, chime]);
 

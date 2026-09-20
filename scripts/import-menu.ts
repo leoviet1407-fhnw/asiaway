@@ -12,12 +12,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
-import {
-  applyMigrations,
-  createPgliteDatabase,
-  createPostgresDatabase,
-  type AppDatabase,
-} from '../src/server/db/client';
+import { createPostgresDatabase, type AppDatabase } from '../src/server/db/client';
+import { applyMigrations, createPgliteDatabase } from '../src/server/db/pglite';
 import { allergens, auditEvents, menuCategories, menuItems } from '../src/server/db/schema';
 import { parseMenuCsv, type ImportedMenu } from '../src/server/menu/import';
 import { ALLERGENS } from '../src/domain/menu/allergens';

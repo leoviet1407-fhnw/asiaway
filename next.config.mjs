@@ -8,6 +8,15 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ['@electric-sql/pglite', 'postgres'],
+
+  // PGlite is 23 MB of WebAssembly used only by tests, the CLI scripts and
+  // zero-infrastructure local development. Production requires DATABASE_URL and
+  // throws before the dynamic import can ever run, so excluding it from the
+  // deployment trace removes dead weight from the image and keeps serverless
+  // function bundles well inside their size limits.
+  outputFileTracingExcludes: {
+    '*': ['node_modules/@electric-sql/pglite/**'],
+  },
   async headers() {
     return [
       {
