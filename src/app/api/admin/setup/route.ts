@@ -16,6 +16,7 @@ import {
 import { parseMenuCsv } from '../../../../server/menu/import';
 import { parseDrinksCsv } from '../../../../server/menu/drinks-import';
 import { loadPhotoManifest, photoFor } from '../../../../server/menu/photos';
+import { provisionSaturdayMenu } from '../../../../server/menu/provision-saturday';
 import { ALLERGENS } from '../../../../domain/menu/allergens';
 import { generateQrToken } from '../../../../domain/session/qr-token';
 import { hashPassword } from '../../../../server/auth/password';
@@ -228,6 +229,10 @@ export async function POST(request: Request) {
         });
     }
 
+    // The Saturday dishes, which come from the restaurant directly rather than
+    // from either CSV.
+    const saturday = await provisionSaturdayMenu(database);
+
     // --- tables ----------------------------------------------------------
     const createdTables: { tableNumber: string; area: string | null; url: string }[] = [];
     const base = (body.baseUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
@@ -309,6 +314,7 @@ export async function POST(request: Request) {
       menuItems: counts?.n ?? 0,
       foodItems: food.items.length,
       drinkItems: drinks.items.length,
+      saturdayItems: saturday.itemsApplied,
       tables: createdTables,
       deactivated,
       userCreated,

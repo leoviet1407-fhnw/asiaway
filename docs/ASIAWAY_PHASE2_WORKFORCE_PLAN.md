@@ -4,7 +4,8 @@
 **Source analysed:** `Arbeitsplan-Asiaway-07.09.-23.09.26 - Staff.pdf` (2 pages, week of Mon 07.09.2026 – Sun 13.09.2026)
 **Builds on:** the existing Next.js / Drizzle / Postgres app in this repository
 **Date:** 2026-09-20
-**Answered since first draft:** closing time = **22:00** every day · 100% = **40–42.5 h/week** (see Q1, Q2 in Part 8)
+**Answered since first draft:** closing time = **22:00** every day · 100% = **40–42.5 h/week**, a corridor · contracts state a **percentage**, not an hours figure · *Aushilfen* have no pensum and are scheduled from the availability they submit
+**Deferred by decision:** salary, pay rates and overtime settlement are out of scope for this build — see Part 9
 
 Legend: **FOUND** (observed in the PDF, reproducible) · **PROPOSED** (my recommendation) · **VERIFY** (needs a legal or business answer before build) · **OPEN** (undecided).
 
@@ -94,8 +95,8 @@ What still stands after the recomputation:
 - **The band is 2.5 h/week wide, and that is a problem of its own.** Across a month, 40 h/week and 42.5 h/week differ by ~11 hours per person. Whether APRIL's 182.5 planned monthly hours are on target or 8.7 hours of overtime depends entirely on which figure her individual contract states. A band cannot settle a payslip. **OPEN (Q2):** each employment needs its own exact `weekly_hours_at_100`; 40–42.5 is the guardrail the validator checks new contracts against, not a value to store.
 - **TAMIE sits exactly on her floor** (32.0 against a 32.0 minimum). Any trimmed shift puts her under contract. She has no slack.
 - **YEN works six consecutive days** (Mon–Sat) at a 70% contract, with one rest day.
-- **DENNIS, contractually an *Aushilfe*, works 5 days and 36 h** — a near-full-time pattern on casual terms. **VERIFY** whether the contract still matches the reality.
-- **PATRICIA is scheduled zero hours with no absence marked.** The plan cannot say whether she is on holiday, unavailable, or omitted.
+- **DENNIS, an *Aushilfe*, works 5 days and 36 h** — a near-full-time pattern on casual terms. Since *Aushilfen* write their own availability, this is what he offered rather than something imposed on him. Still worth watching: a casual arrangement that settles into a fixed weekly pattern can acquire an implied entitlement. **VERIFY** at the next contract review.
+- **PATRICIA is scheduled zero hours with no absence marked.** As an *Aushilfe* she has no entitlement to hours, so zero may be entirely correct — but the plan cannot distinguish *offered nothing* from *offered and not needed* from *overlooked*. Under the new model those are three different, visible states.
 
 The deeper point survives the correction intact: this roster was fine, and **nobody could have known that** until an end time existed. The defect in F1 was never that the hours were wrong. It was that they were unverifiable.
 
@@ -184,10 +185,21 @@ ALTER TYPE user_role ADD VALUE 'MANAGER';   -- plans, approves, closes the month
 ALTER TYPE user_role ADD VALUE 'STAFF';     -- kitchen/cleaning; no waiter tablet
 
 -- who someone is contractually ---------------------------------------------
+-- the house basis, ONE row, versioned -------------------------------------
+work_time_policy : valid_from, valid_to,
+                   weekly_hours_min_at_100 numeric NOT NULL,   -- 40.0
+                   weekly_hours_max_at_100 numeric NOT NULL,   -- 42.5
+                   default_shift_end time NOT NULL             -- 22:00
+                   -- 100% is a CORRIDOR, not a point. See the note below.
+
 employment_type  : FULL_TIME | PART_TIME | ON_CALL
-employments      : user_id, employment_type, pensum_percent,
-                   weekly_hours_at_100 (numeric, e.g. 42.0),
+employments      : user_id, employment_type,
+                   pensum_percent NULL,   -- 100 / 80 / 70; NULL for ON_CALL
                    valid_from, valid_to, note
+                   CHECK (   (employment_type = 'ON_CALL' AND pensum_percent IS NULL)
+                          OR (employment_type <> 'ON_CALL' AND pensum_percent IS NOT NULL))
+                   -- the contract states a PERCENTAGE. Hours are derived:
+                   --   target_corridor = pensum_percent x [min, max] from the policy
                    -- history, not a mutable column: a pensum change is a new row
 
 -- the venue ----------------------------------------------------------------
@@ -210,6 +222,13 @@ availability     : user_id, period_id, on_date, from_time, to_time,
                    kind: AVAILABLE | PREFERRED | UNAVAILABLE,
                    note, submitted_at
                    UNIQUE (user_id, on_date, from_time)
+                   -- Two meanings, by employment_type:
+                   --   ON_CALL  -> an OFFER. Binding on the planner: R8 hard-blocks
+                   --               any assignment outside it. This is how JENNY,
+                   --               PATRICIA and DENNIS get scheduled at all.
+                   --   FULL/PART-> a PREFERENCE. The contract already obliges the
+                   --               hours, so R8 warns and the manager may override
+                   --               with a recorded reason.
 
 absences         : user_id, starts_on, ends_on,
                    type: VACATION | SICK | MILITARY | UNPAID | PUBLIC_HOLIDAY,
@@ -240,10 +259,15 @@ time_entry_revisions : append-only, mirrors order_revisions exactly
                        (full before/after snapshot, actor, reason)
 
 -- the month's answer ----------------------------------------------------------
-monthly_statements : user_id, period_id, target_minutes, planned_minutes,
-                     worked_minutes, absence_minutes,
-                     balance_minutes, carried_in_minutes, carried_out_minutes,
+monthly_statements : user_id, period_id,
+                     target_min_minutes, target_max_minutes,  -- the corridor
+                     planned_minutes, worked_minutes, absence_minutes,
                      closed_at, closed_by
+                     -- NOTE: no balance_minutes, no carry-over. A balance is an
+                     -- interpretation of these facts under a pay rule, and the
+                     -- pay rule is deferred (Part 9). Storing one now would bake
+                     -- in a decision nobody has made. Derive it later in a view;
+                     -- the inputs above are lossless.
 ```
 
 Three notes on the shape:
@@ -251,6 +275,8 @@ Three notes on the shape:
 **`shifts` is the single source of truth.** The station plan and the person plan are two `SELECT`s over one table. F2 becomes impossible to reproduce — there is no second copy to drift from.
 
 **`ends_at` is `NOT NULL timestamptz`, not a `time`.** Both because `END` must be unrepresentable, and because a shift crossing midnight is a normal Saturday.
+
+**100% is a corridor, and that decision has teeth.** Because contracts state a percentage and the house figure is a range, a person's target is a band: APRIL's 100% is 173.8–184.7 h/month, TAMIE's 80% is 139.0–147.7 h. The balance is measured against the nearest edge — inside the corridor the balance is zero, and only hours beyond an edge become overtime or undertime. This is almost certainly the intent behind a percentage-based monthly salary, and it is why the September roster reads as well-calibrated rather than as six separate rounding errors. **But be deliberate about it:** the corridor is 2.5 h/week wide, so it silently absorbs up to ~11 h/month, ~130 h/year, per person. **DEFERRED (Part 9).** Whether hours inside the corridor are settled by the monthly salary, or tracked and carried, is a pay decision and pay is out of scope. Until it is made the corridor is used for **planning warnings only** (R9) and never for money. Nothing is lost by waiting: `time_entries` records exact clock-in, clock-out and breaks regardless, so whichever rule is chosen later can be applied retroactively to data already collected.
 
 **`audit_events` needs no schema change.** It already carries a generic `entity_type` / `entity_id` pair plus a `metadata` jsonb. Roster and timesheet events use `entity_type IN ('shift','time_entry','availability','absence')`. The append-only triggers and the `SELECT, INSERT`-only grant on `asiaway_app` then apply to workforce data for free.
 
@@ -269,8 +295,10 @@ A pure function over a proposed roster, returning violations. This is the part t
 | R5 | Break minutes required by shift length | **yes** | F5 |
 | R6 | No person in two stations at once | **yes** | — |
 | R7 | Every `STAFFED` station meets its headcount | warn | F3 |
-| R8 | Assignee is available and not absent | **yes** | F2 (EDMOND's Friday cleaning) |
-| R9 | Monthly hours vs. the contract's own `weekly_hours_at_100` | warn | F4 |
+| R8a | `ON_CALL`: assignment falls inside submitted availability | **yes, hard** | F4 |
+| R8b | Contracted: assignment respects availability | warn, overridable | F2 (EDMOND's Friday cleaning) |
+| R9 | Contracted: monthly hours land inside the pensum corridor | warn | F4 |
+| R9b | `ON_CALL`: no target exists — report hours only, never a balance | info | F4 |
 | R10 | Split-shift count and span fairness across the team | warn | F5, F6 |
 | R11 | Every published shift acknowledged by its assignee | info | F8 |
 
@@ -286,7 +314,7 @@ A pure function over a proposed roster, returning violations. This is the part t
 |---|---|
 | `/staff/availability` | Month grid. Tap a day → *available / preferred / unavailable* + optional time window. Presets for recurring patterns ("never Sunday", "evenings only"). Shows the deadline and the person's contract target. **This is the screen your part-timers fill out.** |
 | `/staff/schedule` | My published shifts: next 7 days, plus the month. Station, start, end, break, role. One-tap **acknowledge**. |
-| `/staff/timesheet` | This month's worked hours vs. target, running balance, and a **dispute** button per entry that opens a correction request rather than editing the row. |
+| `/staff/timesheet` | This month's worked hours against the corridor, and a **dispute** button per entry that opens a correction request rather than editing the row. No balance and no money shown — see Part 9. |
 | `/staff/absences` | Request holiday; see remaining entitlement and request state. |
 
 **Manager:**
@@ -296,7 +324,7 @@ A pure function over a proposed roster, returning violations. This is the part t
 | `/manager/roster/[period]` | The grid — deliberately the same layout as today's page 1, but live: drag to assign, availability shaded underneath, violations in a side panel updating as you edit. Generate the month from `shift_templates`, then adjust. |
 | `/manager/roster/[period]/publish` | Preflight: every blocking violation, every unstaffed `STAFFED` station, every person outside pensum tolerance. Publish notifies staff and snapshots the revision. |
 | `/manager/approvals` | Absence requests, timesheet disputes, unplanned time entries. |
-| `/manager/month-close` | Per-person statement, carry-over, CSV/PDF export for payroll, then `LOCKED`. |
+| `/manager/month-close` | Per-person hours statement — planned, worked, absence, against the corridor — then `LOCKED`. Payroll export is Part 9. |
 
 The exported PDF should keep today's two-page station/person layout. It is a good layout and the team can read it at a glance — the difference is that both pages are now rendered from one table.
 
@@ -308,8 +336,9 @@ The exported PDF should keep today's two-page station/person layout. It is a goo
 |---|---|---|
 | **B1** | `MANAGER`/`STAFF` roles, `employments`, `stations`, `roster_periods`, availability capture, staff login | Availability stops arriving by WhatsApp. Contracts are in the system. |
 | **B2** | `shift_templates`, `shifts`, roster grid, the rule validator, publish + acknowledge, PDF export | One source of truth. F1, F2, F3, F6, F7 fixed structurally. |
-| **B3** | `time_entries`, corrections with revision history, approvals, `monthly_statements`, payroll export | Actual vs. planned. Overtime becomes a number. |
+| **B3** | `time_entries`, corrections with revision history, approvals, monthly hours report | Actual vs. planned, per person per month. **No pay, no balance, no export.** |
 | **B4** *(optional)* | Clock-in from the waiter tablet; demand forecasting from `orders` volume per hour | Staffing driven by the order data the app already collects. |
+| **B5** *(deferred)* | Pay rates, balance settlement, carry-over, payroll export | Deliberately not now — see Part 9. |
 
 Sequenced so that each phase is independently useful — B1 alone replaces the availability-gathering that currently happens in chat.
 
@@ -322,12 +351,39 @@ Sequenced so that each phase is independently useful — B1 alone replaces the a
 These need your answer before B1 starts; the first three change the data model.
 
 1. ~~**Closing times.**~~ **ANSWERED: 22:00, every day.** Seeded as the default `ends_at` in `shift_templates`. Remaining sub-question: is 22:00 the *last guest out* or the *staff clock-out*? Close-down after the last table is where unrecorded time hides. *(OPEN — minor)*
-2. **Hours at 100% — now the blocking question.** You gave **40–42.5 h/week**, which is a range across contracts, not a single figure. Payroll needs one number per person. Please supply each employee's contractual weekly hours at 100%; 40–42.5 becomes the validator's guardrail for new contracts. Also: is the monthly target calendar-derived (weeks × weekly hours) or a fixed monthly figure? *(OPEN — blocks B3)*
-3. **`Aushilfe` contracts.** Do JENNY, PATRICIA and DENNIS have a pensum, a monthly hour cap, or purely on-call terms? DENNIS's ~39.5 h week needs an answer before the validator can judge it. *(OPEN — see F4)*
+2. ~~**Hours at 100%.**~~ **ANSWERED: the contract states a percentage; 100% = 40–42.5 h/week.** Modelled as a house-level corridor in `work_time_policy` plus `pensum_percent` per employment. The one remaining question — whether hours inside the corridor are settled by salary or carried — is a pay question and has been **deferred to Part 9**. Nothing is blocked. *(DEFERRED)*
+3. ~~**`Aushilfe` contracts.**~~ **ANSWERED: no pensum — they submit when they can work.** Modelled as `ON_CALL` with `pensum_percent IS NULL`, no target and no balance; their availability is binding on the planner (R8a). One thing to watch rather than decide now: DENNIS offers and works ~36 h across 5 days, week after week. A casual arrangement that settles into a fixed pattern can acquire an implied entitlement. **VERIFY** at the next contract review; the system will surface it, since R9b reports his hours every month. *(see F4)*
 4. **Legal thresholds** for R2–R5, from the ArG and the L-GAV Gastgewerbe. *(VERIFY)*
-5. **Overtime policy.** Compensated in time or paid out? What monthly carry-over is allowed, and what triggers an escalation? *(OPEN)*
+5. **Overtime policy.** Compensated in time or paid out? Carry-over? *(DEFERRED to Part 9)*
 6. **Who plans?** Is XUAN the only `MANAGER`, or does APRIL (who holds the OFFICE shifts) plan too? *(OPEN)*
 7. **Languages.** Staff UI in DE only, or DE/EN/VI like the guest menu? The i18n scaffolding already exists in `src/i18n/`. *(OPEN)*
-8. **Who may see money?** Hourly rates are in scope for payroll export but should be `MANAGER`-only. Confirm. *(OPEN)*
+8. **Who may see money?** Moot for now — no rates are stored. Revisit with Part 9. *(DEFERRED)*
 9. **Holiday entitlement** per person, and whether the system tracks the balance or only records absences. *(OPEN)*
 10. **Data retention** for timesheets. Swiss record-keeping obligations are typically multi-year — confirm the period. *(VERIFY)*
+
+---
+
+## Part 9 — Deliberately deferred: salary
+
+**Decision (2026-09-20): pay is out of scope for this build.** No hourly rates, no wage amounts, no balance settlement, no carry-over, no payroll export. B1–B4 deliver planning and time recording only.
+
+This is a clean cut, and it is cheap to reverse later, because of one discipline:
+
+> **Record facts at full fidelity now. Defer only the interpretation.**
+
+Concretely, what is being built still captures everything a pay run would ever need:
+
+| Captured now | Why it matters later |
+|---|---|
+| `time_entries.clock_in_at` / `clock_out_at` / `break_minutes`, to the minute | The raw input to any wage calculation. Cannot be reconstructed after the fact. |
+| `source` (CLOCK / MANUAL / IMPORTED) and `state` (OPEN → SUBMITTED → APPROVED) | An approved entry is the thing a payslip can be defended with. |
+| `time_entry_revisions`, append-only with full snapshots | Who changed an hour, when, and why — the audit trail a wage dispute turns on. |
+| `work_time_policy` versioned by `valid_from` | A 2026 month is later settled against the 2026 corridor, not today's. |
+| `employments` as history rather than a mutable row | A pensum change mid-year resolves correctly. |
+| `absences` typed (VACATION / SICK / MILITARY / UNPAID) | Paid and unpaid absence are already distinguished. |
+
+What is **not** being built: `hourly_rate_cents`, `balance_minutes`, `carried_in/out_minutes`, wage export, and any `MANAGER`-only money visibility rule. A balance is an interpretation of recorded facts under a pay rule; with no pay rule chosen, persisting one would bake in a decision nobody has made. When the rule exists, the balance becomes a view over data already in the table — a migration that adds columns, not one that invents history.
+
+**One consequence to accept knowingly:** until B5, the system will tell you *how many hours* someone worked against their corridor, and will not tell you whether anyone is owed anything. That is the correct output for a planning and time-recording tool, and it is still strictly more than the current PDF can say.
+
+**One thing worth doing now anyway, cheaply:** whatever record-keeping period applies to working-time records (Q10, **VERIFY**) starts running from the first month recorded, not from when payroll is added. Setting retention correctly in B3 costs nothing; retrofitting it costs data.

@@ -10,17 +10,25 @@ import {
   bigserial,
   boolean,
   char,
+  customType,
+  date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+
+/** Postgres bytea. Drizzle has no built-in for it. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
 
 export const userRole = pgEnum('user_role', ['WAITER']);
 export const categoryKind = pgEnum('category_kind', ['FOOD', 'DRINK']);
@@ -116,6 +124,11 @@ export const menuItems = pgTable(
       .notNull()
       .default(sql`'{}'`),
     imagePath: text('image_path'),
+    /**
+     * ISO-8601 weekday numbers (Monday 1 … Sunday 7) this dish is sold on.
+     * NULL means every day, which is almost everything on the menu.
+     */
+    availableWeekdays: smallint('available_weekdays').array(),
     sortOrder: integer('sort_order').notNull(),
     isAvailable: boolean('is_available').notNull().default(true),
     availabilityChangedAt: timestamp('availability_changed_at', { withTimezone: true }),
@@ -126,6 +139,35 @@ export const menuItems = pgTable(
   },
   (t) => ({ categorySort: index('menu_items_category_sort_idx').on(t.categoryId, t.sortOrder) }),
 );
+
+/**
+ * One row per Saturday: that week's special, in three languages, with its
+ * photograph held in the database.
+ *
+ * The photo is stored here rather than on disk because the app runs on a
+ * read-only serverless filesystem, and a weekly upload by restaurant staff must
+ * not need a deployment.
+ */
+export const weeklySpecials = pgTable('weekly_specials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  /** The Saturday this dish is served on. One special per day. */
+  serviceDate: date('service_date').notNull().unique(),
+  menuItemId: uuid('menu_item_id')
+    .notNull()
+    .references(() => menuItems.id),
+  nameEn: text('name_en').notNull(),
+  nameDe: text('name_de').notNull(),
+  nameVi: text('name_vi').notNull(),
+  descriptionEn: text('description_en').notNull().default(''),
+  descriptionDe: text('description_de').notNull().default(''),
+  descriptionVi: text('description_vi').notNull().default(''),
+  imageData: bytea('image_data').notNull(),
+  imageMime: text('image_mime').notNull(),
+  imageEtag: text('image_etag').notNull(),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const restaurantTables = pgTable('restaurant_tables', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -368,6 +410,7 @@ export const schema = {
   allergens,
   menuCategories,
   menuItems,
+  weeklySpecials,
   restaurantTables,
   tableGroups,
   tableGroupMembers,

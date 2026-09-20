@@ -18,6 +18,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { createPostgresDatabase, type AppDatabase } from '../src/server/db/client';
 import { createPgliteDatabase } from '../src/server/db/pglite';
 import { runMigrations } from '../src/server/db/migrator';
+import { provisionSaturdayMenu } from '../src/server/menu/provision-saturday';
 import {
   allergens,
   menuCategories,
@@ -202,12 +203,14 @@ async function main(): Promise<void> {
   }
 
   const itemCount = await seedMenu(db);
+  const saturday = await provisionSaturdayMenu(db);
   const tables = await seedTables(db, baseUrl);
   const waiterCreated = await seedWaiter(db);
 
   console.log('\nSeed complete');
   console.log('=============');
   console.log(`Menu items      : ${itemCount}`);
+  console.log(`Saturday dishes : ${saturday.itemsApplied}`);
   console.log(`Demo tables     : ${tables.length}`);
   console.log(`Waiter account  : ${waiterCreated ? 'created' : 'already existed'}`);
   console.log(`\n  ${DEMO_WAITER.email} / ${DEMO_WAITER.password}   (DEMO ONLY)\n`);

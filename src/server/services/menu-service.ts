@@ -2,6 +2,14 @@ import { and, asc, eq } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import type { Locale } from '../../i18n/locales';
 import { allergens, auditEvents, menuCategories, menuItems } from '../db/schema';
+import {
+  isAvailableOnWeekday,
+  isSaturday,
+  restaurantDate,
+  restaurantWeekday,
+} from '../../domain/menu/saturday';
+import { SATURDAY_SPECIAL_KEY } from '../menu/saturday-menu';
+import { getSpecialForDate } from './specials-service';
 import type { Db } from './order-service';
 
 export interface LocalisedMenuItem {
@@ -24,20 +32,35 @@ export interface LocalisedCategory {
   readonly items: LocalisedMenuItem[];
 }
 
-function pick<T extends Record<string, unknown>>(row: T, base: string, locale: Locale): string {
+function pick<T extends object>(row: T, base: string, locale: Locale): string {
   const key = `${base}${locale === 'en' ? 'En' : locale === 'de' ? 'De' : 'Vi'}`;
-  return String(row[key] ?? '');
+  return String((row as Record<string, unknown>)[key] ?? '');
 }
 
 /**
- * The customer menu, already localised.
+ * The customer menu, already localised, as it stands today.
  *
  * Sold-out items are RETURNED, not filtered out: the guest must still see the
  * dish and that it is unavailable today (spec §13). Availability shown here is
  * advisory — it is re-checked inside the submit transaction, which is what
  * actually decides.
+ *
+ * Dishes sold only on certain days are a different matter and ARE dropped on
+ * the others, because a dish that cannot be had today is not sold out, it is
+ * simply not on. A category left with nothing disappears with them — an empty
+ * "Saturday" heading on a Tuesday tells a guest nothing except that something
+ * is missing.
+ *
+ * The Saturday special is a special case: its name, description and photograph
+ * come from that week's row, and with no row for the day it is not shown at
+ * all. Showing "Saturday Special" with last week's picture would be worse than
+ * showing nothing.
  */
-export async function getMenu(db: Db, locale: Locale): Promise<LocalisedCategory[]> {
+export async function getMenu(
+  db: Db,
+  locale: Locale,
+  now: Date = new Date(),
+): Promise<LocalisedCategory[]> {
   const categories = await db
     .select()
     .from(menuCategories)
@@ -50,25 +73,43 @@ export async function getMenu(db: Db, locale: Locale): Promise<LocalisedCategory
     .where(eq(menuItems.isActive, true))
     .orderBy(asc(menuItems.sortOrder));
 
-  return categories.map((category) => ({
-    id: category.id,
-    slug: category.slug,
-    kind: category.kind,
-    name: pick(category, 'name', locale),
-    items: items
-      .filter((item) => item.categoryId === category.id)
-      .map((item) => ({
-        id: item.id,
-        dishNumber: item.dishNumber,
-        volume: item.volume,
-        name: pick(item, 'name', locale),
-        description: pick(item, 'description', locale),
-        priceCents: item.priceCents,
-        allergenCodes: item.allergenCodes,
-        imagePath: item.imagePath,
-        isAvailable: item.isAvailable,
-      })),
-  }));
+  const weekday = restaurantWeekday(now);
+  const today = restaurantDate(now);
+
+  const special = isSaturday(now) ? await getSpecialForDate(db, today) : null;
+
+  return categories
+    .map((category) => ({
+      id: category.id,
+      slug: category.slug,
+      kind: category.kind,
+      name: pick(category, 'name', locale),
+      items: items
+        .filter((item) => item.categoryId === category.id)
+        .filter((item) => isAvailableOnWeekday(item.availableWeekdays, weekday))
+        .filter((item) => item.externalKey !== SATURDAY_SPECIAL_KEY || special !== null)
+        .map((item) => {
+          const isSpecial = item.externalKey === SATURDAY_SPECIAL_KEY && special;
+          return {
+            id: item.id,
+            dishNumber: item.dishNumber,
+            volume: item.volume,
+            name: isSpecial ? pick(special, 'name', locale) : pick(item, 'name', locale),
+            description: isSpecial
+              ? pick(special, 'description', locale)
+              : pick(item, 'description', locale),
+            priceCents: item.priceCents,
+            allergenCodes: item.allergenCodes,
+            // Served from the database, and keyed on the photo's own hash so a
+            // replaced picture is never served from a stale cache.
+            imagePath: isSpecial
+              ? `/api/menu/specials/${today}/image?v=${special.imageEtag}`
+              : item.imagePath,
+            isAvailable: item.isAvailable,
+          };
+        }),
+    }))
+    .filter((category) => category.items.length > 0);
 }
 
 export async function getMenuItem(
