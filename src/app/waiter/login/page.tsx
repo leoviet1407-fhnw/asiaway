@@ -50,13 +50,7 @@ export default function WaiterLoginPage() {
         // Sound is optional; the visual alert is not.
       }
 
-      // Everyone signs in here, including people who never touch the tablet.
-      // A waiter still lands on the tablet, which is their job during service;
-      // a manager on the roster, and back-of-house staff on their own shifts.
-      const role = (data as { user?: { role?: string } } | null)?.user?.role;
-      router.push(
-        role === 'MANAGER' ? '/manager/roster' : role === 'STAFF' ? '/staff/schedule' : '/waiter',
-      );
+      router.push('/waiter');
       router.refresh();
     } catch {
       setError('No connection. Please check the network.');

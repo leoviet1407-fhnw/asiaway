@@ -6,7 +6,6 @@ dist/
 coverage/
 *.log
 .pglite/
-.pglite-*/
 qr-codes/
 next-env.d.ts
 tsconfig.tsbuildinfo

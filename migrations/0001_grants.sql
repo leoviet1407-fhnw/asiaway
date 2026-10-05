@@ -32,36 +32,3 @@ REVOKE UPDATE, DELETE, TRUNCATE ON audit_events, order_revisions FROM asiaway_ap
 
 GRANT USAGE, SELECT ON SEQUENCE order_number_seq, session_number_seq, audit_events_id_seq
 TO asiaway_app;
-
--- ---------- workforce planning (0007, 0008) ----------------------------------
--- Ordinary mutable operational data: a roster is edited until it is published,
--- and an employee revises their availability until the deadline. The history
--- that must not be rewritten lives in audit_events, which is already locked
--- down above and is where roster and timesheet changes are recorded.
-GRANT SELECT, INSERT, UPDATE, DELETE ON
-  employments, stations, roster_periods, availability, absences
-TO asiaway_app;
-
--- The corridor a past month was settled against must stay as it was, so the
--- application may add a new policy but never rewrite or remove an old one.
-GRANT SELECT, INSERT ON work_time_policy TO asiaway_app;
-REVOKE UPDATE, DELETE, TRUNCATE ON work_time_policy FROM asiaway_app;
-
--- ---------- the roster (0009) -------------------------------------------------
-GRANT SELECT, INSERT, UPDATE, DELETE ON shift_templates, shifts TO asiaway_app;
-
--- Rule thresholds are configuration, changed deliberately and rarely. The
--- application reads them on every validation and must never quietly rewrite
--- the limit it is being judged against.
-GRANT SELECT ON roster_rules TO asiaway_app;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON roster_rules FROM asiaway_app;
-
--- ---------- time recording (0011) ---------------------------------------------
-GRANT SELECT, INSERT, UPDATE ON time_entries TO asiaway_app;
--- Nothing deletes a recorded hour. A mistake is corrected, and the correction
--- is a revision naming who made it.
-REVOKE DELETE, TRUNCATE ON time_entries FROM asiaway_app;
-
--- The correction trail and the closed month are history: insert and read only.
-GRANT SELECT, INSERT ON time_entry_revisions, monthly_statements TO asiaway_app;
-REVOKE UPDATE, DELETE, TRUNCATE ON time_entry_revisions, monthly_statements FROM asiaway_app;

@@ -25,11 +25,6 @@ export type DomainErrorCode =
   | 'REQUEST_IN_FLIGHT'
   | 'SESSION_HAS_UNRESOLVED_ORDERS'
   | 'REASON_REQUIRED'
-  /* Workforce planning (B1). */
-  | 'INVALID_PENSUM'
-  | 'INVALID_WORK_TIME_POLICY'
-  | 'INVALID_PERIOD'
-  | 'ILLEGAL_TIME_ENTRY_TRANSITION'
   | 'VALIDATION_FAILED';
 
 export class DomainError extends Error {
