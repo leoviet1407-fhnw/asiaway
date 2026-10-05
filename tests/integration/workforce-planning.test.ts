@@ -394,3 +394,28 @@ describe('absence', () => {
     ).rejects.toThrow(/absences_period/i);
   });
 });
+
+describe('enough days for a contract', () => {
+  const db = () => ctx.db as unknown as AppDatabase;
+
+  it('tells a 100% employee how many days are still missing, then clears', async () => {
+    const id = await makeUser('APRIL');
+    await exec(`insert into employments (user_id, employment_type, pensum_percent, valid_from)
+                values ('${id}', 'FULL_TIME', 100, date '2026-01-01')`);
+    await exec(`insert into roster_periods (starts_on, ends_on, state, availability_deadline)
+                values (date '2026-10-01', date '2026-10-31', 'AVAILABILITY_OPEN', now() + interval '3 days')`);
+
+    let ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.coverage?.complete).toBe(false);
+    expect(ws.coverage?.missingDays).toBeGreaterThan(15);
+
+    // Every weekday of October with a full-day window is far more than enough.
+    for (let d = 1; d <= 31; d++) {
+      const date = `2026-10-${String(d).padStart(2, '0')}`;
+      if (new Date(date).getUTCDay() % 6 === 0) continue;
+      await setDayAvailability(db(), { userId: id, onDate: date, kind: 'AVAILABLE', fromTime: '10:30', toTime: '22:00' });
+    }
+    ws = await getAvailabilityWorkspace(db(), id);
+    expect(ws.coverage?.complete).toBe(true);
+  });
+});

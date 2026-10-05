@@ -5,6 +5,7 @@ import {
   type Corridor,
   type WorkTimePolicy,
 } from '../../domain/roster/corridor';
+import { coverage, type Coverage } from '../../domain/roster/coverage';
 import {
   availabilityWeight,
   hasHoursTarget,
@@ -61,6 +62,8 @@ export interface AvailabilityWorkspace {
   /** Null for an Aushilfe, who is owed no hours. */
   readonly corridor: (Corridor & { readonly hoursLabel: string }) | null;
   readonly days: readonly AvailabilityDay[];
+  /** Null for an Aushilfe: there is no minimum to meet. */
+  readonly coverage: Coverage | null;
   readonly defaultShiftEnd: string;
 }
 
@@ -147,6 +150,14 @@ export async function getAvailabilityWorkspace(
         .orderBy(asc(availability.onDate))
     : [];
 
+  const mapped = days.map((d) => ({
+    onDate: d.onDate,
+    kind: d.kind as AvailabilityKind,
+    fromTime: d.fromTime.slice(0, 5),
+    toTime: d.toTime.slice(0, 5),
+    note: d.note,
+  }));
+
   return {
     period: period
       ? {
@@ -166,13 +177,8 @@ export async function getAvailabilityWorkspace(
         }
       : null,
     corridor,
-    days: days.map((d) => ({
-      onDate: d.onDate,
-      kind: d.kind as AvailabilityKind,
-      fromTime: d.fromTime.slice(0, 5),
-      toTime: d.toTime.slice(0, 5),
-      note: d.note,
-    })),
+    days: mapped,
+    coverage: corridor ? coverage(mapped, corridor.minMinutes) : null,
     defaultShiftEnd,
   };
 }

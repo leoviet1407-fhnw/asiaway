@@ -28,6 +28,14 @@ interface Workspace {
   } | null;
   corridor: { minMinutes: number; maxMinutes: number; hoursLabel: string } | null;
   days: Day[];
+  coverage: {
+    offeredDays: number;
+    offeredMinutes: number;
+    requiredMinutes: number;
+    requiredDays: number;
+    missingDays: number;
+    complete: boolean;
+  } | null;
   defaultShiftEnd: string;
 }
 
@@ -149,11 +157,32 @@ export default function AvailabilityPage() {
               {ws.contract?.pensumPercent ?? '—'}% contract
               {ws.corridor ? ` · ${ws.corridor.hoursLabel} this month` : ''}
             </strong>{' '}
-            — what you enter is taken as a preference. Your contracted hours still apply, so the
-            plan may differ; you will be told if it does.
+            — you must choose enough days to cover your contract. The final plan may still differ
+            slightly; you will be told if it does.
           </>
         )}
       </div>
+
+      {ws.coverage && (
+        <div
+          className={`mt-3 border-l-2 p-3 text-sm ${
+            ws.coverage.complete ? 'border-brand-600 bg-brand-50' : 'border-danger-500 bg-danger-50'
+          }`}
+        >
+          <strong>
+            {ws.coverage.complete
+              ? 'Enough days chosen. Thank you.'
+              : `Not enough yet: choose at least ${ws.coverage.missingDays} more day${
+                  ws.coverage.missingDays === 1 ? '' : 's'
+                }.`}
+          </strong>
+          <div className="mt-1 text-ink-muted">
+            {ws.coverage.offeredDays} days chosen · you need about {ws.coverage.requiredDays} days
+            ({Math.round(ws.coverage.offeredMinutes / 60)} of{' '}
+            {Math.round(ws.coverage.requiredMinutes / 60)} h)
+          </div>
+        </div>
+      )}
 
       {ws.period.deadline && (
         <p className={`mt-3 text-sm ${locked ? 'text-danger-500' : 'text-ink-muted'}`}>
