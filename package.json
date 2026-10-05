@@ -22,7 +22,8 @@
     "qr": "tsx scripts/generate-qr.ts",
     "user:create": "tsx scripts/create-user.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "workforce:seed": "tsx scripts/seed-workforce.ts"
+    "workforce:seed": "tsx scripts/seed-workforce.ts",
+    "test-login:create": "tsx scripts/create-test-login.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
