@@ -79,7 +79,7 @@ const TEMPLATES: {
 ];
 
 /** The next month the restaurant would be planning. */
-const PERIOD = { startsOn: '2026-10-01', endsOn: '2026-10-31', deadline: '2026-09-25T22:00:00Z' };
+const PERIOD = { startsOn: '2026-10-01', endsOn: '2026-10-31', deadline: new Date(Date.now() + 14 * 86_400_000).toISOString() };
 
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
