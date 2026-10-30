@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Sans, IBM_Plex_Sans_Thai } from 'next/font/google';
+import { BASE_VIEWPORT } from '../config/viewport';
 import './globals.css';
 
 /* asiaway.ch serves both cuts from Typekit. The Google mirrors are the same
@@ -25,12 +26,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
 };
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  themeColor: '#ac2025',
-};
+export const viewport: Viewport = BASE_VIEWPORT;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

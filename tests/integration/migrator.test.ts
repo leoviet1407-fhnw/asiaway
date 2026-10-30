@@ -50,6 +50,29 @@ describe('running migrations against a live database', () => {
     expect(second.alreadyApplied).toEqual([...MIGRATION_FILES]);
   });
 
+  it('leaves no lock behind, so the next instance to wake never waits on it', async () => {
+    const { db, exec } = await freshDatabase();
+    await runMigrations(db, exec);
+
+    const locks = await db.execute(
+      sql`select count(*)::int as n from pg_locks where locktype = 'advisory'`,
+    );
+    expect(((locks as any).rows ?? locks)[0].n).toBe(0);
+  });
+
+  it('applies each file once when two instances wake together', async () => {
+    const { db, exec } = await freshDatabase();
+    const [a, b] = await Promise.all([runMigrations(db, exec), runMigrations(db, exec)]);
+
+    // Between them every file is applied, and none by both.
+    const appliedByBoth = a.applied.filter((f) => b.applied.includes(f));
+    expect(appliedByBoth).toEqual([]);
+    expect([...a.applied, ...b.applied].sort()).toEqual([...MIGRATION_FILES].sort());
+
+    const rows = await db.execute(sql`select count(*)::int as n from schema_migrations`);
+    expect(((rows as any).rows ?? rows)[0].n).toBe(MIGRATION_FILES.length);
+  });
+
   it('records what it applied, so a later migration can be added safely', async () => {
     const { db, exec } = await freshDatabase();
     await runMigrations(db, exec);

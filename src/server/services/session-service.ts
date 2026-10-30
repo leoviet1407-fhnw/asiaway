@@ -312,6 +312,85 @@ export async function requestCheckout(
 }
 
 /**
+ * Guest calls a member of staff to their table.
+ *
+ * One call stands until someone acknowledges it: pressing again while staff are
+ * on their way returns the original moment and creates no second alert. Once a
+ * waiter has dealt with it, the guest can call again. Closing the session clears
+ * any call still open, as it does every alert for that table.
+ */
+export async function callStaff(
+  db: Db,
+  input: { sessionId: string; deviceId: string | null },
+): Promise<{ alreadyCalled: boolean; calledAt: Date }> {
+  return db.transaction(async (tx: Db) => {
+    const [session] = await tx
+      .select()
+      .from(diningSessions)
+      .where(eq(diningSessions.id, input.sessionId));
+
+    if (!session) throw domainError('SESSION_NOT_FOUND', 'Dining session not found');
+    if (session.status === 'CLOSED') {
+      throw domainError('SESSION_CLOSED', 'This table session has been closed');
+    }
+
+    const [open] = await tx
+      .select({ createdAt: notifications.createdAt })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.sessionId, session.id),
+          eq(notifications.type, 'STAFF_CALLED'),
+          eq(notifications.status, 'PENDING'),
+        ),
+      );
+    if (open) return { alreadyCalled: true, calledAt: open.createdAt };
+
+    const calledAt = new Date();
+    await tx.insert(notifications).values({
+      type: 'STAFF_CALLED',
+      status: 'PENDING',
+      sessionId: session.id,
+      tableId: session.primaryTableId,
+      createdAt: calledAt,
+    });
+
+    await tx
+      .update(diningSessions)
+      .set({ lastActivityAt: calledAt })
+      .where(eq(diningSessions.id, session.id));
+
+    await tx.insert(auditEvents).values({
+      actorType: 'CUSTOMER',
+      actorDeviceId: input.deviceId,
+      action: 'STAFF_CALLED',
+      entityType: 'SESSION',
+      entityId: session.id,
+      tableId: session.primaryTableId,
+      sessionId: session.id,
+      metadata: {},
+    });
+
+    return { alreadyCalled: false, calledAt };
+  });
+}
+
+/** When the guest's call is still waiting for staff, or null when none is. */
+export async function pendingStaffCall(db: Db, sessionId: string): Promise<Date | null> {
+  const [open] = await db
+    .select({ createdAt: notifications.createdAt })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.sessionId, sessionId),
+        eq(notifications.type, 'STAFF_CALLED'),
+        eq(notifications.status, 'PENDING'),
+      ),
+    );
+  return open?.createdAt ?? null;
+}
+
+/**
  * Staff close the session after payment has been taken at the POS.
  *
  * Refuses while any order still awaits waiter action, unless forced with a

@@ -27,6 +27,7 @@ import {
   submitOrder,
 } from '../../src/server/services/order-service';
 import type { Db } from '../../src/server/services/order-service';
+import { acknowledgeOrder } from '../../src/server/services/session-service';
 import { DomainError } from '../../src/domain/errors';
 import { generateQrToken } from '../../src/domain/session/qr-token';
 
@@ -675,6 +676,70 @@ describe('an order taken by a waiter at the table', () => {
       idempotencyKey: randomUUID(),
     });
     expect(result.totalCents).toBe(4900);
+  });
+
+  it('raises no alert when the waiter enters it into the POS themselves, as in Oerlikon', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+    });
+
+    expect(result.queued).toBe(false);
+    const alerts = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.orderId, result.orderId));
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('reaches whoever enters orders into the POS, as in Winterthur', async () => {
+    const result = await createOrderForTable(db, {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 2 }],
+      note: 'no coriander',
+      idempotencyKey: randomUUID(),
+      sendToQueue: true,
+    });
+
+    expect(result.queued).toBe(true);
+    const [alert] = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.orderId, result.orderId));
+    expect(alert).toMatchObject({
+      type: 'NEW_ORDER',
+      status: 'PENDING',
+      tableId: fx.tableId,
+      payload: { orderNumber: result.orderNumber, totalCents: 4900, itemCount: 2, takenByStaff: true },
+    });
+
+    // "Entered into the POS" clears it, exactly as for a guest's order.
+    await acknowledgeOrder(db, { orderId: result.orderId, userId: fx.waiterId });
+    const [after] = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.orderId, result.orderId));
+    expect(after!.status).toBe('ACKNOWLEDGED');
+  });
+
+  it('raises one alert, not two, when the phone sends twice', async () => {
+    const input = {
+      tableId: fx.tableId,
+      userId: fx.waiterId,
+      lines: [{ menuItemId: fx.pho, quantity: 1 }],
+      note: null,
+      idempotencyKey: randomUUID(),
+      sendToQueue: true,
+    };
+    const first = await createOrderForTable(db, input);
+    const second = await createOrderForTable(db, input);
+
+    expect(second).toMatchObject({ replayed: true, queued: true, orderId: first.orderId });
+    expect(await db.select().from(notifications)).toHaveLength(1);
   });
 });
 

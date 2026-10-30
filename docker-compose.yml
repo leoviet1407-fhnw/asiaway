@@ -21,7 +21,10 @@ services:
       - '5432:5432'
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_RESTAURANT_LOCATION: ${NEXT_PUBLIC_RESTAURANT_LOCATION:-oerlikon}
     restart: unless-stopped
     depends_on:
       db:

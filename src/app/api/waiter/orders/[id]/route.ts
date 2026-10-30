@@ -69,6 +69,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         // The original customer submission travels with every response, so the
         // waiter can always see what the guest actually asked for.
         originalSubmission: revisions.find((r) => r.revisionNumber === 0)?.afterSnapshot ?? null,
+        // A waiter typed it in at the table, so no guest sent anything.
+        takenByStaff: revisions.find((r) => r.revisionNumber === 0)?.actorType === 'WAITER',
         revisions: revisions.map((r) => ({
           revisionNumber: r.revisionNumber,
           revisionType: r.revisionType,

@@ -1,6 +1,18 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "asiaway-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+    { "name": "asiaway-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 },
+    {
+      "name": "asiaway-dev-winterthur",
+      "runtimeExecutable": "/usr/bin/env",
+      "runtimeArgs": [
+        "NEXT_PUBLIC_RESTAURANT_LOCATION=winterthur",
+        "PGLITE_DIR=.pglite/winterthur",
+        "APP_BASE_URL=http://localhost:3001",
+        "CRON_SECRET=local-dev-only-not-a-secret",
+        "npm", "run", "dev", "--", "-p", "3001"
+      ],
+      "port": 3001
+    }
   ]
 }

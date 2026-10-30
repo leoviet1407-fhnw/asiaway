@@ -9,8 +9,12 @@
 html,
 body {
   @apply bg-surface text-ink antialiased;
-  /* Mobile-first: never allow a sideways scroll on a phone. */
+  /* Mobile-first: never allow a sideways scroll on a phone. `clip`, not
+     `hidden`: hidden turns the page into its own scroll box, which quietly
+     stops every sticky header from sticking. hidden stays as the fallback for
+     browsers too old to know clip. */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @layer base {
@@ -52,6 +56,12 @@ body {
   }
   .card {
     @apply border border-ink/10 bg-surface;
+  }
+  /* The guest header and bottom bar, each with the iPhone's safe area added, so
+     everything pinned to them lines up on a phone with a notch or home bar. */
+  .guest-frame {
+    --guest-header: calc(4rem + env(safe-area-inset-top));
+    --guest-nav: calc(3.5rem + env(safe-area-inset-bottom));
   }
   .field {
     @apply w-full border border-ink/25 bg-surface px-4 py-3 text-base

@@ -61,6 +61,7 @@ export const notificationType = pgEnum('notification_type', [
   'NEW_ORDER',
   'CHECKOUT_REQUESTED',
   'ORDER_UPDATED',
+  'STAFF_CALLED',
 ]);
 export const notificationStatus = pgEnum('notification_status', ['PENDING', 'ACKNOWLEDGED']);
 export const idempotencyState = pgEnum('idempotency_state', ['IN_PROGRESS', 'COMPLETED']);

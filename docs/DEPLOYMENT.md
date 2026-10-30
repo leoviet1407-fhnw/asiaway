@@ -60,6 +60,7 @@ Copy `.env.example`. Generate each secret with `openssl rand -base64 48`.
 | `CUSTOMER_COOKIE_SECRET` | production | Signs the guest session cookie; min 32 chars. Changing it logs out every guest |
 | `AUTH_SECRET` | production | Reserved for the auth layer |
 | `APP_BASE_URL` | yes | Public HTTPS address; **the QR codes encode it** |
+| `NEXT_PUBLIC_RESTAURANT_LOCATION` | no | `oerlikon` (default) or `winterthur`. Picks the floor plan and the Saturday menu. Read at **build** time |
 | `NEXT_PUBLIC_RESTAURANT_TIMEZONE` | no | Default `Europe/Zurich` (confirm — open question E8) |
 | `SESSION_IDLE_TIMEOUT_HOURS` | no | Default `4` (proposal E6) |
 | `SEED_ALLOW_PROD` | no | Guard; the demo seed refuses a real database without it |
@@ -114,6 +115,47 @@ DATABASE_URL=postgres://... APP_BASE_URL=https://your-domain npm run qr
 This writes `qr-codes/table-XX.svg`, `.png` and a printable `print-sheet.html`.
 **`APP_BASE_URL` is baked into every code**, so set it correctly before printing:
 reprinting means revisiting every table.
+
+## A second restaurant: Winterthur
+
+Winterthur runs the same code as Oerlikon as a deployment of its own: its own
+database, its own address, its own QR codes and staff accounts. Nothing is
+shared while it runs — orders, sold-out marks and bills in one restaurant never
+appear in the other. A push to `main` redeploys both.
+
+What differs is kept in two files: `src/config/restaurant.ts` (Winterthur has
+no Saturday menu) and `src/config/floor-plan.ts` (its room, and which tables
+can be pushed together). The food menu, drinks and photos come from the same
+files in `data/` as Oerlikon's.
+
+1. **A new database.** Create a second Neon (or other managed PostgreSQL)
+   database. Never point Winterthur at Oerlikon's.
+2. **A new Vercel project** from the same GitHub repository and branch.
+3. **Its own variables**, set before the first build:
+
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_RESTAURANT_LOCATION` | `winterthur` |
+   | `DATABASE_URL` | Winterthur's **pooled** connection string |
+   | `APP_BASE_URL` | Winterthur's public address — the QR codes encode it |
+   | `CUSTOMER_COOKIE_SECRET`, `AUTH_SECRET`, `CRON_SECRET` | Newly generated. Never reuse Oerlikon's |
+   | `NEXT_PUBLIC_DISABLE_SSE` | `1` |
+
+4. **Provision it** — schema, menu and Winterthur's 45 tables in one call:
+
+   ```bash
+   curl -X POST "https://WINTERTHUR-ADDRESS/api/admin/setup" -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" --data @data/winterthur-tables.json
+   ```
+
+   The response lists each table with its QR link. It reports
+   `"saturdayItems": 0`, which is correct for Winterthur.
+5. **Staff accounts**, as in [First deployment](#first-deployment), with
+   `DATABASE_URL` set to Winterthur's database.
+6. **QR codes**, as in [Tables and QR codes](#tables-and-qr-codes), with
+   Winterthur's `DATABASE_URL` and `APP_BASE_URL`.
+
+Changing `NEXT_PUBLIC_RESTAURANT_LOCATION` later needs a redeploy, not just a
+restart: it is built into the pages.
 
 ## Routine deployment
 

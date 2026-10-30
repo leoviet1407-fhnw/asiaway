@@ -38,7 +38,11 @@ const STATE_STYLE: Record<FloorTable['state'], string> = {
 
 const FIXTURE_STYLE: Record<string, string> = {
   buffet: 'rounded-full border border-dashed border-ink/25 bg-surface-sunken text-ink-muted',
+  bar: 'rounded-full border border-dashed border-ink/25 bg-surface-sunken text-ink-muted',
   entrance: 'rounded-xl border border-dashed border-ink/25 text-ink-muted',
+  landmark: 'rounded-xl border border-dashed border-ink/25 text-ink-muted',
+  // Round, so a tree never reads as a table.
+  plant: 'rounded-full border border-dashed border-ink/25 text-ink-muted',
   // A room divider is a solid screen between two runs of tables.
   divider: 'self-center h-1 w-full rounded-full bg-ink/30',
 };
@@ -225,7 +229,8 @@ export function FloorPlan({
   }
 
   const placed = tables.filter((t) => positionFor(t.tableNumber));
-  const outside = tables.filter((t) => t.area === 'OUTSIDE');
+  // Outside tables a plan already draws stay on the plan, not listed twice.
+  const outside = tables.filter((t) => t.area === 'OUTSIDE' && !positionFor(t.tableNumber));
   // Anything neither placed nor outside must still be reachable.
   const unplaced = tables.filter(
     (t) => !positionFor(t.tableNumber) && t.area !== 'OUTSIDE',
@@ -315,7 +320,8 @@ export function FloorPlan({
                 className={`flex items-center justify-center text-[11px] uppercase
                             tracking-wide ${FIXTURE_STYLE[fixture.kind]}`}
               >
-                {fixture.kind === 'buffet' ? (
+                {/* A tall, narrow feature — the buffet, a bar — reads along its length. */}
+                {(fixture.rowSpan ?? 1) > (fixture.colSpan ?? 1) ? (
                   <span className="[writing-mode:vertical-rl] rotate-180">{fixture.label}</span>
                 ) : (
                   fixture.label

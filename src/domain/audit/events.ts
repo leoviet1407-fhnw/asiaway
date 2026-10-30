@@ -33,6 +33,7 @@ export const AUDIT_ACTIONS = [
   'SATURDAY_SPECIAL_SET',
   'SATURDAY_SPECIAL_UPDATED',
   'NOTIFICATION_ACKNOWLEDGED',
+  'STAFF_CALLED',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

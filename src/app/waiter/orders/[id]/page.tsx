@@ -35,6 +35,7 @@ interface OrderDetail {
   waiterNote: string | null;
   items: OrderLine[];
   originalSubmission: Snapshot | null;
+  takenByStaff: boolean;
   revisions: {
     revisionNumber: number;
     revisionType: string;
@@ -409,7 +410,9 @@ export default function WaiterOrderPage() {
 
       {order.originalSubmission && order.currentRevisionNumber > 0 && (
         <section className="card p-4">
-          <h2 className="h-label">What the guest originally sent</h2>
+          <h2 className="h-label">
+            {order.takenByStaff ? 'Taken at the table' : 'What the guest originally sent'}
+          </h2>
           <ul className="mt-2 space-y-1 text-sm text-ink-muted">
             {order.originalSubmission.items.map((item, index) => (
               <li key={index} className="flex justify-between">

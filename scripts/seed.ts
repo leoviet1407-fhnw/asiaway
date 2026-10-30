@@ -19,6 +19,7 @@ import { createPostgresDatabase, type AppDatabase } from '../src/server/db/clien
 import { createPgliteDatabase } from '../src/server/db/pglite';
 import { runMigrations } from '../src/server/db/migrator';
 import { provisionSaturdayMenu } from '../src/server/menu/provision-saturday';
+import { RESTAURANT } from '../src/config/restaurant';
 import {
   allergens,
   menuCategories,
@@ -203,7 +204,7 @@ async function main(): Promise<void> {
   }
 
   const itemCount = await seedMenu(db);
-  const saturday = await provisionSaturdayMenu(db);
+  const saturday = RESTAURANT.saturdayMenu ? await provisionSaturdayMenu(db) : { itemsApplied: 0 };
   const tables = await seedTables(db, baseUrl);
   const waiterCreated = await seedWaiter(db);
 

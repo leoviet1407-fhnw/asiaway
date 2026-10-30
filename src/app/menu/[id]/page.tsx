@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCustomer } from '../../../components/customer/CustomerProvider';
+import { DishPhoto } from '../../../components/customer/DishPhoto';
 import { formatMoney } from '../../../lib/format';
 
 interface ItemDetail {
@@ -30,15 +31,21 @@ export default function ItemDetailPage() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // The language switches to the guest's saved one just after the page opens;
+    // a load started in the old language must not land after the new one.
+    let current = true;
     fetch(`/api/menu/items/${params.id}?lang=${locale}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('item'))))
-      .then(setItem)
-      .catch(() => setError(true));
+      .then((data) => current && setItem(data))
+      .catch(() => current && setError(true));
 
     fetch(`/api/allergens?lang=${locale}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => data && setLegend(data.allergens))
+      .then((data) => current && data && setLegend(data.allergens))
       .catch(() => undefined);
+    return () => {
+      current = false;
+    };
   }, [params.id, locale]);
 
   if (error) {
@@ -64,7 +71,9 @@ export default function ItemDetailPage() {
   const relevant = legend.filter((entry) => item.allergenCodes.includes(entry.code));
 
   return (
-    <article className="space-y-4">
+    // Extra room at the end for the add bar, which is taller than the cart bar
+    // the page frame allows for; without it the allergen note ends up beneath it.
+    <article className="space-y-4 pb-20">
       <Link href="/menu" className="inline-flex min-h-tap items-center text-sm text-ink-muted">
         ← {t('common.back')}
       </Link>
@@ -72,12 +81,16 @@ export default function ItemDetailPage() {
       {/* No image element at all when there is no photograph: the spec forbids
           placeholder or misleading imagery. */}
       {item.imagePath && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.imagePath}
-          alt={item.name}
-          className="aspect-[4/3] w-full rounded-2xl bg-surface-sunken object-cover"
-        />
+        // Edge to edge on a phone: the photograph is the reason to open a dish.
+        <div className="-mx-4">
+          <DishPhoto
+            src={item.imagePath}
+            alt={item.name}
+            sizes="(max-width: 28rem) 100vw, 28rem"
+            eager
+            className="aspect-square w-full bg-surface-sunken object-cover"
+          />
+        </div>
       )}
 
       <header>
@@ -118,7 +131,7 @@ export default function ItemDetailPage() {
           {t('menu.soldOut')}
         </p>
       ) : (
-        <div className="fixed inset-x-0 bottom-16 mx-auto max-w-md space-y-2 bg-surface-sunken/95 px-4 py-3 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-[var(--guest-nav)] z-20 mx-auto max-w-md space-y-2 bg-surface-sunken/95 px-4 py-3 backdrop-blur">
           <div className="flex items-center justify-center gap-4">
             <button
               type="button"

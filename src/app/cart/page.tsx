@@ -316,7 +316,7 @@ export default function CartPage() {
         <span>{formatMoney(cartTotalCents)}</span>
       </div>
 
-      <div className="fixed inset-x-0 bottom-16 mx-auto max-w-md space-y-2 bg-surface-sunken/95 px-4 py-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-[var(--guest-nav)] z-20 mx-auto max-w-md space-y-2 bg-surface-sunken/95 px-4 py-3 backdrop-blur">
         <button
           className="btn-primary w-full"
           onClick={editingOrder ? saveChanges : submit}

@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { createOrderForTable, finaliseExpiredOrders } from '../../../../server/services/order-service';
 import { publishWaiterEvent } from '../../../../server/notifications/hub';
 import { apiError, handleApiError, withWaiter } from '../../../../server/http/api';
+import { RESTAURANT } from '../../../../config/restaurant';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -134,9 +135,17 @@ export async function POST(request: Request) {
         lines: parsed.data.items,
         note: parsed.data.note ?? null,
         idempotencyKey,
+        sendToQueue: RESTAURANT.queueWaiterOrders,
       });
 
-      if (!result.replayed) publishWaiterEvent('order_updated', { orderId: result.orderId });
+      if (!result.replayed) {
+        // A queued order is announced like a guest's, so it chimes at once.
+        if (result.queued) {
+          publishWaiterEvent('new_order', { orderId: result.orderId, orderNumber: result.orderNumber });
+        } else {
+          publishWaiterEvent('order_updated', { orderId: result.orderId });
+        }
+      }
 
       return NextResponse.json(result, { status: result.replayed ? 200 : 201 });
     })) as NextResponse;

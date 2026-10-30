@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useWaiterEvents } from './useWaiterEvents';
 import { FloorPlan, type TableGroup } from './FloorPlan';
+import { RESTAURANT } from '../../config/restaurant';
 import { formatElapsed, formatMoney, formatTime } from '../../lib/format';
 
 interface TableTile {
@@ -53,8 +54,11 @@ const STATE_LABEL: Record<TableTile['state'], string> = {
 
 export function WaiterDashboard({ userName }: { userName: string }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const { notifications, connection, newOrderCount, checkoutCount, refresh } =
+  const { notifications, connection, newOrderCount, checkoutCount, staffCallCount, refresh, acknowledge } =
     useWaiterEvents(soundEnabled);
+  // Where guests pay at the counter nobody asks for the bill at the table, so
+  // that counter would only ever read zero; staff calls are what arrive instead.
+  const atCounter = RESTAURANT.payment === 'counter';
   const [tables, setTables] = useState<TableTile[] | null>(null);
   const [groups, setGroups] = useState<TableGroup[]>([]);
 
@@ -139,9 +143,11 @@ export function WaiterDashboard({ userName }: { userName: string }) {
             Sold out
           </Link>
 
-          <Link href="/waiter/specials" className="btn-secondary px-3 py-2 text-sm">
-            Saturday dish
-          </Link>
+          {RESTAURANT.saturdayMenu && (
+            <Link href="/waiter/specials" className="btn-secondary px-3 py-2 text-sm">
+              Saturday dish
+            </Link>
+          )}
 
           <form action="/api/waiter/auth/signout" method="post">
             <button
@@ -165,12 +171,21 @@ export function WaiterDashboard({ userName }: { userName: string }) {
             {newOrderCount}
           </p>
         </Link>
-        <div className="card p-4">
-          <p className="text-sm text-ink-muted">Bill requests</p>
-          <p className={`text-3xl font-bold ${checkoutCount > 0 ? 'text-danger-500' : ''}`}>
-            {checkoutCount}
-          </p>
-        </div>
+        {atCounter ? (
+          <div className="card p-4">
+            <p className="text-sm text-ink-muted">Staff calls</p>
+            <p className={`text-3xl font-bold ${staffCallCount > 0 ? 'text-danger-500' : ''}`}>
+              {staffCallCount}
+            </p>
+          </div>
+        ) : (
+          <div className="card p-4">
+            <p className="text-sm text-ink-muted">Bill requests</p>
+            <p className={`text-3xl font-bold ${checkoutCount > 0 ? 'text-danger-500' : ''}`}>
+              {checkoutCount}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* The alert banner stays until the order is opened or acknowledged —
@@ -181,12 +196,19 @@ export function WaiterDashboard({ userName }: { userName: string }) {
             <div
               key={n.id}
               className={`card flex flex-wrap items-center justify-between gap-3 p-3 ${
-                n.type === 'CHECKOUT_REQUESTED' ? 'border-danger-500/50' : 'border-warn-500/50'
+                n.type === 'CHECKOUT_REQUESTED' || n.type === 'STAFF_CALLED'
+                  ? 'border-danger-500/50'
+                  : 'border-warn-500/50'
               }`}
             >
               <div>
                 <p className="font-semibold">
-                  {n.type === 'CHECKOUT_REQUESTED' ? 'Bill requested' : 'New order'} — Table{' '}
+                  {n.type === 'CHECKOUT_REQUESTED'
+                    ? 'Bill requested'
+                    : n.type === 'STAFF_CALLED'
+                      ? 'Staff called'
+                      : 'New order'}{' '}
+                  — Table{' '}
                   {n.tableNumber ?? '?'}
                   {typeof n.payload?.orderNumber === 'number' && ` · #${n.payload.orderNumber}`}
                 </p>
@@ -196,18 +218,29 @@ export function WaiterDashboard({ userName }: { userName: string }) {
                     ` · ${formatMoney(n.payload.totalCents as number)}`}
                 </p>
               </div>
-              <Link
-                href={
-                  n.orderId
-                    ? `/waiter/orders/${n.orderId}`
-                    : n.sessionId
-                      ? `/waiter/sessions/${n.sessionId}`
-                      : '/waiter/orders'
-                }
-                className="btn-primary px-4 py-2 text-sm"
-              >
-                Open
-              </Link>
+              {n.type === 'STAFF_CALLED' ? (
+                // Nothing to open: someone goes to the table, then clears it.
+                <button
+                  type="button"
+                  className="btn-primary px-4 py-2 text-sm"
+                  onClick={() => void acknowledge(n.id)}
+                >
+                  Done
+                </button>
+              ) : (
+                <Link
+                  href={
+                    n.orderId
+                      ? `/waiter/orders/${n.orderId}`
+                      : n.sessionId
+                        ? `/waiter/sessions/${n.sessionId}`
+                        : '/waiter/orders'
+                  }
+                  className="btn-primary px-4 py-2 text-sm"
+                >
+                  Open
+                </Link>
+              )}
             </div>
           ))}
         </section>

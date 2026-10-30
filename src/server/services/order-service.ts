@@ -1073,6 +1073,11 @@ export interface CreateOrderForTableInput {
   readonly lines: readonly CartLineRequest[];
   readonly note: string | null;
   readonly idempotencyKey: string;
+  /**
+   * Put the order in the queue, with the alert, for whoever enters orders into
+   * the POS. Off, the waiter who took it is trusted to enter it themselves.
+   */
+  readonly sendToQueue?: boolean;
 }
 
 /**
@@ -1095,7 +1100,13 @@ export interface CreateOrderForTableInput {
 export async function createOrderForTable(
   db: Db,
   input: CreateOrderForTableInput,
-): Promise<{ orderId: string; orderNumber: number; totalCents: number; replayed: boolean }> {
+): Promise<{
+  orderId: string;
+  orderNumber: number;
+  totalCents: number;
+  queued: boolean;
+  replayed: boolean;
+}> {
   const requestHash = hashRequest({ lines: input.lines, note: input.note, table: input.tableId });
 
   return db.transaction(async (tx: Db) => {
@@ -1121,8 +1132,10 @@ export async function createOrderForTable(
           orderId: string;
           orderNumber: number;
           totalCents: number;
+          queued?: boolean;
         };
-        return { ...body, replayed: true };
+        // Bodies stored before queueing existed carry no flag: none were queued.
+        return { ...body, queued: body.queued ?? false, replayed: true };
       }
       throw domainError('REQUEST_IN_FLIGHT', 'This order is already being created');
     }
@@ -1285,6 +1298,26 @@ export async function createOrderForTable(
       .set({ lastActivityAt: now })
       .where(eq(diningSessions.id, session.id));
 
+    const queued = input.sendToQueue === true;
+    if (queued) {
+      // Someone else enters it into the POS, so it reaches them exactly as a
+      // guest's order does: an alert, a place in the queue, and "Entered into
+      // the POS" to clear it.
+      await tx.insert(notifications).values({
+        type: 'NEW_ORDER',
+        status: 'PENDING',
+        sessionId: session.id,
+        orderId: order!.id,
+        tableId: input.tableId,
+        payload: {
+          orderNumber: order!.orderNumber,
+          totalCents: confirmed.totalCents,
+          itemCount: confirmed.items.reduce((n, i) => n + i.quantity, 0),
+          takenByStaff: true,
+        },
+      });
+    }
+
     await writeAuditEvents(tx, [
       {
         action: 'ORDER_SUBMITTED',
@@ -1316,6 +1349,7 @@ export async function createOrderForTable(
       orderId: order!.id,
       orderNumber: order!.orderNumber,
       totalCents: confirmed.totalCents,
+      queued,
     };
 
     await tx

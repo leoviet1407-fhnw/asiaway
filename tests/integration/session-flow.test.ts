@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestContext } from '../helpers/db';
 import {
@@ -15,10 +15,13 @@ import {
   users,
 } from '../../src/server/db/schema';
 import {
+  acknowledgeNotification,
+  callStaff,
   closeIdleSessions,
   closeSession,
   getTableOverview,
   openSessionForTable,
+  pendingStaffCall,
   requestCheckout,
   resolveScan,
 } from '../../src/server/services/session-service';
@@ -282,6 +285,71 @@ describe('checkout request', () => {
       .where(eq(diningSessions.id, scan.sessionId));
     // The request is remembered even though the status moved on.
     expect(session!.checkoutRequestedAt).not.toBeNull();
+  });
+});
+
+describe('a guest calling staff to the table', () => {
+  const staffCalls = (sessionId: string) =>
+    db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.sessionId, sessionId), eq(notifications.type, 'STAFF_CALLED')));
+
+  it('alerts staff with the table, and leaves the session as it was', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    const result = await callStaff(db, { sessionId: scan.sessionId, deviceId: scan.deviceId });
+    expect(result.alreadyCalled).toBe(false);
+
+    const [call] = await staffCalls(scan.sessionId);
+    expect(call).toMatchObject({ status: 'PENDING', tableId: fx.t11.id });
+    expect(await pendingStaffCall(db, scan.sessionId)).toEqual(result.calledAt);
+
+    // Calling someone over is not asking for the bill.
+    const [session] = await db
+      .select()
+      .from(diningSessions)
+      .where(eq(diningSessions.id, scan.sessionId));
+    expect(session!.status).toBe('OCCUPIED');
+    expect(session!.checkoutRequestedAt).toBeNull();
+
+    const [audit] = await db
+      .select()
+      .from(auditEvents)
+      .where(and(eq(auditEvents.sessionId, scan.sessionId), eq(auditEvents.action, 'STAFF_CALLED')));
+    expect(audit).toMatchObject({ actorType: 'CUSTOMER', actorDeviceId: scan.deviceId });
+  });
+
+  it('does not alert twice while staff are already on their way', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    const first = await callStaff(db, { sessionId: scan.sessionId, deviceId: null });
+    const second = await callStaff(db, { sessionId: scan.sessionId, deviceId: null });
+
+    expect(second.alreadyCalled).toBe(true);
+    expect(second.calledAt.getTime()).toBe(first.calledAt.getTime());
+    expect(await staffCalls(scan.sessionId)).toHaveLength(1);
+  });
+
+  it('lets the guest call again once staff have dealt with it', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    await callStaff(db, { sessionId: scan.sessionId, deviceId: null });
+    const [call] = await staffCalls(scan.sessionId);
+    await acknowledgeNotification(db, { notificationId: call!.id, userId: fx.waiterId });
+    expect(await pendingStaffCall(db, scan.sessionId)).toBeNull();
+
+    const again = await callStaff(db, { sessionId: scan.sessionId, deviceId: null });
+    expect(again.alreadyCalled).toBe(false);
+    expect(await staffCalls(scan.sessionId)).toHaveLength(2);
+  });
+
+  it('clears a call still open when the table is closed, and refuses one after', async () => {
+    const scan = await resolveScan(db, { qrToken: fx.t11.token });
+    await callStaff(db, { sessionId: scan.sessionId, deviceId: null });
+    await closeSession(db, { sessionId: scan.sessionId, userId: fx.waiterId });
+
+    expect(await pendingStaffCall(db, scan.sessionId)).toBeNull();
+    await expect(callStaff(db, { sessionId: scan.sessionId, deviceId: null })).rejects.toMatchObject({
+      code: 'SESSION_CLOSED',
+    });
   });
 });
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface PendingNotification {
   id: string;
-  type: 'NEW_ORDER' | 'CHECKOUT_REQUESTED' | 'ORDER_UPDATED';
+  type: 'NEW_ORDER' | 'CHECKOUT_REQUESTED' | 'ORDER_UPDATED' | 'STAFF_CALLED';
   createdAt: string;
   tableNumber: string | null;
   tableLabel: string | null;
@@ -38,6 +38,7 @@ export function useWaiterEvents(soundEnabled: boolean) {
   const [notifications, setNotifications] = useState<PendingNotification[]>([]);
   const [connection, setConnection] = useState<ConnectionState>('connecting');
   const previousIds = useRef<Set<string>>(new Set());
+  const loaded = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
   const failures = useRef(0);
 
@@ -76,8 +77,12 @@ export function useWaiterEvents(soundEnabled: boolean) {
       const data = await response.json();
       const next: PendingNotification[] = data.notifications;
 
+      // Silent on the first read only, so opening the screen does not chime for
+      // what is already waiting. Checking for an empty queue instead silenced
+      // the first order to arrive into one, which is most orders.
       const incoming = next.filter((n) => !previousIds.current.has(n.id));
-      if (incoming.length > 0 && previousIds.current.size > 0) chime();
+      if (incoming.length > 0 && loaded.current) chime();
+      loaded.current = true;
       previousIds.current = new Set(next.map((n) => n.id));
 
       setNotifications(next);
@@ -124,7 +129,13 @@ export function useWaiterEvents(soundEnabled: boolean) {
         void refresh();
       });
 
-      for (const type of ['new_order', 'checkout_requested', 'order_updated', 'availability_changed']) {
+      for (const type of [
+        'new_order',
+        'checkout_requested',
+        'staff_called',
+        'order_updated',
+        'availability_changed',
+      ]) {
         source.addEventListener(type, () => void refresh());
       }
 
@@ -187,5 +198,6 @@ export function useWaiterEvents(soundEnabled: boolean) {
     acknowledge,
     newOrderCount: notifications.filter((n) => n.type === 'NEW_ORDER').length,
     checkoutCount: notifications.filter((n) => n.type === 'CHECKOUT_REQUESTED').length,
+    staffCallCount: notifications.filter((n) => n.type === 'STAFF_CALLED').length,
   };
 }

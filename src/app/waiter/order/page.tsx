@@ -47,7 +47,11 @@ function OrderPad() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ orderNumber: number; totalCents: number } | null>(null);
+  const [done, setDone] = useState<{
+    orderNumber: number;
+    totalCents: number;
+    queued: boolean;
+  } | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
   // The table is normally already chosen, because the way in is tapping it on
   // the floor plan. Only show the picker when something is genuinely undecided.
@@ -129,7 +133,11 @@ function OrderPad() {
         setError(data?.error?.message ?? 'The order could not be saved.');
         return;
       }
-      setDone({ orderNumber: data.orderNumber, totalCents: data.totalCents });
+      setDone({
+        orderNumber: data.orderNumber,
+        totalCents: data.totalCents,
+        queued: data.queued === true,
+      });
       setLines([]);
       setNote('');
       // Only after a confirmed success, so the NEXT order is a new one.
@@ -164,7 +172,11 @@ function OrderPad() {
               On the shared bill for {group.tables.join(' + ')}, at table {anchorNumber}.
             </p>
           )}
-          <p className="pt-2 text-sm text-ink-muted">Now enter it into the POS.</p>
+          <p className="pt-2 text-sm text-ink-muted">
+            {done.queued
+              ? 'Sent to the order queue, to be entered into the POS.'
+              : 'Now enter it into the POS.'}
+          </p>
         </div>
         <button className="btn-primary w-full" onClick={() => setDone(null)}>
           Take another order for this table

@@ -13,6 +13,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Which restaurant the image is for. Baked in at build time because the
+# waiter's browser needs it too — see src/config/restaurant.ts.
+ARG NEXT_PUBLIC_RESTAURANT_LOCATION=oerlikon
+ENV NEXT_PUBLIC_RESTAURANT_LOCATION=$NEXT_PUBLIC_RESTAURANT_LOCATION
 RUN npm run build
 
 FROM node:22-alpine AS runner

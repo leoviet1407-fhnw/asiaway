@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { formatMoney } from '../../lib/format';
 import type { Translator } from '../../i18n';
+import { DishPhoto } from './DishPhoto';
 
 export interface HighlightItem {
   id: string;
@@ -63,19 +64,24 @@ export function MenuHighlights({
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 scroll-px-4
                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {items.map((item) => (
-          <li key={item.id} className="w-48 shrink-0 snap-start">
-            <article className="card overflow-hidden">
-              <Link href={`/menu/${item.id}`} className="block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+        {items.map((item, index) => (
+          // A card about two-thirds of a phone wide, so the next one peeks in and
+          // says "swipe" without a word.
+          <li key={item.id} className="flex w-[13.5rem] shrink-0 snap-start">
+            <article className="card flex w-full flex-col overflow-hidden">
+              <Link href={`/menu/${item.id}`} className="flex flex-1 flex-col">
+                {/* Portrait, like the photographs themselves, so the dish is
+                    shown whole rather than cropped to a strip. */}
+                <DishPhoto
                   src={item.imagePath!}
                   alt=""
-                  loading="lazy"
-                  className="h-36 w-full bg-surface-sunken object-cover"
+                  sizes="13.5rem"
+                  eager={index < 2}
+                  className="aspect-[4/5] w-full bg-surface-sunken object-cover"
                 />
-                <div className="p-3">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">
+                <div className="flex flex-1 flex-col p-3">
+                  {/* Two lines reserved, so every card in the row ends level. */}
+                  <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-5">
                     {item.dishNumber && (
                       <span className="text-ink-muted">{item.dishNumber} · </span>
                     )}
@@ -97,7 +103,7 @@ export function MenuHighlights({
                     className="min-h-tap w-full rounded-xl bg-brand-50 text-sm font-semibold
                                text-brand-700 hover:bg-brand-100"
                   >
-                    {added === item.id ? t('item.added') : t('item.add')}
+                    {added === item.id ? `✓ ${t('item.added')}` : `+ ${t('item.addShort')}`}
                   </button>
                 ) : (
                   <p className="min-h-tap rounded-xl bg-danger-50 py-2 text-center text-sm

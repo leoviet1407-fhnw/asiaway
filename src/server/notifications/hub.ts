@@ -16,6 +16,7 @@ import { EventEmitter } from 'node:events';
 export type WaiterEventType =
   | 'new_order'
   | 'checkout_requested'
+  | 'staff_called'
   | 'order_updated'
   | 'availability_changed';
 

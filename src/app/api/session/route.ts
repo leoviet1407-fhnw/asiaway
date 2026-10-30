@@ -3,6 +3,7 @@ import { eq, ne, and, sql } from 'drizzle-orm';
 import { db } from '../../../server/db/index';
 import { diningSessions, orders, restaurantTables } from '../../../server/db/schema';
 import { getCustomerContext, handleApiError } from '../../../server/http/api';
+import { pendingStaffCall } from '../../../server/services/session-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,8 @@ export async function GET() {
       tableNumber: session.tableNumber,
       tableLabel: session.tableLabel,
       checkoutRequestedAt: session.checkoutRequestedAt?.toISOString() ?? null,
+      // A call still waiting for staff, so a reload keeps saying they are coming.
+      staffCalledAt: (await pendingStaffCall(database, context.sessionId))?.toISOString() ?? null,
       orderCount: totals[0]?.count ?? 0,
       sessionTotalCents: totals[0]?.total ?? 0,
     });

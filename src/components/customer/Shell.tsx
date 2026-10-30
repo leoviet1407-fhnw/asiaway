@@ -47,19 +47,25 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   const tabs = [
-    { href: '/menu', label: t('nav.menu') },
-    { href: '/orders', label: t('nav.orders') },
-    { href: '/checkout', label: t('nav.bill') },
+    { href: '/menu', label: t('nav.menu'), icon: ICONS.menu },
+    { href: '/orders', label: t('nav.orders'), icon: ICONS.orders },
+    { href: '/checkout', label: t('nav.bill'), icon: ICONS.bill },
   ];
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col">
-      <header className="sticky top-0 z-10 border-b border-ink/10 bg-surface/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold leading-tight">{t('app.name')}</p>
+    <div className="guest-frame mx-auto flex min-h-screen max-w-md flex-col">
+      <header
+        className="sticky top-0 z-30 border-b border-ink/10 bg-surface/95 px-4 backdrop-blur"
+        style={{ height: 'var(--guest-header)', paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="flex h-full items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/asiaway-logo.png" alt={t('app.name')} className="h-7 w-auto" />
             {table && (
-              <p className="text-xs text-ink-muted">{t('table.label', { table })}</p>
+              <p className="truncate text-sm font-medium text-ink-muted">
+                {t('table.label', { table })}
+              </p>
             )}
           </div>
           <label className="sr-only" htmlFor="lang">
@@ -80,10 +86,17 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 px-4 pb-40 pt-4">{children}</main>
+      <main
+        className="flex-1 px-4 pt-4"
+        style={{ paddingBottom: 'calc(10rem + env(safe-area-inset-bottom))' }}
+      >
+        {children}
+      </main>
 
-      {cartCount > 0 && pathname !== '/cart' && (
-        <div className="fixed inset-x-0 bottom-16 z-20 mx-auto max-w-md px-4 pb-2">
+      {/* Not on a dish's own page: its add bar sits in the same place, and the
+          cart bar would cover the very button the guest came to press. */}
+      {cartCount > 0 && pathname !== '/cart' && !pathname.startsWith('/menu/') && (
+        <div className="fixed inset-x-0 bottom-[var(--guest-nav)] z-20 mx-auto max-w-md px-4 pb-2">
           <Link
             href="/cart"
             className="btn-primary flex w-full items-center justify-between shadow-lg"
@@ -97,7 +110,8 @@ export function Shell({ children }: { children: ReactNode }) {
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-md border-t border-ink/10 bg-surface"
+        className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-md border-t border-ink/10 bg-surface"
+        style={{ height: 'var(--guest-nav)', paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Main"
       >
         {tabs.map((tab) => {
@@ -107,10 +121,11 @@ export function Shell({ children }: { children: ReactNode }) {
               key={tab.href}
               href={tab.href}
               aria-current={active ? 'page' : undefined}
-              className={`flex min-h-tap flex-1 items-center justify-center py-3 text-sm font-medium ${
+              className={`flex min-h-tap flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium ${
                 active ? 'text-brand-600' : 'text-ink-muted'
               }`}
             >
+              {tab.icon}
               {tab.label}
             </Link>
           );
@@ -119,3 +134,43 @@ export function Shell({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/** Line icons for the bottom bar, drawn in the text colour so the active tab turns red. */
+const icon = (path: ReactNode) => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    className="h-5 w-5"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {path}
+  </svg>
+);
+
+const ICONS = {
+  // An open menu card.
+  menu: icon(
+    <>
+      <path d="M3 5.5c2.5-1.2 5.5-1.2 9 .8 3.5-2 6.5-2 9-.8v13c-2.5-1.2-5.5-1.2-9 .8-3.5-2-6.5-2-9-.8z" />
+      <path d="M12 6.3v13" />
+    </>,
+  ),
+  // A ticket with lines: what has been ordered.
+  orders: icon(
+    <>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </>,
+  ),
+  // A card being paid with.
+  bill: icon(
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="1.5" />
+      <path d="M3 10h18M7 15h3" />
+    </>,
+  ),
+};

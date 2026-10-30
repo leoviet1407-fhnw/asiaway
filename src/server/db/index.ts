@@ -38,9 +38,9 @@ async function create(): Promise<DatabaseHandle> {
     // A deployment step a person has to remember is not a deployment step.
     //
     // Safe to do here, and what the migrator was built for: the ledger makes a
-    // second run a no-op, and the advisory lock serialises the several
-    // instances a serverless host can wake at once. The cost is one cheap
-    // SELECT per cold start.
+    // second run a no-op, and a transaction-level lock serialises the several
+    // instances a serverless host can wake at once without ever outliving its
+    // transaction behind the pooler. The cost is one cheap SELECT per cold start.
     if (process.env.MIGRATE_ON_BOOT !== '0') {
       const { runMigrations } = await import('./migrator');
       await runMigrations(db, executeMultiple);
