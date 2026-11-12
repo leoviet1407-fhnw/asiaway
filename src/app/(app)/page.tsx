@@ -7,8 +7,8 @@ import { db } from '@/server/db';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
-import { PhotoTile } from '@/components/PhotoTile';
-import { RESERVATIONS_URL, SITE_IMAGES } from '@/lib/site-images';
+import { Icon, type IconName } from '@/components/Icon';
+import { RESERVATIONS_URL } from '@/lib/site-images';
 
 export const metadata = { title: 'Start' };
 
@@ -22,20 +22,13 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <PhotoTile
-        size="hero"
-        href="/bestellungen/neu"
-        image={SITE_IMAGES.dishes}
-        title={`Hallo ${p.name.split(' ')[0]}`}
-        accent="xin chào"
-        text="Was steht heute an? Neue Bestellung starten →"
-      />
+      <h1 className="text-2xl">Hallo {p.name.split(' ')[0]}</h1>
 
       <div className="grid grid-cols-2 gap-3">
-        <PhotoTile href="/bestellungen" image={SITE_IMAGES.vegetables} title="Bestellen" accent="đặt hàng" text="Bei Lieferanten" badge={submitted.length + drafts.length || undefined} />
-        <PhotoTile href="/wareneingang" image={SITE_IMAGES.market} title="Wareneingang" accent="nhận hàng" text="Scannen & prüfen" badge={deliveries.length || undefined} />
-        <PhotoTile href="/tagesabschluss/neu" title="Abschluss" accent="kết ca" text="Tageskasse" />
-        <PhotoTile href={RESERVATIONS_URL} external title="Reservationen" accent="đặt bàn" text="Gäste & Tische" />
+        <Action href="/bestellungen/neu" icon="cart" label="Neue Bestellung" primary />
+        <Action href="/wareneingang" icon="scan" label="Wareneingang" badge={deliveries.length} />
+        <Action href="/tagesabschluss/neu" icon="cash" label="Tagesabschluss" />
+        <Action href={RESERVATIONS_URL} icon="calendar" label="Reservationen" external />
       </div>
 
       {orderer && (
@@ -108,5 +101,25 @@ function OrderRow({ o }: { o: Awaited<ReturnType<typeof listOrders>>[number] }) 
         <OrderStatusChip status={o.status} />
       </Link>
     </li>
+  );
+}
+
+function Action({ href, icon, label, primary, badge, external }: { href: string; icon: IconName; label: string; primary?: boolean; badge?: number; external?: boolean }) {
+  const className = `${primary ? 'btn-primary' : 'btn-secondary'} relative h-20 flex-col gap-1 text-center normal-case tracking-normal`;
+  const body = (
+    <>
+      <Icon name={icon} className="h-6 w-6" />
+      <span className="text-base font-semibold">{label}</span>
+      {badge ? <span className="absolute right-2 top-2 rounded-full bg-brand-600 px-2 text-xs font-bold text-white">{badge}</span> : null}
+    </>
+  );
+  return external ? (
+    <a href={href} className={className}>
+      {body}
+    </a>
+  ) : (
+    <Link href={href} className={className}>
+      {body}
+    </Link>
   );
 }
