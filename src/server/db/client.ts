@@ -26,4 +26,4 @@ export function createPostgresDatabase(connectionString: string) {
 }
 
 /** Applied in this order; each file runs once (see migrator.ts). */
-export const MIGRATION_FILES = ['0000_init.sql'] as const;
+export const MIGRATION_FILES = ['0000_init.sql', '0001_closings.sql'] as const;

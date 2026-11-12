@@ -27,6 +27,10 @@ export default async function HomePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        <Link href="/tagesabschluss/neu" className="btn-secondary col-span-2 h-14 text-base">
+          <Icon name="cash" className="h-6 w-6" />
+          Tagesabschluss
+        </Link>
         <Link href="/bestellungen/neu" className="btn-primary h-20 flex-col text-base">
           <Icon name="cart" className="h-6 w-6" />
           Neue Bestellung

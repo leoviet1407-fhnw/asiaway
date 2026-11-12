@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/', label: 'Start', icon: 'home' as const },
     { href: '/bestellungen', label: 'Bestellen', icon: 'cart' as const },
     { href: '/wareneingang', label: 'Wareneingang', icon: 'scan' as const },
+    { href: '/tagesabschluss', label: 'Abschluss', icon: 'cash' as const },
     { href: '/artikel', label: 'Artikel', icon: 'box' as const },
     ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: 'Lieferanten', icon: 'truck' as const }] : []),
   ];

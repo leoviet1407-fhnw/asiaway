@@ -10,6 +10,7 @@ const MESSAGES: Record<string, string> = {
   ITEM_NOT_FROM_SUPPLIER: 'Dieser Artikel ist nicht beim Lieferanten gelistet.',
   ALREADY_SENT: 'Diese Bestellung wurde bereits gesendet.',
   RECEIPT_CLOSED: 'Diese Lieferung ist bereits abgeschlossen.',
+  CLOSING_LOCKED: 'Dieser Abschluss ist bereits freigegeben und gesperrt.',
   MAIL_FAILED: 'Die E-Mail konnte nicht gesendet werden. Die Bestellung bleibt zur Prüfung.',
   INTERNAL_ERROR: 'Unerwarteter Fehler. Bitte nochmals versuchen.',
 };

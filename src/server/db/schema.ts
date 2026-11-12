@@ -211,6 +211,38 @@ export const auditEvents = pgTable('audit_events', {
   details: jsonb('details').notNull().default({}),
 });
 
+
+export const closingStatus = pgEnum('closing_status', ['SUBMITTED', 'APPROVED']);
+
+export const dailyClosings = pgTable('daily_closings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  locationId: text('location_id').notNull(),
+  businessDate: date('business_date').notNull(),
+  station: text('station').notNull(),
+  status: closingStatus('status').notNull().default('SUBMITTED'),
+  cashCountedCents: integer('cash_counted_cents').notNull(),
+  startFloatCents: integer('start_float_cents').notNull(),
+  eftCents: integer('eft_cents').notNull(),
+  mobileCents: integer('mobile_cents').notNull().default(0),
+  posGrossCents: integer('pos_gross_cents').notNull(),
+  note: text('note'),
+  closedBy: uuid('closed_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid('updated_by'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  approvedBy: uuid('approved_by'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+});
+
+export const closingPhotos = pgTable('closing_photos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  closingId: uuid('closing_id').notNull(),
+  mime: text('mime').notNull(),
+  data: bytea('data').notNull(),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schema = {
   locations,
   users,
@@ -228,4 +260,6 @@ export const schema = {
   receiptPhotos,
   emailLog,
   auditEvents,
+  dailyClosings,
+  closingPhotos,
 };

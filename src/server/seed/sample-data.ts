@@ -7,6 +7,7 @@ import { loadPrincipalForUser } from '../auth/session';
 import type { AppDatabase } from '../db/client';
 import { itemBarcodes, items, locations, supplierItems, suppliers, userRoles, users } from '../db/schema';
 import { MemoryMailer } from '../mail/mailer';
+import { saveClosing } from '../services/closing-service';
 import { openDraft, sendOrder, setLineQty, submitOrder, updateOrderDetails } from '../services/order-service';
 
 /**
@@ -192,6 +193,9 @@ export async function seedSampleData(
   await updateOrderDetails(db, wth, d3.id, { deliveryDate: today, note: null });
   await submitOrder(db, wth, d3.id);
   await sendOrder(db, orderer, d3.id, new MemoryMailer(), 'seed@asiaway.test');
+
+  // A daily closing: the figures of the paper form of 12 Nov (1. OG)
+  await saveClosing(db, wvn, { locationId: 'winti-vn', businessDate: addDaysIso(today, -1), station: '1. OG', cashCountedCents: 72800, startFloatCents: 30000, eftCents: 226725, mobileCents: 0, posGrossCents: 258460, note: null });
 
   // Oerlikon: sent drinks order from Handel, for a second goods-in example
   const d4 = await openDraft(db, oer, 'oerlikon', supplierIds.handel!);

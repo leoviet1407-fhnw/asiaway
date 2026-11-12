@@ -1,4 +1,4 @@
-export type IconName = 'home' | 'cart' | 'scan' | 'box' | 'truck' | 'camera' | 'check' | 'plus' | 'minus' | 'alert' | 'file';
+export type IconName = 'home' | 'cart' | 'scan' | 'box' | 'truck' | 'camera' | 'check' | 'plus' | 'minus' | 'alert' | 'file' | 'cash';
 
 const PATHS: Record<IconName, string> = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -11,6 +11,7 @@ const PATHS: Record<IconName, string> = {
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
   alert: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+  cash: 'M3 7h18v10H3zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM6 10v.01M18 14v.01',
   file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
 };
 

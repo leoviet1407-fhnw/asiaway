@@ -12,6 +12,12 @@ import { db } from '@/server/db';
 import { mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
 import { updateItem, updateSupplier, type StorageArea } from '@/server/services/catalog-service';
 import {
+  addClosingPhoto,
+  approveClosing,
+  reopenClosing,
+  saveClosing,
+} from '@/server/services/closing-service';
+import {
   cancelOrder,
   copyLastOrder,
   openDraft,
@@ -264,5 +270,63 @@ export async function updateSupplierAction(_prev: { error?: string; saved?: bool
   } catch (error) {
     if (isRedirect(error)) throw error;
     return { error: fail(error).error };
+  }
+}
+
+// --- Daily closing (Tagesabschluss) -------------------------------------------------
+
+function cents(form: FormData, name: string): number {
+  const value = parseChfToCents(String(form.get(name) ?? '0') || '0');
+  if (value === null) throw new DomainError('VALIDATION_FAILED', 'Ein Betrag ist ungültig.');
+  return value;
+}
+
+export async function saveClosingAction(_prev: { error?: string } | undefined, form: FormData): Promise<{ error?: string }> {
+  let id: string;
+  try {
+    const p = await requirePrincipal();
+    id = await saveClosing(await db(), p, {
+      id: String(form.get('id') ?? '') || undefined,
+      locationId: String(form.get('locationId') ?? ''),
+      businessDate: String(form.get('businessDate') ?? ''),
+      station: String(form.get('station') ?? ''),
+      cashCountedCents: cents(form, 'cashCounted'),
+      startFloatCents: cents(form, 'startFloat'),
+      eftCents: cents(form, 'eft'),
+      mobileCents: cents(form, 'mobile'),
+      posGrossCents: cents(form, 'posGross'),
+      note: String(form.get('note') ?? '') || null,
+    });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: fail(error).error };
+  }
+  revalidatePath('/tagesabschluss', 'layout');
+  redirect(`/tagesabschluss/${id}?gespeichert=1`);
+}
+
+export async function closingStepAction(closingId: string, step: 'approve' | 'reopen'): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    if (step === 'approve') await approveClosing(await db(), p, closingId);
+    else await reopenClosing(await db(), p, closingId);
+    revalidatePath('/tagesabschluss', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function uploadClosingPhotoAction(form: FormData): Promise<ActionResult<string>> {
+  try {
+    const p = await requirePrincipal();
+    const file = form.get('photo');
+    if (!(file instanceof File)) return { ok: false, error: 'Kein Foto erhalten.' };
+    const id = await addClosingPhoto(await db(), p, String(form.get('closingId')), file.type, Buffer.from(await file.arrayBuffer()));
+    return { ok: true, value: id };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
   }
 }

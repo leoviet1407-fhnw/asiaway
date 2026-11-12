@@ -55,6 +55,10 @@ npx next dev --experimental-https -H 0.0.0.0
 
 Then open `https://<laptop-ip>:3000` and accept the certificate warning. The service worker (installable PWA) is active only in production builds, or in development with `?sw=1`.
 
+## Tagesabschluss (daily closing)
+
+Replaces the paper form. Staff enter the counted till, starting float, EFT, mobile payment and the POS gross (SOLL); the app calculates cash sales, total (IST), difference/tips and **cash to bank** (`POS gross − EFT − mobile`) as you type. One closing per day and station. An orderer or admin approves it, which locks it. Photos of the form and the POS report can be attached, and an orderer can export a month as CSV (`/tagesabschluss/export?monat=2026-11`). The POS gross is typed in, so it works with any POS. Stations and the CHF 300 float are in `src/domain/closing.ts`.
+
 ## Commands
 
 | Command | What it does |

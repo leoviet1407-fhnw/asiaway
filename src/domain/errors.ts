@@ -10,6 +10,7 @@ export type DomainErrorCode =
   | 'ITEM_NOT_FROM_SUPPLIER'
   | 'ALREADY_SENT'
   | 'RECEIPT_CLOSED'
+  | 'CLOSING_LOCKED'
   | 'MAIL_FAILED';
 
 export class DomainError extends Error {
