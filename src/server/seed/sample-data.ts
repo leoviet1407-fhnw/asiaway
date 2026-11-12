@@ -113,7 +113,7 @@ export async function seedIfEmpty(db: AppDatabase): Promise<boolean> {
 
 export async function seedSampleData(
   db: AppDatabase,
-  { password = process.env.SEED_PASSWORD || 'asiaway-dev', withOrders = true } = {},
+  { password = process.env.SEED_PASSWORD || 'asiaway-dev', withOrders = true, withUsers = true } = {},
 ): Promise<void> {
   await db.insert(locations).values([...LOCATIONS]).onConflictDoNothing();
 
@@ -146,6 +146,8 @@ export async function seedSampleData(
       }
     }
   }
+
+  if (!withUsers) return;
 
   const hash = await hashPassword(password);
   const userIds: Record<string, string> = {};
