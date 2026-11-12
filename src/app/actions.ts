@@ -53,7 +53,7 @@ export async function loginAction(_prev: { error?: string } | undefined, form: F
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/',
+      path: '/', // not BASE_PATH: a narrower path was not sent back by the browser in testing
       maxAge: SESSION_DAYS * 24 * 3600,
     });
   } catch (error) {
@@ -66,7 +66,7 @@ export async function loginAction(_prev: { error?: string } | undefined, form: F
 export async function logoutAction(): Promise<void> {
   const jar = await cookies();
   await logout(await db(), jar.get(SESSION_COOKIE)?.value);
-  jar.delete(SESSION_COOKIE);
+  jar.delete({ name: SESSION_COOKIE, path: '/' });
   redirect('/login');
 }
 

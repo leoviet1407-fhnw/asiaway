@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Sans } from 'next/font/google';
 import { ServiceWorker } from '@/components/ServiceWorker';
+import { withBase } from '@/lib/base-path';
 import './globals.css';
 
 const plex = IBM_Plex_Sans({
@@ -13,10 +14,9 @@ const plex = IBM_Plex_Sans({
 export const metadata: Metadata = {
   title: { default: 'AsiaWay Staff', template: '%s · AsiaWay Staff' },
   description: 'Bestellungen und Wareneingang für AsiaWay',
-  manifest: '/manifest.webmanifest',
   applicationName: 'AsiaWay Staff',
   appleWebApp: { capable: true, title: 'AsiaWay Staff', statusBarStyle: 'black-translucent' },
-  icons: { icon: '/icons/icon-192.png', apple: '/icons/apple-touch-icon.png' },
+  icons: { icon: withBase('/icons/icon-192.png'), apple: withBase('/icons/apple-touch-icon.png') },
   robots: { index: false, follow: false },
 };
 

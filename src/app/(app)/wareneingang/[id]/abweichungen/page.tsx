@@ -4,6 +4,7 @@ import { DomainError } from '@/domain/errors';
 import { formatQty } from '@/domain/qty';
 import { LINE_STATUS_LABEL, type LineStatus } from '@/domain/receiving';
 import { formatDateTime, formatDay } from '@/lib/dates';
+import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getReceiptView } from '@/server/services/receiving-service';
@@ -109,9 +110,9 @@ export default async function DiscrepancyPage({ params, searchParams }: { params
           <h2 className="mb-2 text-lg">Fotos</h2>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {view.photos.map((ph) => (
-              <a key={ph.id} href={`/wareneingang/foto/${ph.id}`} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-btn border border-surface-line bg-white">
+              <a key={ph.id} href={withBase(`/wareneingang/foto/${ph.id}`)} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-btn border border-surface-line bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/wareneingang/foto/${ph.id}`} alt={ph.kind === 'DAMAGE' ? 'Schaden' : 'Lieferschein'} className="aspect-square w-full object-cover" />
+                <img src={withBase(`/wareneingang/foto/${ph.id}`)} alt={ph.kind === 'DAMAGE' ? 'Schaden' : 'Lieferschein'} className="aspect-square w-full object-cover" />
                 <div className="px-1 py-0.5 text-center text-xs">{ph.kind === 'DAMAGE' ? 'Schaden' : 'Lieferschein'}</div>
               </a>
             ))}

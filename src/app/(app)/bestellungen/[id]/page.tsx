@@ -5,6 +5,7 @@ import { belowMinimum, canCancelOrder, canEditOrder, canReceiveOrder, canSendOrd
 import { formatAmount, formatChf } from '@/domain/qty';
 import { isOrderer } from '@/domain/roles';
 import { formatDateTime, formatDay } from '@/lib/dates';
+import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { STORAGE_AREA_LABEL, listItems, type StorageArea } from '@/server/services/catalog-service';
@@ -107,7 +108,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <dd>{preview.subject}</dd>
           </dl>
           <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-btn bg-surface-sunken p-3 font-sans text-sm">{preview.text}</pre>
-          <a href={`/bestellungen/${order.id}/pdf`} target="_blank" className="btn-secondary" rel="noreferrer">
+          <a href={withBase(`/bestellungen/${order.id}/pdf`)} target="_blank" className="btn-secondary" rel="noreferrer">
             PDF ansehen
           </a>
         </section>
@@ -118,7 +119,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <div className="text-sm">
             Gesendet an <strong>{order.sentTo}</strong> am {formatDateTime(order.sentAt)}.
           </div>
-          <a href={`/bestellungen/${order.id}/pdf`} target="_blank" className="btn-secondary" rel="noreferrer">
+          <a href={withBase(`/bestellungen/${order.id}/pdf`)} target="_blank" className="btn-secondary" rel="noreferrer">
             Gesendetes PDF
           </a>
         </section>

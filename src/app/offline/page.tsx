@@ -1,3 +1,5 @@
+import { withBase } from '@/lib/base-path';
+
 export const metadata = { title: 'Offline' };
 
 export default function OfflinePage() {
@@ -8,7 +10,7 @@ export default function OfflinePage() {
         Das Telefon ist gerade offline. Begonnene Wareneingänge bleiben auf dem Gerät gespeichert und werden gesendet, sobald
         die Verbindung zurück ist.
       </p>
-      <a href="/" className="btn-primary mt-6">
+      <a href={withBase('/')} className="btn-primary mt-6">
         Nochmals versuchen
       </a>
     </main>

@@ -2,6 +2,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  basePath: (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, ''),
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ['@electric-sql/pglite', 'postgres', 'nodemailer', 'pdf-lib'],

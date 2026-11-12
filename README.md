@@ -82,6 +82,7 @@ Copy `.env.example` to `.env.local`. **Never commit a filled-in env file.**
 | `SMTP_URL` | e.g. `smtps://user:pass@mail.example.ch:465` when `MAIL_TRANSPORT=smtp` |
 | `ORDER_FROM_EMAIL` | Sender of order emails |
 | `ORDER_CC_EMAIL` | Optional archive copy of every order email |
+| `NEXT_PUBLIC_BASE_PATH` | URL prefix when served under asiaway.ch, e.g. `/staff/app`. Empty for a (sub)domain. Set at BUILD time |
 | `SEED_PASSWORD` | Password for the sample users |
 
 ## How it is built
@@ -116,3 +117,13 @@ Some design points:
 - A user admin screen (use `npm run user:add` for now), and password reset.
 - Real SMTP account and sender address; hosting (EU Postgres with backups); `staff.asiaway.ch` DNS.
 - Phase 2 (stock ledger, counting, par levels) and Phase 3 (SumUp), as described in the plan.
+
+## Serving it under asiaway.ch/staff/… instead of a subdomain
+
+Build with the prefix, for example:
+
+```bash
+NEXT_PUBLIC_BASE_PATH=/staff/app npm run build
+```
+
+The app then lives at `https://asiaway.ch/staff/app/`. The web server in front of it must send that path to the Node app **before** WordPress sees it (a reverse-proxy rule, e.g. nginx `location /staff/app/ { proxy_pass http://127.0.0.1:3000; }` with the prefix kept). WordPress keeps `/staff/` (the login hub) and `/staff/reservationen/`; a plain WordPress hosting plan cannot do this. The session cookie uses `Path=/`, so it is also sent to WordPress pages (it is httpOnly and random, and WordPress ignores it).
