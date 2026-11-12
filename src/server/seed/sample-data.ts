@@ -5,9 +5,11 @@ import { addDaysIso, todayIso } from '../../lib/dates';
 import { hashPassword } from '../auth/password';
 import { loadPrincipalForUser } from '../auth/session';
 import type { AppDatabase } from '../db/client';
-import { itemBarcodes, items, locations, supplierItems, suppliers, userRoles, users } from '../db/schema';
+import { itemBarcodes, items, locations, staffProfiles, supplierItems, suppliers, userRoles, users } from '../db/schema';
 import { MemoryMailer } from '../mail/mailer';
 import { saveClosing } from '../services/closing-service';
+import { saveShift } from '../services/roster-service';
+import { mondayOf, parseTime } from '../../domain/roster';
 import { openDraft, sendOrder, setLineQty, submitOrder, updateOrderDetails } from '../services/order-service';
 
 /**
@@ -158,6 +160,17 @@ export async function seedSampleData(
     await db.insert(userRoles).values(u.grants.map((g) => ({ userId: row!.id, role: g.role, locationId: g.locationId })));
   }
 
+  // Team profiles for the roster. The extra Aushilfe has no login need beyond the sample password.
+  const [extra] = await db.insert(users).values({ email: 'aushilfe@asiaway.test', name: 'Aushilfe Muster', passwordHash: hash }).returning({ id: users.id });
+  await db.insert(userRoles).values([{ userId: extra!.id, role: 'STAFF', locationId: 'winti-vn' }, { userId: extra!.id, role: 'STAFF', locationId: 'winti-th' }]);
+  const profile = (email: string, site: string, employmentType: 'FULL_TIME' | 'PART_TIME' | 'ON_CALL' | 'MANAGEMENT', pensumPercent: number | null, sort: number) =>
+    db.insert(staffProfiles).values({ userId: userIds[email]!, site, employmentType, pensumPercent, sort });
+  await profile('besteller@asiaway.test', 'winterthur', 'MANAGEMENT', null, 0);
+  await profile('winti-vn@asiaway.test', 'winterthur', 'FULL_TIME', 100, 1);
+  await profile('winti-th@asiaway.test', 'winterthur', 'PART_TIME', 80, 2);
+  await db.insert(staffProfiles).values({ userId: extra!.id, site: 'winterthur', employmentType: 'ON_CALL', pensumPercent: null, sort: 3 });
+  await profile('oerlikon@asiaway.test', 'oerlikon', 'PART_TIME', 60, 1);
+
   if (!withOrders) return;
 
   const principal = async (email: string) => (await loadPrincipalForUser(db, userIds[email]!)) as Principal;
@@ -193,6 +206,17 @@ export async function seedSampleData(
   await updateOrderDetails(db, wth, d3.id, { deliveryDate: today, note: null });
   await submitOrder(db, wth, d3.id);
   await sendOrder(db, orderer, d3.id, new MemoryMailer(), 'seed@asiaway.test');
+
+  // A draft roster for next week (Winterthur)
+  const monday = mondayOf(addDaysIso(today, 7));
+  const shiftBase = { site: 'winterthur', breakMin: 0 };
+  const sh = (email: string, offset: number, start: string, end: string, station: string, roleLabel: string | null) =>
+    saveShift(db, orderer, { ...shiftBase, date: addDaysIso(monday, offset), userId: userIds[email]!, startMin: parseTime(start)!, endMin: parseTime(end)!, station, roleLabel });
+  await sh('winti-vn@asiaway.test', 0, '10:30', '14:30', 'EG Thai', 'Mittagsschicht · À la carte');
+  await sh('winti-vn@asiaway.test', 1, '17:30', '22:00', '1. OG', 'Abendschicht · Drinks');
+  await sh('winti-th@asiaway.test', 0, '12:00', '17:00', 'EG Thai', 'Mittag/Nachmittag');
+  await sh('winti-th@asiaway.test', 2, '10:30', '14:30', 'Buffet', 'Aufbau Buffet / Kasse');
+  await sh('besteller@asiaway.test', 3, '10:30', '14:30', 'Office', 'Administration');
 
   // A daily closing: the figures of the paper form of 12 Nov (1. OG)
   await saveClosing(db, wvn, { locationId: 'winti-vn', businessDate: addDaysIso(today, -1), station: '1. OG', cashCountedCents: 72800, startFloatCents: 30000, eftCents: 226725, mobileCents: 0, posGrossCents: 258460, note: null });

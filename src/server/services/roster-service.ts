@@ -1,0 +1,454 @@
+import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { domainError } from '../../domain/errors';
+import { isAdmin, isOrderer, type Principal } from '../../domain/roles';
+import {
+  LEAD_DAYS,
+  ROSTER_SITES,
+  addDays,
+  checkShiftTimes,
+  hasBlockingViolation,
+  isOpenForStaff,
+  mondayOf,
+  monthDates,
+  stationsOf,
+  validateRoster,
+  weekDates,
+  type Absence,
+  type AbsenceStatus,
+  type AbsenceType,
+  type AvailabilityDay,
+  type AvailabilityKind,
+  type EmploymentType,
+  type RosterPerson,
+  type Shift,
+  type Violation,
+} from '../../domain/roster';
+import { todayIso } from '../../lib/dates';
+import { hashPassword } from '../auth/password';
+import { audit } from '../audit';
+import type { AppDatabase } from '../db/client';
+import {
+  absences,
+  availability,
+  availabilitySubmissions,
+  rosterWeeks,
+  shifts,
+  staffProfiles,
+  userRoles,
+  users,
+} from '../db/schema';
+
+// --- Who may do what --------------------------------------------------------------------
+/** Planners (Besteller/Leitung and admins) make the plan, for every site. */
+export const isPlanner = isOrderer;
+
+export async function getProfile(db: AppDatabase, userId: string) {
+  const [row] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId)).limit(1);
+  return row ?? null;
+}
+
+/** The sites this person may open: all for planners, their own for staff. */
+export async function sitesFor(db: AppDatabase, p: Principal) {
+  if (isPlanner(p)) return [...ROSTER_SITES];
+  const profile = await getProfile(db, p.userId);
+  return ROSTER_SITES.filter((s) => s.id === profile?.site);
+}
+
+function requirePlanner(p: Principal) {
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung kann den Plan ändern.');
+}
+
+async function requireSite(db: AppDatabase, p: Principal, siteId: string) {
+  if (!ROSTER_SITES.some((s) => s.id === siteId)) throw domainError('NOT_FOUND', 'Unknown site');
+  if (isPlanner(p)) return;
+  const profile = await getProfile(db, p.userId);
+  if (profile?.site !== siteId) throw domainError('FORBIDDEN', 'Not your site');
+}
+
+const isoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+// --- Team ---------------------------------------------------------------------------------
+export interface TeamMember extends RosterPerson {
+  email: string;
+  site: string;
+  active: boolean;
+}
+
+export async function listTeam(db: AppDatabase, siteId: string, { includeInactive = false } = {}): Promise<TeamMember[]> {
+  const rows = await db
+    .select({ p: staffProfiles, u: users })
+    .from(staffProfiles)
+    .innerJoin(users, eq(users.id, staffProfiles.userId))
+    .where(eq(staffProfiles.site, siteId))
+    .orderBy(asc(staffProfiles.sort), asc(users.name));
+  return rows
+    .filter((r) => includeInactive || (r.p.active && r.u.active))
+    .map((r) => ({
+      userId: r.u.id,
+      name: r.u.name,
+      email: r.u.email,
+      site: r.p.site,
+      active: r.p.active && r.u.active,
+      employmentType: r.p.employmentType as EmploymentType,
+      pensumPercent: r.p.pensumPercent,
+    }));
+}
+
+export interface ProfileInput {
+  site: string;
+  employmentType: EmploymentType;
+  pensumPercent: number | null;
+  active: boolean;
+}
+
+function checkProfile(input: ProfileInput) {
+  if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
+  const needsPensum = input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME';
+  if (needsPensum && !(input.pensumPercent && input.pensumPercent >= 1 && input.pensumPercent <= 100)) {
+    throw domainError('VALIDATION_FAILED', 'Das Pensum muss zwischen 1 und 100 % liegen.');
+  }
+}
+
+export async function saveProfile(db: AppDatabase, p: Principal, userId: string, input: ProfileInput): Promise<void> {
+  requirePlanner(p);
+  checkProfile(input);
+  const values = {
+    site: input.site,
+    employmentType: input.employmentType,
+    pensumPercent: input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME' ? input.pensumPercent : null,
+    active: input.active,
+  };
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw domainError('NOT_FOUND', 'User not found');
+  await db.insert(staffProfiles).values({ userId, ...values }).onConflictDoUpdate({ target: staffProfiles.userId, set: values });
+  await audit(db, p.userId, 'team.profile', 'user', userId, values);
+}
+
+/**
+ * Creates a login and a team profile in one go. Admin only. Returns the
+ * one-time password, which is shown once and never stored in clear.
+ */
+export async function createStaffUser(
+  db: AppDatabase,
+  p: Principal,
+  input: ProfileInput & { name: string; email: string; password: string },
+): Promise<string> {
+  if (!isAdmin(p)) throw domainError('FORBIDDEN', 'Nur Admins können Mitarbeiter anlegen.');
+  checkProfile(input);
+  const email = input.email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw domainError('VALIDATION_FAILED', 'E-Mail ist ungültig.');
+  if (!input.name.trim()) throw domainError('VALIDATION_FAILED', 'Name fehlt.');
+  const hash = await hashPassword(input.password);
+  const userId = await db.transaction(async (tx) => {
+    const [u] = await tx.insert(users).values({ email, name: input.name.trim(), passwordHash: hash }).returning({ id: users.id });
+    // Staff may enter goods-in and closings for the restaurants of their site.
+    const ids = ROSTER_SITES.find((s) => s.id === input.site)!.locationIds;
+    await tx.insert(userRoles).values(ids.map((id) => ({ userId: u!.id, role: 'STAFF' as const, locationId: id })));
+    const needsPensum = input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME';
+    await tx.insert(staffProfiles).values({ userId: u!.id, site: input.site, employmentType: input.employmentType, pensumPercent: needsPensum ? input.pensumPercent : null, active: input.active });
+    return u!.id;
+  }).catch((error: unknown) => {
+    const e = error as { code?: string; cause?: { code?: string } };
+    if (e?.code === '23505' || e?.cause?.code === '23505') throw domainError('VALIDATION_FAILED', 'Diese E-Mail wird schon verwendet.');
+    throw error;
+  });
+  await audit(db, p.userId, 'team.create', 'user', userId, { site: input.site, type: input.employmentType });
+  return userId;
+}
+
+// --- The week ------------------------------------------------------------------------------
+type ShiftRow = typeof shifts.$inferSelect;
+
+const toShift = (r: ShiftRow): Shift => ({
+  id: r.id,
+  userId: r.userId,
+  date: r.workDate,
+  startMin: r.startMin,
+  endMin: r.endMin,
+  breakMin: r.breakMin,
+  station: r.station,
+  roleLabel: r.roleLabel,
+});
+
+export async function listAbsences(db: AppDatabase, userIds: string[], from: string, to: string, statuses: AbsenceStatus[] = ['APPROVED']) {
+  if (userIds.length === 0) return [];
+  return db
+    .select()
+    .from(absences)
+    .where(and(inArray(absences.userId, userIds), inArray(absences.status, statuses), lte(absences.startDate, to), gte(absences.endDate, from)));
+}
+
+export interface WeekView {
+  site: string;
+  weekStart: string;
+  status: 'DRAFT' | 'PUBLISHED';
+  publishedAt: Date | null;
+  people: TeamMember[];
+  shifts: Shift[];
+  /** Planners only: what staff reported, and the checks. */
+  availability: AvailabilityDay[];
+  absences: Absence[];
+  violations: Violation[];
+  /** Staff cannot see a week the planner has not published. */
+  hidden: boolean;
+}
+
+export async function getWeekView(db: AppDatabase, p: Principal, siteId: string, weekStart: string): Promise<WeekView> {
+  await requireSite(db, p, siteId);
+  if (!isoDate(weekStart)) throw domainError('VALIDATION_FAILED', 'Invalid week');
+  const dates = weekDates(weekStart);
+  const [week] = await db.select().from(rosterWeeks).where(and(eq(rosterWeeks.site, siteId), eq(rosterWeeks.weekStart, weekStart))).limit(1);
+  const status = (week?.status ?? 'DRAFT') as 'DRAFT' | 'PUBLISHED';
+  const planner = isPlanner(p);
+  const people = await listTeam(db, siteId);
+  if (!planner && status !== 'PUBLISHED') {
+    return { site: siteId, weekStart, status, publishedAt: null, people, shifts: [], availability: [], absences: [], violations: [], hidden: true };
+  }
+  const rows = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
+  const weekShifts = rows.map(toShift);
+  const ids = people.map((x) => x.userId);
+  const abs = (await listAbsences(db, ids, dates[0]!, dates[6]!)).map((a) => ({ userId: a.userId, startDate: a.startDate, endDate: a.endDate, type: a.type as AbsenceType }));
+  let avail: AvailabilityDay[] = [];
+  let violations: Violation[] = [];
+  if (planner) {
+    const av = ids.length
+      ? await db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates[6]!)))
+      : [];
+    avail = av.map((a) => ({ userId: a.userId, date: a.workDate, kind: a.kind as AvailabilityKind, fromMin: a.fromMin, toMin: a.toMin }));
+    violations = validateRoster({ weekStart, people, shifts: weekShifts, availability: avail, absences: abs });
+  }
+  return { site: siteId, weekStart, status, publishedAt: week?.publishedAt ?? null, people, shifts: weekShifts, availability: avail, absences: abs, violations, hidden: false };
+}
+
+export interface SaveShiftInput {
+  id?: string | undefined;
+  site: string;
+  date: string;
+  userId: string | null;
+  startMin: number;
+  endMin: number;
+  breakMin: number;
+  station: string;
+  roleLabel: string | null;
+}
+
+export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftInput, now = new Date()): Promise<string> {
+  requirePlanner(p);
+  if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
+  if (!isoDate(input.date)) throw domainError('VALIDATION_FAILED', 'Datum ist ungültig.');
+  const problem = checkShiftTimes(input.startMin, input.endMin, input.breakMin);
+  if (problem) throw domainError('VALIDATION_FAILED', problem);
+  if (!stationsOf(input.site).some((s) => s.name === input.station)) throw domainError('VALIDATION_FAILED', 'Station ist ungültig.');
+  if (input.userId) {
+    const profile = await getProfile(db, input.userId);
+    if (!profile || profile.site !== input.site || !profile.active) throw domainError('VALIDATION_FAILED', 'Diese Person gehört nicht zum Team dieses Standorts.');
+  }
+  const values = {
+    site: input.site,
+    workDate: input.date,
+    userId: input.userId,
+    startMin: input.startMin,
+    endMin: input.endMin,
+    breakMin: input.breakMin,
+    station: input.station,
+    roleLabel: input.roleLabel?.trim() || null,
+    updatedAt: now,
+  };
+  if (input.id) {
+    const [row] = await db.update(shifts).set(values).where(and(eq(shifts.id, input.id), eq(shifts.site, input.site))).returning({ id: shifts.id });
+    if (!row) throw domainError('NOT_FOUND', 'Shift not found');
+    await audit(db, p.userId, 'shift.update', 'shift', row.id, { date: input.date, userId: input.userId });
+    return row.id;
+  }
+  const [row] = await db.insert(shifts).values({ ...values, createdBy: p.userId, createdAt: now }).returning({ id: shifts.id });
+  await audit(db, p.userId, 'shift.create', 'shift', row!.id, { date: input.date, userId: input.userId });
+  return row!.id;
+}
+
+export async function deleteShift(db: AppDatabase, p: Principal, shiftId: string): Promise<void> {
+  requirePlanner(p);
+  if (!/^[0-9a-f-]{36}$/i.test(shiftId)) throw domainError('NOT_FOUND', 'Shift not found');
+  const [row] = await db.delete(shifts).where(eq(shifts.id, shiftId)).returning({ id: shifts.id, date: shifts.workDate });
+  if (!row) throw domainError('NOT_FOUND', 'Shift not found');
+  await audit(db, p.userId, 'shift.delete', 'shift', row.id, { date: row.date });
+}
+
+/** Publishes a week so staff can see it. Refused while there are errors. */
+export async function publishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<void> {
+  requirePlanner(p);
+  const view = await getWeekView(db, p, siteId, weekStart);
+  if (hasBlockingViolation(view.violations)) {
+    throw domainError('ROSTER_BLOCKED', 'Plan has errors', { errors: view.violations.filter((v) => v.severity === 'error').length });
+  }
+  await db
+    .insert(rosterWeeks)
+    .values({ site: siteId, weekStart, status: 'PUBLISHED', publishedBy: p.userId, publishedAt: now })
+    .onConflictDoUpdate({ target: [rosterWeeks.site, rosterWeeks.weekStart], set: { status: 'PUBLISHED', publishedBy: p.userId, publishedAt: now } });
+  await audit(db, p.userId, 'roster.publish', 'roster_week', `${siteId}:${weekStart}`);
+}
+
+export async function unpublishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string): Promise<void> {
+  requirePlanner(p);
+  await db.update(rosterWeeks).set({ status: 'DRAFT' }).where(and(eq(rosterWeeks.site, siteId), eq(rosterWeeks.weekStart, weekStart)));
+  await audit(db, p.userId, 'roster.unpublish', 'roster_week', `${siteId}:${weekStart}`);
+}
+
+/** Copies last week's shifts into an empty week (a starting point to adjust). Returns how many. */
+export async function copyWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string): Promise<number> {
+  requirePlanner(p);
+  const from = addDays(weekStart, -7);
+  const existing = await db.select({ id: shifts.id }).from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, weekStart), lte(shifts.workDate, addDays(weekStart, 6)))).limit(1);
+  if (existing.length > 0) throw domainError('VALIDATION_FAILED', 'Diese Woche hat schon Schichten.');
+  const rows = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, from), lte(shifts.workDate, addDays(from, 6))));
+  if (rows.length === 0) return 0;
+  await db.insert(shifts).values(rows.map((r) => ({ site: r.site, workDate: addDays(r.workDate, 7), userId: r.userId, startMin: r.startMin, endMin: r.endMin, breakMin: r.breakMin, station: r.station, roleLabel: r.roleLabel, createdBy: p.userId })));
+  await audit(db, p.userId, 'roster.copy', 'roster_week', `${siteId}:${weekStart}`, { count: rows.length });
+  return rows.length;
+}
+
+/** Published shifts of one person, for "Meine Schichten". */
+export async function listMyShifts(db: AppDatabase, p: Principal, from: string, to: string): Promise<(Shift & { site: string })[]> {
+  const rows = await db
+    .select()
+    .from(shifts)
+    .where(and(eq(shifts.userId, p.userId), gte(shifts.workDate, from), lte(shifts.workDate, to)))
+    .orderBy(asc(shifts.workDate), asc(shifts.startMin));
+  // A shift is visible once the planner has published its week.
+  const published = new Set((await db.select().from(rosterWeeks).where(eq(rosterWeeks.status, 'PUBLISHED'))).map((w) => `${w.site}:${w.weekStart}`));
+  return rows.filter((r) => published.has(`${r.site}:${mondayOf(r.workDate)}`)).map((r) => ({ ...toShift(r), site: r.site }));
+}
+
+// --- Availability a month ahead -------------------------------------------------------------
+export async function getAvailabilityMonth(db: AppDatabase, p: Principal, userId: string, month: string) {
+  if (userId !== p.userId && !isPlanner(p)) throw domainError('FORBIDDEN', 'Not allowed');
+  if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
+  const dates = monthDates(month);
+  const days = (await db.select().from(availability).where(and(eq(availability.userId, userId), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates.at(-1)!)))).map(
+    (a): AvailabilityDay => ({ userId: a.userId, date: a.workDate, kind: a.kind as AvailabilityKind, fromMin: a.fromMin, toMin: a.toMin }),
+  );
+  const [submission] = await db.select().from(availabilitySubmissions).where(and(eq(availabilitySubmissions.userId, userId), eq(availabilitySubmissions.month, month))).limit(1);
+  const abs = await db
+    .select()
+    .from(absences)
+    .where(and(eq(absences.userId, userId), lte(absences.startDate, dates.at(-1)!), gte(absences.endDate, dates[0]!)))
+    .orderBy(asc(absences.startDate));
+  return { days, submittedAt: submission?.submittedAt ?? null, absences: abs };
+}
+
+export interface SetAvailabilityInput {
+  userId: string;
+  date: string;
+  /** null removes the entry. */
+  kind: AvailabilityKind | null;
+  fromMin: number | null;
+  toMin: number | null;
+}
+
+/** Staff change only days that are at least LEAD_DAYS away; the planner any day. */
+export async function setAvailability(db: AppDatabase, p: Principal, input: SetAvailabilityInput, now = new Date()): Promise<void> {
+  const planner = isPlanner(p);
+  if (input.userId !== p.userId && !planner) throw domainError('FORBIDDEN', 'Not allowed');
+  if (!isoDate(input.date)) throw domainError('VALIDATION_FAILED', 'Datum ist ungültig.');
+  if (!planner && !isOpenForStaff(input.date, todayIso(now))) throw domainError('TOO_LATE', 'Too late', { leadDays: LEAD_DAYS });
+  if (input.kind === null) {
+    await db.delete(availability).where(and(eq(availability.userId, input.userId), eq(availability.workDate, input.date)));
+    return;
+  }
+  const windowed = input.fromMin !== null && input.toMin !== null;
+  if ((input.fromMin === null) !== (input.toMin === null) || (windowed && !(input.toMin! > input.fromMin! && input.fromMin! >= 0 && input.toMin! <= 30 * 60))) {
+    throw domainError('VALIDATION_FAILED', 'Die Zeit ist ungültig.');
+  }
+  const values = { kind: input.kind, fromMin: input.fromMin, toMin: input.toMin, updatedBy: p.userId, updatedAt: now };
+  await db.insert(availability).values({ userId: input.userId, workDate: input.date, ...values }).onConflictDoUpdate({ target: [availability.userId, availability.workDate], set: values });
+}
+
+/** Marks a month as reported ("Meldung abschicken"). */
+export async function submitMonth(db: AppDatabase, p: Principal, month: string, now = new Date()): Promise<void> {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
+  if (!(await getProfile(db, p.userId))) throw domainError('FORBIDDEN', 'Kein Team-Profil.');
+  await db.insert(availabilitySubmissions).values({ userId: p.userId, month, submittedAt: now }).onConflictDoUpdate({ target: [availabilitySubmissions.userId, availabilitySubmissions.month], set: { submittedAt: now } });
+  await audit(db, p.userId, 'availability.submit', 'user', p.userId, { month });
+}
+
+/** For the planner: who has reported for the month, and what they asked for. */
+export async function submissionOverview(db: AppDatabase, p: Principal, siteId: string, month: string) {
+  requirePlanner(p);
+  const people = await listTeam(db, siteId);
+  const ids = people.map((x) => x.userId);
+  if (ids.length === 0) return [];
+  const dates = monthDates(month);
+  const [subs, av, abs] = await Promise.all([
+    db.select().from(availabilitySubmissions).where(and(inArray(availabilitySubmissions.userId, ids), eq(availabilitySubmissions.month, month))),
+    db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates.at(-1)!))),
+    db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['REQUESTED', 'APPROVED']), lte(absences.startDate, dates.at(-1)!), gte(absences.endDate, dates[0]!))),
+  ]);
+  return people.map((person) => ({
+    person,
+    submittedAt: subs.find((s) => s.userId === person.userId)?.submittedAt ?? null,
+    availableDays: av.filter((a) => a.userId === person.userId && a.kind === 'AVAILABLE').length,
+    unavailableDays: av.filter((a) => a.userId === person.userId && a.kind === 'UNAVAILABLE').length,
+    absences: abs.filter((a) => a.userId === person.userId),
+  }));
+}
+
+// --- Holidays ----------------------------------------------------------------------------------
+export interface AbsenceInput {
+  userId: string;
+  startDate: string;
+  endDate: string;
+  type: AbsenceType;
+  note: string | null;
+}
+
+/** Staff ask for time off (REQUESTED); the planner records it directly (APPROVED). */
+export async function requestAbsence(db: AppDatabase, p: Principal, input: AbsenceInput, now = new Date()): Promise<string> {
+  const planner = isPlanner(p);
+  if (input.userId !== p.userId && !planner) throw domainError('FORBIDDEN', 'Not allowed');
+  if (!isoDate(input.startDate) || !isoDate(input.endDate) || input.endDate < input.startDate) throw domainError('VALIDATION_FAILED', 'Das Datum ist ungültig.');
+  if (!planner && input.type !== 'VACATION') throw domainError('VALIDATION_FAILED', 'Staff can only request holidays.');
+  if (!planner && input.startDate < todayIso(now)) throw domainError('VALIDATION_FAILED', 'Der Beginn liegt in der Vergangenheit.');
+  if (!(await getProfile(db, input.userId))) throw domainError('VALIDATION_FAILED', 'Kein Team-Profil.');
+  const [row] = await db
+    .insert(absences)
+    .values({
+      userId: input.userId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      type: input.type,
+      status: planner ? 'APPROVED' : 'REQUESTED',
+      note: input.note?.trim() || null,
+      requestedAt: now,
+      createdBy: p.userId,
+      ...(planner ? { decidedBy: p.userId, decidedAt: now } : {}),
+    })
+    .returning({ id: absences.id });
+  await audit(db, p.userId, 'absence.request', 'absence', row!.id, { start: input.startDate, end: input.endDate, type: input.type });
+  return row!.id;
+}
+
+export async function decideAbsence(db: AppDatabase, p: Principal, absenceId: string, approve: boolean, now = new Date()): Promise<void> {
+  requirePlanner(p);
+  if (!/^[0-9a-f-]{36}$/i.test(absenceId)) throw domainError('NOT_FOUND', 'Absence not found');
+  const [row] = await db.update(absences).set({ status: approve ? 'APPROVED' : 'REJECTED', decidedBy: p.userId, decidedAt: now }).where(eq(absences.id, absenceId)).returning({ id: absences.id });
+  if (!row) throw domainError('NOT_FOUND', 'Absence not found');
+  await audit(db, p.userId, approve ? 'absence.approve' : 'absence.reject', 'absence', absenceId);
+}
+
+/** Staff withdraw their own pending request; the planner can delete any. */
+export async function cancelAbsence(db: AppDatabase, p: Principal, absenceId: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(absenceId)) throw domainError('NOT_FOUND', 'Absence not found');
+  const [row] = await db.select().from(absences).where(eq(absences.id, absenceId)).limit(1);
+  if (!row) throw domainError('NOT_FOUND', 'Absence not found');
+  if (!isPlanner(p) && !(row.userId === p.userId && row.status === 'REQUESTED')) throw domainError('FORBIDDEN', 'Not allowed');
+  await db.delete(absences).where(eq(absences.id, absenceId));
+  await audit(db, p.userId, 'absence.cancel', 'absence', absenceId);
+}
+
+export async function listPendingAbsences(db: AppDatabase, p: Principal, siteId: string) {
+  requirePlanner(p);
+  const people = await listTeam(db, siteId);
+  if (people.length === 0) return [];
+  const rows = await db.select().from(absences).where(and(inArray(absences.userId, people.map((x) => x.userId)), eq(absences.status, 'REQUESTED'))).orderBy(asc(absences.startDate));
+  return rows.map((a) => ({ ...a, name: people.find((x) => x.userId === a.userId)?.name ?? '' }));
+}
+

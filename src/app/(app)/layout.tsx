@@ -18,8 +18,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const links = [
     { href: '/', label: 'Start', icon: 'home' as const },
     { href: '/bestellungen', label: 'Bestellen', icon: 'cart' as const },
-    { href: '/wareneingang', label: 'Wareneingang', icon: 'scan' as const },
+    { href: '/wareneingang', label: 'Eingang', icon: 'scan' as const },
     { href: '/tagesabschluss', label: 'Abschluss', icon: 'cash' as const },
+    { href: '/dienstplan', label: 'Dienstplan', icon: 'calendar' as const },
+  ];
+  const more = [
     { href: '/artikel', label: 'Artikel', icon: 'box' as const },
     ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: 'Lieferanten', icon: 'truck' as const }] : []),
   ];
@@ -32,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-sm text-white/70">Staff</span>
           </Link>
           <nav className="ml-6 hidden md:block">
-            <NavLinks links={links} variant="top" />
+            <NavLinks links={[...links, ...more]} variant="top" />
           </nav>
           <div className="ml-auto flex items-center gap-2 text-right">
             <div className="hidden leading-tight sm:block">
@@ -49,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <main className="mx-auto max-w-5xl px-4 py-4">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-surface-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        <NavLinks links={links} variant="bottom" />
+        <NavLinks links={[...links, { href: '/mehr', label: 'Mehr', icon: 'more' as const }]} variant="bottom" />
       </nav>
     </div>
   );

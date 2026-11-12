@@ -59,6 +59,14 @@ Then open `https://<laptop-ip>:3000` and accept the certificate warning. The ser
 
 Replaces the paper form. Staff enter the counted till, starting float, EFT, mobile payment and the POS gross (SOLL); the app calculates cash sales, total (IST), difference/tips and **cash to bank** (`POS gross − EFT − mobile`) as you type. One closing per day and station. An orderer or admin approves it, which locks it. Photos of the form and the POS report can be attached, and an orderer can export a month as CSV (`/tagesabschluss/export?monat=2026-11`). The POS gross is typed in, so it works with any POS. Stations and the CHF 300 float are in `src/domain/closing.ts`.
 
+## Dienstplan (staff roster)
+
+- **One plan per site**, not per restaurant: Winterthur (EG Thai + 1. OG Vietnamese share the staff) and Oerlikon. Stations and their colours are in `src/domain/roster.ts`.
+- **Staff report a month ahead.** On *Verfügbarkeit & Ferien* they mark days *verfügbar* / *nicht verfügbar* (with an optional time window) and request holidays; a day can only be changed by staff while it is at least **28 days** away (`LEAD_DAYS`). *Meldung abschicken* tells the planner who has reported. Aushilfen are only scheduled on days they offered; contracted staff are available unless they say no.
+- **The planner (Besteller / Admin)** builds the week in a grid (click a cell), sees weekly hours against each person's pensum (100 % = 40–42.5 h), and gets checks: overlaps, 11 h rest, 14 h span, breaks, days in a row, holidays, availability. Errors block publishing; staff see a week only once it is published.
+- **PDF** in the layout of the paper plan (page 1 station plan, page 2 plan by person): `/dienstplan/pdf?site=winterthur&woche=2026-11-09`.
+- Team profiles (contract type, pensum) are edited under *Team & Meldungen*; an admin can add a person with a login there. The legal limits in `roster.ts` (rest, span, breaks) are defaults to **verify** against ArG / L-GAV.
+
 ## Commands
 
 | Command | What it does |

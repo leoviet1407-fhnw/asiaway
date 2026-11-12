@@ -243,6 +243,75 @@ export const closingPhotos = pgTable('closing_photos', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+
+export const employmentType = pgEnum('employment_type', ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT']);
+export const rosterWeekStatus = pgEnum('roster_week_status', ['DRAFT', 'PUBLISHED']);
+export const availabilityKind = pgEnum('availability_kind', ['AVAILABLE', 'UNAVAILABLE']);
+export const absenceType = pgEnum('absence_type', ['VACATION', 'SICK', 'OTHER']);
+export const absenceStatus = pgEnum('absence_status', ['REQUESTED', 'APPROVED', 'REJECTED']);
+
+export const staffProfiles = pgTable('staff_profiles', {
+  userId: uuid('user_id').primaryKey(),
+  site: text('site').notNull(),
+  employmentType: employmentType('employment_type').notNull(),
+  pensumPercent: integer('pensum_percent'),
+  active: boolean('active').notNull().default(true),
+  sort: integer('sort').notNull().default(0),
+});
+
+export const rosterWeeks = pgTable('roster_weeks', {
+  site: text('site').notNull(),
+  weekStart: date('week_start').notNull(),
+  status: rosterWeekStatus('status').notNull().default('DRAFT'),
+  publishedBy: uuid('published_by'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+});
+
+export const shifts = pgTable('shifts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  site: text('site').notNull(),
+  workDate: date('work_date').notNull(),
+  userId: uuid('user_id'),
+  startMin: integer('start_min').notNull(),
+  endMin: integer('end_min').notNull(),
+  breakMin: integer('break_min').notNull().default(0),
+  station: text('station').notNull(),
+  roleLabel: text('role_label'),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const availability = pgTable('availability', {
+  userId: uuid('user_id').notNull(),
+  workDate: date('work_date').notNull(),
+  kind: availabilityKind('kind').notNull(),
+  fromMin: integer('from_min'),
+  toMin: integer('to_min'),
+  updatedBy: uuid('updated_by'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const availabilitySubmissions = pgTable('availability_submissions', {
+  userId: uuid('user_id').notNull(),
+  month: text('month').notNull(),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const absences = pgTable('absences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  type: absenceType('type').notNull(),
+  status: absenceStatus('status').notNull().default('REQUESTED'),
+  note: text('note'),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by').notNull(),
+  decidedBy: uuid('decided_by'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }),
+});
+
 export const schema = {
   locations,
   users,
@@ -262,4 +331,10 @@ export const schema = {
   auditEvents,
   dailyClosings,
   closingPhotos,
+  staffProfiles,
+  rosterWeeks,
+  shifts,
+  availability,
+  availabilitySubmissions,
+  absences,
 };

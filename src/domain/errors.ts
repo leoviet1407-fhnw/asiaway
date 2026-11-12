@@ -11,6 +11,8 @@ export type DomainErrorCode =
   | 'ALREADY_SENT'
   | 'RECEIPT_CLOSED'
   | 'CLOSING_LOCKED'
+  | 'TOO_LATE'
+  | 'ROSTER_BLOCKED'
   | 'MAIL_FAILED';
 
 export class DomainError extends Error {

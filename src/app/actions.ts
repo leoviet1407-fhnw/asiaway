@@ -1,16 +1,32 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { DomainError } from '@/domain/errors';
 import { parseChfToCents, parseQty } from '@/domain/qty';
+import { parseTime } from '@/domain/roster';
 import { messageFor } from '@/lib/messages';
 import { requirePrincipal } from '@/server/auth/current';
 import { SESSION_COOKIE, SESSION_DAYS, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
 import { updateItem, updateSupplier, type StorageArea } from '@/server/services/catalog-service';
+import {
+  cancelAbsence,
+  copyWeek,
+  createStaffUser,
+  decideAbsence,
+  deleteShift,
+  publishWeek,
+  requestAbsence,
+  saveProfile,
+  saveShift,
+  setAvailability,
+  submitMonth,
+  unpublishWeek,
+} from '@/server/services/roster-service';
 import {
   addClosingPhoto,
   approveClosing,
@@ -328,5 +344,165 @@ export async function uploadClosingPhotoAction(form: FormData): Promise<ActionRe
   } catch (error) {
     if (isRedirect(error)) throw error;
     return fail(error);
+  }
+}
+
+// --- Dienstplan (staff roster) -------------------------------------------------------------
+
+export async function saveShiftAction(input: {
+  id?: string;
+  site: string;
+  date: string;
+  userId: string | null;
+  start: string;
+  end: string;
+  breakMin: number;
+  station: string;
+  roleLabel: string;
+}): Promise<ActionResult<string>> {
+  try {
+    const p = await requirePrincipal();
+    const startMin = parseTime(input.start);
+    const endMin = parseTime(input.end);
+    if (startMin === null || endMin === null) return { ok: false, error: 'Zeit ist ungültig (z. B. 10:30).' };
+    const id = await saveShift(await db(), p, {
+      id: input.id,
+      site: input.site,
+      date: input.date,
+      userId: input.userId || null,
+      startMin,
+      endMin,
+      breakMin: Math.max(0, Math.round(Number(input.breakMin) || 0)),
+      station: input.station,
+      roleLabel: input.roleLabel || null,
+    });
+    return { ok: true, value: id };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function deleteShiftAction(shiftId: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await deleteShift(await db(), p, shiftId);
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function weekStepAction(site: string, weekStart: string, step: 'publish' | 'unpublish' | 'copy'): Promise<ActionResult<number>> {
+  try {
+    const p = await requirePrincipal();
+    const database = await db();
+    let value = 0;
+    if (step === 'publish') await publishWeek(database, p, site, weekStart);
+    if (step === 'unpublish') await unpublishWeek(database, p, site, weekStart);
+    if (step === 'copy') value = await copyWeek(database, p, site, weekStart);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true, value };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function setAvailabilityAction(input: { userId: string; date: string; kind: 'AVAILABLE' | 'UNAVAILABLE' | null; from: string; to: string }): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    const from = input.from ? parseTime(input.from) : null;
+    const to = input.to ? parseTime(input.to) : null;
+    if ((input.from && from === null) || (input.to && to === null)) return { ok: false, error: 'Zeit ist ungültig (z. B. 17:00).' };
+    await setAvailability(await db(), p, { userId: input.userId, date: input.date, kind: input.kind, fromMin: from, toMin: to });
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function submitMonthAction(month: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await submitMonth(await db(), p, month);
+    revalidatePath('/', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function requestAbsenceAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
+  try {
+    const p = await requirePrincipal();
+    const type = String(form.get('type') ?? 'VACATION');
+    await requestAbsence(await db(), p, {
+      userId: String(form.get('userId') || p.userId),
+      startDate: String(form.get('startDate') ?? ''),
+      endDate: String(form.get('endDate') ?? '') || String(form.get('startDate') ?? ''),
+      type: type === 'SICK' || type === 'OTHER' ? type : 'VACATION',
+      note: String(form.get('note') ?? '') || null,
+    });
+    revalidatePath('/dienstplan', 'layout');
+    return { saved: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: fail(error).error };
+  }
+}
+
+export async function absenceStepAction(absenceId: string, step: 'approve' | 'reject' | 'cancel'): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    const database = await db();
+    if (step === 'cancel') await cancelAbsence(database, p, absenceId);
+    else await decideAbsence(database, p, absenceId, step === 'approve');
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+function profileFrom(form: FormData) {
+  const type = String(form.get('employmentType') ?? 'PART_TIME');
+  const employmentType = (['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'] as const).find((t) => t === type) ?? 'PART_TIME';
+  const pensum = Number(String(form.get('pensum') ?? '').replace('%', '').trim());
+  return {
+    site: String(form.get('site') ?? ''),
+    employmentType,
+    pensumPercent: Number.isFinite(pensum) && pensum > 0 ? pensum : null,
+    active: form.get('active') === 'on',
+  };
+}
+
+export async function saveProfileAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
+  try {
+    const p = await requirePrincipal();
+    await saveProfile(await db(), p, String(form.get('userId')), profileFrom(form));
+    revalidatePath('/dienstplan', 'layout');
+    return { saved: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: fail(error).error };
+  }
+}
+
+export async function createStaffAction(_prev: { error?: string; password?: string; email?: string } | undefined, form: FormData): Promise<{ error?: string; password?: string; email?: string }> {
+  try {
+    const p = await requirePrincipal();
+    const password = randomBytes(9).toString('base64url');
+    const email = String(form.get('email') ?? '').trim();
+    await createStaffUser(await db(), p, { ...profileFrom(form), active: true, name: String(form.get('name') ?? ''), email, password });
+    revalidatePath('/dienstplan', 'layout');
+    return { password, email };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: fail(error).error };
   }
 }

@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { isOrderer } from '@/domain/roles';
 import { formatChf } from '@/domain/qty';
-import { formatDay } from '@/lib/dates';
+import { formatDay, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
+import { dueMonth, firstOpenDate } from '@/domain/roster';
+import { getAvailabilityMonth, getProfile } from '@/server/services/roster-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -19,15 +21,26 @@ export default async function HomePage() {
   const submitted = await listOrders(database, p, { statuses: ['SUBMITTED'] });
   const deliveries = await listReceivable(database, p);
   const orderer = isOrderer(p);
+  const profile = await getProfile(database, p.userId);
+  const month = dueMonth(todayIso());
+  const reported = profile ? (await getAvailabilityMonth(database, p, p.userId, month)).submittedAt !== null : true;
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl">Hallo {p.name.split(' ')[0]}</h1>
 
+      {!reported && (
+        <Link href={`/dienstplan/verfuegbarkeit?monat=${month}`} className="block rounded-btn bg-brand-600 p-4 text-white">
+          <div className="font-semibold">Verfügbarkeit & Ferien melden</div>
+          <div className="text-sm text-white/85">Für {month.slice(5)}/{month.slice(0, 4)} – bitte ab {formatDay(firstOpenDate(todayIso()))} einen Monat im Voraus eintragen →</div>
+        </Link>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <Action href="/bestellungen/neu" icon="cart" label="Neue Bestellung" primary />
         <Action href="/wareneingang" icon="scan" label="Wareneingang" badge={deliveries.length} />
         <Action href="/tagesabschluss/neu" icon="cash" label="Tagesabschluss" />
+        <Action href="/dienstplan" icon="calendar" label="Dienstplan" />
         <Action href={RESERVATIONS_URL} icon="calendar" label="Reservationen" external />
       </div>
 
