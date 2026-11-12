@@ -1,0 +1,4 @@
+sku;name_de;name_vi;storage_area;stock_unit;fresh;key_item;supplier;supplier_sku;order_unit;pack_size;price_chf;ean
+A-1001;Jasminreis 20 kg;Gạo thơm 20 kg;Trockenlager;Sack;nein;ja;Muster Asia Food AG;AS-1001;Sack 20 kg;1;42.50;2001001000004
+A-1005;Fischsauce 1 l;Nước mắm 1 l;Trockenlager;Fl;nein;ja;Muster Asia Food AG;AS-1005;Karton à 12 × 1 l;12;46.80;2001005000000|2101005000007:0.0833
+F-3001;Koriander;Ngò rí;Kühlraum;Bund;ja;ja;Muster Frischmarkt GmbH;FR-3001;Bund;1;1.20;

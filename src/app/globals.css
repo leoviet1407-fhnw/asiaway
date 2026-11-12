@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  @apply bg-surface-sunken text-charcoal antialiased;
+  overflow-x: clip;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-[16px] leading-relaxed;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-semibold text-navy leading-tight;
+  }
+  input,
+  select,
+  textarea {
+    @apply rounded-btn border border-surface-line bg-white px-3 py-2 text-charcoal min-h-tap;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus,
+  button:focus-visible,
+  a:focus-visible {
+    @apply outline-none ring-2 ring-brand-600/50;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-tap items-center justify-center gap-2 rounded-btn px-4 py-2 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border border-navy/20 bg-white text-navy hover:bg-navy-50;
+  }
+  .btn-ghost {
+    @apply btn text-navy hover:bg-navy-50;
+  }
+  .btn-danger {
+    @apply btn border border-brand-600 bg-white text-brand-600 hover:bg-brand-50;
+  }
+  .card {
+    @apply rounded-btn border border-surface-line bg-white p-4;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .label {
+    @apply mb-1 block text-sm font-semibold text-navy;
+  }
+}

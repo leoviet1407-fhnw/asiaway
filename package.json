@@ -1,0 +1,46 @@
+{
+  "name": "asiaway-staff",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "tsx scripts/seed.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "user:add": "tsx scripts/add-user.ts",
+    "items:import": "tsx scripts/import-items.ts",
+    "icons": "tsx scripts/make-icons.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
+    "csv-parse": "^5.6.0",
+    "drizzle-orm": "^0.38.3",
+    "next": "^15.5.25",
+    "nodemailer": "^6.10.1",
+    "pdf-lib": "^1.17.1",
+    "postgres": "^3.4.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

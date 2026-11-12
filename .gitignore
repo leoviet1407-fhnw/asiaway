@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.next/
+coverage/
+*.log
+.pglite/
+.pglite-*/
+.outbox/
+next-env.d.ts
+tsconfig.tsbuildinfo
+.DS_Store
