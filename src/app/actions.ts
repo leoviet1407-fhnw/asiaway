@@ -9,7 +9,7 @@ import { parseChfToCents, parseQty } from '@/domain/qty';
 import { parseTime } from '@/domain/roster';
 import { messageFor } from '@/lib/messages';
 import { requirePrincipal } from '@/server/auth/current';
-import { SESSION_COOKIE, SESSION_DAYS, login, logout } from '@/server/auth/session';
+import { SESSION_COOKIE, SESSION_DAYS, changePassword, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
 import { updateItem, updateSupplier, type StorageArea } from '@/server/services/catalog-service';
@@ -501,6 +501,19 @@ export async function createStaffAction(_prev: { error?: string; password?: stri
     await createStaffUser(await db(), p, { ...profileFrom(form), active: true, name: String(form.get('name') ?? ''), email, password });
     revalidatePath('/dienstplan', 'layout');
     return { password, email };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: fail(error).error };
+  }
+}
+
+export async function changePasswordAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
+  try {
+    const p = await requirePrincipal();
+    const next = String(form.get('next') ?? '');
+    if (next !== String(form.get('repeat') ?? '')) return { error: 'Die beiden neuen Passwörter sind nicht gleich.' };
+    await changePassword(await db(), p.userId, String(form.get('current') ?? ''), next, (await cookies()).get(SESSION_COOKIE)?.value);
+    return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
     return { error: fail(error).error };

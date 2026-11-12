@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AppDatabase } from '@/server/db/client';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
-import { MAX_FAILED_LOGINS, login, logout, principalFromToken } from '@/server/auth/session';
+import { MAX_FAILED_LOGINS, changePassword, login, logout, principalFromToken } from '@/server/auth/session';
 import { seedSampleData } from '@/server/seed/sample-data';
 import { createTestDatabase } from '../helpers/db';
 
@@ -44,5 +44,17 @@ describe('sessions', () => {
       await expect(login(db, 'winti-vn@asiaway.test', 'wrong')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
     }
     await expect(login(db, 'winti-vn@asiaway.test', 'test-password')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+  });
+
+  it('changes the password, ends other sessions and keeps the current one', async () => {
+    const a = await login(db, 'admin@asiaway.test', 'test-password');
+    const b = await login(db, 'admin@asiaway.test', 'test-password');
+    await expect(changePassword(db, a.userId, 'wrong-password', 'brand-new-pass', a.token)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(changePassword(db, a.userId, 'test-password', 'short', a.token)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await changePassword(db, a.userId, 'test-password', 'brand-new-pass', a.token);
+    expect(await principalFromToken(db, a.token)).not.toBeNull();
+    expect(await principalFromToken(db, b.token)).toBeNull();
+    await expect(login(db, 'admin@asiaway.test', 'test-password')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await login(db, 'admin@asiaway.test', 'brand-new-pass');
   });
 });

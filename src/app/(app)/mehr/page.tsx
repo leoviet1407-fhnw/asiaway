@@ -3,6 +3,7 @@ import { isAdmin, isOrderer } from '@/domain/roles';
 import { Icon, type IconName } from '@/components/Icon';
 import { requirePrincipal } from '@/server/auth/current';
 import { logoutAction } from '../../actions';
+import { PasswordForm } from './PasswordForm';
 
 export const metadata = { title: 'Mehr' };
 
@@ -30,6 +31,7 @@ export default async function MorePage() {
           </li>
         ))}
       </ul>
+      <PasswordForm />
       <form action={logoutAction}>
         <button className="btn-secondary w-full">Abmelden ({p.name})</button>
       </form>
