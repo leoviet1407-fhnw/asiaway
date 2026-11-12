@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "seed": "tsx scripts/seed.ts",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:bootstrap": "tsx scripts/bootstrap.ts",
     "user:add": "tsx scripts/add-user.ts",
     "items:import": "tsx scripts/import-items.ts",
     "icons": "tsx scripts/make-icons.ts"
