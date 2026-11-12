@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { Logo } from '@/components/Logo';
 import { SITE_IMAGES } from '@/lib/site-images';
 import { currentPrincipal } from '@/server/auth/current';
 import { getDatabase } from '@/server/db';
@@ -17,9 +18,7 @@ export default async function LoginPage() {
       <div className="absolute inset-0 bg-gradient-to-b from-navy/60 via-navy/75 to-navy" />
       <div className="relative w-full max-w-sm">
         <div className="mb-6">
-          <div className="text-4xl font-bold text-white">
-            Asia<span className="text-brand-500">Way</span>
-          </div>
+          <Logo variant="white" className="h-14" />
           <p className="mt-1 text-white/70">
             Staff <span className="ml-2 text-sm text-brand-500">nhân viên</span>
           </p>
