@@ -7,7 +7,8 @@ import { db } from '@/server/db';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
-import { Icon } from '@/components/Icon';
+import { PhotoTile } from '@/components/PhotoTile';
+import { RESERVATIONS_URL, SITE_IMAGES } from '@/lib/site-images';
 
 export const metadata = { title: 'Start' };
 
@@ -21,24 +22,20 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl">Hallo {p.name.split(' ')[0]}</h1>
-        <p className="text-charcoal-muted">Was steht heute an?</p>
-      </div>
+      <PhotoTile
+        size="hero"
+        href="/bestellungen/neu"
+        image={SITE_IMAGES.dishes}
+        title={`Hallo ${p.name.split(' ')[0]}`}
+        accent="xin chào"
+        text="Was steht heute an? Neue Bestellung starten →"
+      />
 
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/tagesabschluss/neu" className="btn-secondary col-span-2 h-14 text-base">
-          <Icon name="cash" className="h-6 w-6" />
-          Tagesabschluss
-        </Link>
-        <Link href="/bestellungen/neu" className="btn-primary h-20 flex-col text-base">
-          <Icon name="cart" className="h-6 w-6" />
-          Neue Bestellung
-        </Link>
-        <Link href="/wareneingang" className="btn-secondary h-20 flex-col text-base">
-          <Icon name="scan" className="h-6 w-6" />
-          Wareneingang
-        </Link>
+        <PhotoTile href="/bestellungen" image={SITE_IMAGES.vegetables} title="Bestellen" accent="đặt hàng" text="Bei Lieferanten" badge={submitted.length + drafts.length || undefined} />
+        <PhotoTile href="/wareneingang" image={SITE_IMAGES.market} title="Wareneingang" accent="nhận hàng" text="Scannen & prüfen" badge={deliveries.length || undefined} />
+        <PhotoTile href="/tagesabschluss/neu" title="Abschluss" accent="kết ca" text="Tageskasse" />
+        <PhotoTile href={RESERVATIONS_URL} external title="Reservationen" accent="đặt bàn" text="Gäste & Tische" />
       </div>
 
       {orderer && (
@@ -85,7 +82,7 @@ export default async function HomePage() {
 function Section({ title, count, empty, children }: { title: string; count: number; empty: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 flex items-center gap-2 text-lg">
+      <h2 className="h-site mb-3 flex items-center gap-2">
         {title}
         <span className="chip bg-navy-50 text-navy">{count}</span>
       </h2>
