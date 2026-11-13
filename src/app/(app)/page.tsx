@@ -7,6 +7,7 @@ import { db } from '@/server/db';
 import { addDays, dueMonth, formatTime, mustReportTimes, stationsOf, type EmploymentType } from '@/domain/roster';
 import { getAvailabilityMonth, getProfile, getWeekStatuses, listMyShifts } from '@/server/services/roster-service';
 import { getMonthHours, getVacationBalance } from '@/server/services/hours-service';
+import { getPattern } from '@/server/services/pattern-service';
 import { countOpenRequests } from '@/server/services/change-request-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
@@ -48,7 +49,7 @@ export default async function HomePage() {
     ]);
     const shortWeeks = status.weeks.filter((w) => w.enforced && !w.ok).length;
     // People with a Pensum report no times, only holiday; casual staff report the times they can work
-    if (mustReportTimes(profile.employmentType as EmploymentType)) availability = { done: reportMonth.submittedAt !== null, missingDays: 0, shortWeeks: 0 };
+    if (mustReportTimes(profile.employmentType as EmploymentType)) availability = { done: reportMonth.submittedAt !== null || (await getPattern(database, p, p.userId)).some((d) => d.kind !== null), missingDays: 0, shortWeeks: 0 };
     if (!mustReportTimes(profile.employmentType as EmploymentType)) vacation = await getVacationBalance(database, p, p.userId, Number(today.slice(0, 4)));
     unconfirmed = hours.planned.filter((s) => s.date <= today && s.entryId === null).length;
   }
@@ -135,25 +136,25 @@ export default async function HomePage() {
       <div className="grid grid-cols-2 gap-3">
         {profile ? (
           <>
-            <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} primary />
-            <Action href="/dienstplan/stunden" icon="cash" label={t('Meine Stunden')} badge={unconfirmed} />
-            <Action href="/dienstplan/anfragen" icon="calendar" label={t('Änderungsanfragen')} badge={openRequests} />
-            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="calendar" label={availability ? t('Verfügbarkeit & Ferien') : t('Ferien')} />
+            <Action href="/dienstplan" icon="users" label={t('Dienstplan')} primary />
+            <Action href="/dienstplan/stunden" icon="clock" label={t('Meine Stunden')} badge={unconfirmed} />
+            <Action href="/dienstplan/anfragen" icon="swap" label={t('Änderungsanfragen')} badge={openRequests} />
+            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="sun" label={availability ? t('Verfügbarkeit & Ferien') : t('Ferien')} />
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
-            <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
+            <Action href="/tagesabschluss/neu" icon="receipt" label={t('Tagesabschluss')} />
             <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} />
-            {planner && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
-            <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
+            {planner && <Action href="/dienstplan/uebersicht" icon="chart" label={t('Übersicht')} />}
+            <Action href={RESERVATIONS_URL} icon="ticket" label={t('Reservationen')} external />
           </>
         ) : (
           <>
             <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} primary />
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
-            <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
-            <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} />
-            {planner && <Action href="/dienstplan/anfragen" icon="calendar" label={t('Änderungsanfragen')} badge={openRequests} />}
-            {planner && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
-            <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
+            <Action href="/tagesabschluss/neu" icon="receipt" label={t('Tagesabschluss')} />
+            <Action href="/dienstplan" icon="users" label={t('Dienstplan')} />
+            {planner && <Action href="/dienstplan/anfragen" icon="swap" label={t('Änderungsanfragen')} badge={openRequests} />}
+            {planner && <Action href="/dienstplan/uebersicht" icon="chart" label={t('Übersicht')} />}
+            <Action href={RESERVATIONS_URL} icon="ticket" label={t('Reservationen')} external />
           </>
         )}
       </div>

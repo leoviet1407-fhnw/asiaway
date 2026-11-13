@@ -8,6 +8,7 @@ import { db } from '@/server/db';
 import { getAvailabilityMonth, getProfile, listAbsencesOfYear, listTeam } from '@/server/services/roster-service';
 import { getVacationBalance } from '@/server/services/hours-service';
 import { PatternPanel, type PatternRow } from './PatternPanel';
+import { DINNER_WINDOW, LUNCH_WINDOW } from '@/domain/availability';
 import { getPattern } from '@/server/services/pattern-service';
 import { AvailabilityEditor } from './AvailabilityEditor';
 import { VacationPanel } from './VacationPanel';
@@ -48,7 +49,9 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : dueMonth(today);
   const data = await getAvailabilityMonth(database, p, userId, month);
   const pattern = await getPattern(database, p, userId);
-  const patternRows: PatternRow[] = pattern.map((d) => ({ weekday: d.weekday, mode: d.kind === 'UNAVAILABLE' ? 'NO' : d.kind === 'AVAILABLE' ? (d.fromMin === null ? 'ALL' : 'WINDOW') : '', from: d.fromMin === null ? '' : formatTime(d.fromMin), to: d.toMin === null ? '' : formatTime(d.toMin) }));
+  const modeOf = (d: (typeof pattern)[number]): PatternRow['mode'] =>
+    d.kind === 'UNAVAILABLE' ? 'NO' : d.kind !== 'AVAILABLE' ? '' : d.fromMin === null ? 'ALL' : d.fromMin === LUNCH_WINDOW.fromMin && d.toMin === LUNCH_WINDOW.toMin ? 'LUNCH' : d.fromMin === DINNER_WINDOW.fromMin && d.toMin === DINNER_WINDOW.toMin ? 'DINNER' : 'WINDOW';
+  const patternRows: PatternRow[] = pattern.map((d) => ({ weekday: d.weekday, mode: modeOf(d), from: d.fromMin === null ? '' : formatTime(d.fromMin), to: d.toMin === null ? '' : formatTime(d.toMin) }));
   const vacation = await getVacationBalance(database, p, userId, Number(month.slice(0, 4)));
   const own = userId === p.userId;
   const href = (m: string) => `/dienstplan/verfuegbarkeit?monat=${m}${own ? '' : `&person=${userId}`}`;
@@ -80,13 +83,18 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         </p>
       </div>
 
+      <PatternPanel key={`pattern-${userId}`} userId={userId} rows={patternRows} />
+
+      <div>
+        <h2 className="h-site">{t('Ausnahmen und bestimmte Wochen')}</h2>
+        <p className="mt-1 text-sm text-charcoal-muted">{t('Nur wenn eine Woche anders ist als Ihre Standardwoche: hier ändern und abschicken.')}</p>
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <Link href={href(shiftMonth(month, -1))} className="btn-secondary px-3" aria-label={t('Vormonat')}>←</Link>
         <div className="font-semibold text-navy">{monthName(month, t.lang)}</div>
         <Link href={href(shiftMonth(month, 1))} className="btn-secondary px-3" aria-label={t('Folgemonat')}>→</Link>
       </div>
-
-      <PatternPanel key={`pattern-${userId}-${month}`} userId={userId} month={month} monthLabel={monthName(month, t.lang)} rows={patternRows} canApply />
 
       <AvailabilityEditor
         key={`${userId}-${month}`}
@@ -100,6 +108,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         absences={data.absences.map((a) => ({ startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status }))}
         submittedAt={data.submittedAt ? data.submittedAt.toISOString() : null}
         isSelf={own}
+        pattern={patternRows}
       />
       </>
       )}

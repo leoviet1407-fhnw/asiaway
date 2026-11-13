@@ -6,7 +6,7 @@ import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listPendingAbsences, listTeam, submissionOverview } from '@/server/services/roster-service';
-import { AbsenceDecision, BalanceForm, FillMissing, NewMemberForm, ProfileForm } from './TeamForms';
+import { AbsenceDecision, BalanceForm, NewMemberForm, ProfileForm } from './TeamForms';
 import { formatOvertime, vacationNeedsAttention } from '@/domain/hours';
 import { getYearlyBalance, teamBalances } from '@/server/services/hours-service';
 import { getT } from '@/i18n/server';
@@ -38,7 +38,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const href = (m: string, s = site.id) => `/dienstplan/team?site=${s}&monat=${m}`;
   // Only casual staff report the times they can work; people with a Pensum enter holiday only
   const reporting = overview.filter((o) => mustReportTimes(o.person.employmentType));
-  const missing = reporting.filter((o) => !o.submittedAt).length;
+  const missing = reporting.filter((o) => !o.submittedAt && !o.hasPattern).length;
 
   return (
     <div className="space-y-6 pb-8">
@@ -63,7 +63,6 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <p className="card text-charcoal-muted">{t('Nur Aushilfen melden ihre Zeiten. Im Team gibt es noch keine.')}</p>
         ) : (
           <>
-            {missing > 0 && <FillMissing site={site.id} month={month} />}
             <p className={`rounded-btn p-3 text-sm font-semibold ${missing === 0 ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>
               {missing === 0 ? t('Alle haben gemeldet.') : t('{missing} von {total} haben noch nicht gemeldet.', { missing, total: reporting.length })}
             </p>
@@ -78,7 +77,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {o.submittedAt ? <span className="chip bg-ok-50 text-ok-500">✓ {formatDateTime(o.submittedAt).slice(0, 10)}</span> : <span className="chip bg-warn-50 text-warn-500">{t('fehlt')}</span>}
+                    {o.submittedAt ? <span className="chip bg-ok-50 text-ok-500">✓ {formatDateTime(o.submittedAt).slice(0, 10)}</span> : o.hasPattern ? <span className="chip bg-ok-50 text-ok-500">✓ {t('Standardwoche')}</span> : <span className="chip bg-warn-50 text-warn-500">{t('fehlt')}</span>}
                     <Link href={`/dienstplan/verfuegbarkeit?monat=${month}&person=${o.person.userId}`} className="btn-ghost min-h-0 px-2 py-1 text-sm">{t('öffnen')}</Link>
                   </div>
                 </li>

@@ -17,7 +17,7 @@ import { ROSTER_SITES, mustReportTimes, weekDates, shiftNetMinutes, worksByPlan,
 import { weeklyMinutes } from '../../domain/hours';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
-import { absences, availability, shifts, staffingNeeds } from '../db/schema';
+import { absences, availability, availabilityPatterns, shifts, staffingNeeds } from '../db/schema';
 import { listTeam } from './roster-service';
 
 function requirePlanner(p: Principal) {
@@ -102,15 +102,19 @@ export async function getCoverage(db: AppDatabase, p: Principal, siteId: string,
   const away = ids.length
     ? await db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, dates[6]!), gte(absences.endDate, dates[0]!)))
     : [];
-  // People with a Pensum report nothing: they work the plan, so they count as available unless they are away
+  // A Standardwoche applies to days without an entry; people with a Pensum report nothing and count as available
+  const patterns = ids.length ? await db.select().from(availabilityPatterns).where(inArray(availabilityPatterns.userId, ids)) : [];
+  const fromPattern: AvailabilityDay[] = patterns.flatMap((pat) =>
+    dates.flatMap((date, i): AvailabilityDay[] => (pat.weekday === i + 1 && !av.some((a) => a.userId === pat.userId && a.date === date) ? [{ userId: pat.userId, date, kind: pat.kind as AvailabilityKind, fromMin: pat.fromMin, toMin: pat.toMin }] : [])),
+  );
   const implicit: AvailabilityDay[] = team
     .filter((m) => worksByPlan(m))
-    .flatMap((m) => dates.filter((date) => !av.some((a) => a.userId === m.userId && a.date === date)).map((date): AvailabilityDay => ({ userId: m.userId, date, kind: 'AVAILABLE', fromMin: null, toMin: null })));
+    .flatMap((m) => dates.filter((date) => !av.some((a) => a.userId === m.userId && a.date === date) && !fromPattern.some((a) => a.userId === m.userId && a.date === date)).map((date): AvailabilityDay => ({ userId: m.userId, date, kind: 'AVAILABLE', fromMin: null, toMin: null })));
   const isAway = (userId: string, date: string) => away.some((a) => a.userId === userId && a.startDate <= date && date <= a.endDate);
   const planned = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
 
   const days: CoverageDay[] = dates.map((date, i) => {
-    const offers = [...av, ...implicit].filter((a) => a.date === date && !isAway(a.userId, date));
+    const offers = [...av, ...fromPattern, ...implicit].filter((a) => a.date === date && !isAway(a.userId, date));
     const day = planned.filter((s) => s.workDate === date && s.userId);
     const inWindow = (w: { fromMin: number; toMin: number }) => new Set(day.filter((s) => s.startMin < w.toMin && s.endMin > w.fromMin).map((s) => s.userId)).size;
     return {
@@ -132,6 +136,6 @@ export async function getCoverage(db: AppDatabase, p: Principal, siteId: string,
       offeredHours: av.filter((a) => !isAway(a.userId, a.date)).reduce((sum, a) => sum + offeredMinutes(a), 0) / 60,
       plannedHours: planned.filter((s) => s.userId).reduce((sum, s) => sum + shiftNetMinutes(s), 0) / 60,
     },
-    silent: team.filter((m) => mustReportTimes(m.employmentType) && !av.some((a) => a.userId === m.userId)).map((m) => m.name),
+    silent: team.filter((m) => mustReportTimes(m.employmentType) && !av.some((a) => a.userId === m.userId) && !patterns.some((x) => x.userId === m.userId)).map((m) => m.name),
   };
 }

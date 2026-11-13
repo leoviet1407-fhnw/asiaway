@@ -20,6 +20,8 @@ interface Props {
   days: AvailabilityDay[];
   absences: { startDate: string; endDate: string; type: AbsenceType; status: string }[];
   submittedAt: string | null;
+  /** The Standardwoche: applies to days without an entry of their own. */
+  pattern: { weekday: number; mode: '' | 'ALL' | 'LUNCH' | 'DINNER' | 'WINDOW' | 'NO'; from: string; to: string }[];
 }
 
 type Choice = 'ganz' | 'mittag' | 'abend' | 'frei' | 'eigen' | null;
@@ -53,6 +55,7 @@ function parseHm(value: string): number | null {
   return h > 29 || min > 59 ? null : h * 60 + min;
 }
 
+const weekdayNo = (iso: string) => ((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
 const weeklyNeed = (pensum: number) => Math.round((WEEKLY_HOURS_AT_100 * 60 * pensum) / 100);
 
 /**
@@ -127,6 +130,8 @@ export function AvailabilityEditor(props: Props) {
   const option = (active: boolean, tone: 'ok' | 'no') =>
     `btn min-h-[52px] flex-col gap-0 px-2 py-1 text-sm leading-tight ${active ? (tone === 'no' ? 'bg-brand-600 text-white' : 'bg-ok-500 text-white') : 'border border-surface-line bg-white text-navy'}`;
 
+  const patternOf = (date: string) => props.pattern.find((p) => p.weekday === weekdayNo(date) && p.mode !== '');
+  const patternLabel = (p: NonNullable<ReturnType<typeof patternOf>>) => (p.mode === 'NO' ? t('Frei') : p.mode === 'ALL' ? t('Ganzer Tag') : p.mode === 'LUNCH' ? t('Mittag') : p.mode === 'DINNER' ? t('Abend') : `${p.from}–${p.to}`);
   const label = (c: Cell) => {
     const ch = choiceOf(c);
     return ch === 'frei' ? t('Frei') : ch === 'ganz' ? t('Ganzer Tag') : ch === 'mittag' ? t('Mittag') : ch === 'abend' ? t('Abend') : `${c.from}–${c.to}`;
@@ -139,7 +144,7 @@ export function AvailabilityEditor(props: Props) {
           {t('Wählen Sie für jeden Tag, wann Sie arbeiten können. Pro Woche brauchen Sie mindestens {hours} h (Pensum {pct} %).', { hours: hours(weeklyNeed(props.pensumPercent)), pct: props.pensumPercent })}
         </p>
       ) : (
-        <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Tragen Sie ein, wann Sie arbeiten können – Woche für Woche, zum Beispiel die 1. und 2. Woche im Dezember – und schicken Sie es ab. Tage ohne Eintrag gelten als nicht verfügbar.')}</p>
+        <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Tage ohne Eintrag folgen Ihrer Standardwoche. Hier ändern Sie einzelne Tage oder ganze Wochen – zum Beispiel die 1. und 2. Woche im Dezember – und schicken es ab.')}</p>
       )}
 
       <div className="flex items-center justify-between gap-2">
@@ -199,6 +204,8 @@ export function AvailabilityEditor(props: Props) {
                   <span className="text-xs font-semibold text-warn-500">{t('bitte wählen')}</span>
                 ) : cell ? (
                   <span className="text-xs font-semibold text-ok-500">✓ {label(cell)}</span>
+                ) : patternOf(date) ? (
+                  <span className="text-xs font-semibold text-ok-500">✓ {t('Standardwoche')}: {patternLabel(patternOf(date)!)}</span>
                 ) : (
                   <span className="text-xs text-charcoal-muted">{t('nicht gemeldet = frei')}</span>
                 )}
@@ -227,6 +234,11 @@ export function AvailabilityEditor(props: Props) {
                       <span className="text-xs opacity-80">{t('ich kann nicht')}</span>
                     </button>
                   </div>
+                  {cell && patternOf(date) && (
+                    <button type="button" className="text-xs text-brand-600 underline" onClick={() => push(date, null)}>
+                      {t('Zurück zur Standardwoche')}
+                    </button>
+                  )}
                   {custom === date || ch === 'eigen' ? (
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="text-charcoal-muted">{t('Eigene Zeit')}:</span>

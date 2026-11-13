@@ -476,6 +476,7 @@ export async function submissionOverview(db: AppDatabase, p: Principal, siteId: 
   const ids = people.map((x) => x.userId);
   if (ids.length === 0) return [];
   const dates = monthDates(month);
+  const patternUsers = new Set((await db.select({ u: availabilityPatterns.userId }).from(availabilityPatterns).where(inArray(availabilityPatterns.userId, ids))).map((x) => x.u));
   const [subs, av, abs] = await Promise.all([
     db.select().from(availabilitySubmissions).where(and(inArray(availabilitySubmissions.userId, ids), eq(availabilitySubmissions.month, month))),
     db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates.at(-1)!))),
@@ -484,6 +485,8 @@ export async function submissionOverview(db: AppDatabase, p: Principal, siteId: 
   return people.map((person) => ({
     person,
     submittedAt: subs.find((s) => s.userId === person.userId)?.submittedAt ?? null,
+    /** A Standardwoche counts as a report: the person only changes exceptions. */
+    hasPattern: patternUsers.has(person.userId),
     availableDays: av.filter((a) => a.userId === person.userId && a.kind === 'AVAILABLE').length,
     unavailableDays: av.filter((a) => a.userId === person.userId && a.kind === 'UNAVAILABLE').length,
     absences: abs.filter((a) => a.userId === person.userId),

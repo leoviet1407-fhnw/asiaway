@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { DomainError } from '@/domain/errors';
 import { parseChfToCents, parseQty } from '@/domain/qty';
 import { parseTime } from '@/domain/roster';
+import { DINNER_WINDOW, LUNCH_WINDOW } from '@/domain/availability';
 import { messageFor } from '@/lib/messages';
 import { getT } from '@/i18n/server';
 import { LANG_COOKIE } from '@/i18n/translate';
@@ -714,7 +715,7 @@ export async function withdrawChangeAction(id: string): Promise<ActionResult> {
 // --- Standardwoche, special days, holiday limits, roster suggestion --------------------------------
 interface PatternInput {
   weekday: number;
-  mode: '' | 'ALL' | 'WINDOW' | 'NO';
+  mode: '' | 'ALL' | 'LUNCH' | 'DINNER' | 'WINDOW' | 'NO';
   from?: string;
   to?: string;
 }
@@ -730,7 +731,9 @@ export async function savePatternAction(userId: string, days: PatternInput[]): P
         const toMin = parseTime(d.to ?? '');
         if (fromMin === null || toMin === null) return { ok: false, error: t('Zeit ist ungültig (z. B. 10:30).') };
         list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin, toMin });
-      } else if (d.mode === 'ALL') list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin: null, toMin: null });
+      } else if (d.mode === 'LUNCH') list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin: LUNCH_WINDOW.fromMin, toMin: LUNCH_WINDOW.toMin });
+      else if (d.mode === 'DINNER') list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin: DINNER_WINDOW.fromMin, toMin: DINNER_WINDOW.toMin });
+      else if (d.mode === 'ALL') list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin: null, toMin: null });
       else if (d.mode === 'NO') list.push({ weekday: d.weekday, kind: 'UNAVAILABLE' as const, fromMin: null, toMin: null });
       else list.push({ weekday: d.weekday, kind: null, fromMin: null, toMin: null });
     }

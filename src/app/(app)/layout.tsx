@@ -22,8 +22,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/', label: t('Start'), icon: 'home' as const },
     { href: '/bestellungen', label: t('Bestellen'), icon: 'cart' as const },
     { href: '/wareneingang', label: t('Eingang'), icon: 'scan' as const },
-    { href: '/tagesabschluss', label: t('Abschluss'), icon: 'cash' as const },
-    { href: '/dienstplan', label: t('Dienstplan'), icon: 'calendar' as const },
+    { href: '/tagesabschluss', label: t('Abschluss'), icon: 'receipt' as const },
+    { href: '/dienstplan', label: t('Dienstplan'), icon: 'users' as const },
   ];
   const more = [
     { href: '/artikel', label: t('Artikel'), icon: 'box' as const },

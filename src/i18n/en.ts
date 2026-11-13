@@ -715,6 +715,16 @@ export const EN: Record<string, string> = {
   'Mitarbeiter können jederzeit eintragen und ändern.': 'Staff can enter and change things at any time.',
   'Dieser Tag ist schon vorbei.': 'This day is already over.',
 
+  // --- Standard week as the main thing ---
+  'Standardwoche gespeichert. Sie gilt ab jetzt für jede Woche.': 'Standard week saved. It now applies to every week.',
+  'Wann können Sie normalerweise arbeiten? Einmal einstellen, dann gilt es für jede Woche. Nur Ausnahmen tragen Sie weiter unten ein.': 'When can you normally work? Set it once and it applies to every week. You only enter exceptions further down.',
+  'Ausnahmen und bestimmte Wochen': 'Exceptions and specific weeks',
+  'Nur wenn eine Woche anders ist als Ihre Standardwoche: hier ändern und abschicken.': 'Only when a week differs from your standard week: change it here and submit.',
+  'Standardwoche': 'Standard week',
+  'Zurück zur Standardwoche': 'Back to the standard week',
+  'Tage ohne Eintrag folgen Ihrer Standardwoche. Hier ändern Sie einzelne Tage oder ganze Wochen – zum Beispiel die 1. und 2. Woche im Dezember – und schicken es ab.': 'Days without an entry follow your standard week. Here you change single days or whole weeks – for example the 1st and 2nd week of December – and submit it.',
+  'Wann Sie arbeiten können, Ferien': 'When you can work, holiday',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

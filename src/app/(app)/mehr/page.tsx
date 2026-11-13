@@ -18,12 +18,12 @@ export default async function MorePage() {
   const items: { href: string; label: string; text: string; icon: IconName }[] = [
     { href: '/artikel', label: t('Artikel'), text: t('Artikelliste, Barcodes, Preise'), icon: 'box' },
     ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: t('Lieferanten'), text: t('Kontakte, Liefertage, Mindestbestellung'), icon: 'truck' as const }] : []),
-    { href: '/dienstplan/stunden', label: t('Meine Stunden'), text: t('Arbeitszeit, Überstunden, Ferien-Rest'), icon: 'calendar' },
-    { href: '/dienstplan/verfuegbarkeit', label: t('Verfügbarkeit & Ferien'), text: t('Einen Monat im Voraus melden'), icon: 'calendar' },
-    ...(isPlanner(p) ? [{ href: '/dienstplan/bedarf', label: t('Bedarf & Abdeckung'), text: t('Wie viele Personen gebraucht werden und wie viele gemeldet haben'), icon: 'calendar' as const }] : []),
-    ...(isPlanner(p) ? [{ href: '/dienstplan/saison', label: t('Feiertage & Ferienzeit'), text: t('Besondere Tage, Ferien-Limiten'), icon: 'calendar' as const }] : []),
-    ...(isPlanner(p) ? [{ href: '/dienstplan/uebersicht', label: t('Übersicht'), text: t('Alle Mitarbeiter, Diagramme zu Stunden, Ferien und Umsatz'), icon: 'calendar' as const }] : []),
-    ...(isPlanner(p) ? [{ href: '/dienstplan/team', label: t('Team & Meldungen'), text: t('Wer hat gemeldet, Ferienanfragen, Mitarbeiter'), icon: 'calendar' as const }] : []),
+    { href: '/dienstplan/stunden', label: t('Meine Stunden'), text: t('Arbeitszeit, Überstunden, Ferien-Rest'), icon: 'clock' as const },
+    { href: '/dienstplan/verfuegbarkeit', label: t('Verfügbarkeit & Ferien'), text: t('Wann Sie arbeiten können, Ferien'), icon: 'sun' as const },
+    ...(isPlanner(p) ? [{ href: '/dienstplan/bedarf', label: t('Bedarf & Abdeckung'), text: t('Wie viele Personen gebraucht werden und wie viele gemeldet haben'), icon: 'chart' as const }] : []),
+    ...(isPlanner(p) ? [{ href: '/dienstplan/saison', label: t('Feiertage & Ferienzeit'), text: t('Besondere Tage, Ferien-Limiten'), icon: 'sun' as const }] : []),
+    ...(isPlanner(p) ? [{ href: '/dienstplan/uebersicht', label: t('Übersicht'), text: t('Alle Mitarbeiter, Diagramme zu Stunden, Ferien und Umsatz'), icon: 'chart' as const }] : []),
+    ...(isPlanner(p) ? [{ href: '/dienstplan/team', label: t('Team & Meldungen'), text: t('Wer hat gemeldet, Ferienanfragen, Mitarbeiter'), icon: 'users' as const }] : []),
   ];
   return (
     <div className="mx-auto max-w-md space-y-4">

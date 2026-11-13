@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useActionState, useState, useTransition } from 'react';
 import { EMPLOYMENT_LABEL, ROSTER_SITES, type EmploymentType } from '@/domain/roster';
-import { absenceStepAction, createStaffAction, fillMissingAction, saveBalanceAction, saveProfileAction } from '../../../actions';
+import { absenceStepAction, createStaffAction, saveBalanceAction, saveProfileAction } from '../../../actions';
 import { useT } from '@/i18n/client';
 
 const TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'];
@@ -143,31 +143,5 @@ export function BalanceForm({ userId, year, vacationDays, vacationCarry, overtim
       <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending}>{state?.saved ? t('Gespeichert ✓') : t('Speichern')}</button>
       {state?.error && <p className="col-span-full text-sm text-danger-500">{state.error}</p>}
     </form>
-  );
-}
-
-/** Fallback for late staff: the Standardwoche is entered for everybody who has not reported yet. */
-export function FillMissing({ site, month }: { site: string; month: string }) {
-  const t = useT();
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        className="btn-secondary min-h-0 px-3 py-1.5 text-sm"
-        disabled={pending}
-        onClick={() =>
-          start(async () => {
-            const r = await fillMissingAction(site, month);
-            setMsg(r.ok ? t('{people} Personen, {days} Tage aus der Standardwoche eingetragen.', { people: r.people ?? 0, days: r.days ?? 0 }) : r.error);
-            router.refresh();
-          })
-        }
-      >
-        {t('Fehlende mit Standardwoche füllen')}
-      </button>
-      {msg && <span className="text-sm text-charcoal-muted">{msg}</span>}
-    </div>
   );
 }

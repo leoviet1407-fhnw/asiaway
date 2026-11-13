@@ -9,7 +9,7 @@ import { seedSampleData } from '@/server/seed/sample-data';
 import { applyPattern, fillMissingFromPatterns, getPattern, savePattern } from '@/server/services/pattern-service';
 import { getCoverage, saveNeeds } from '@/server/services/coverage-service';
 import { deleteVacationRule, listSpecialDays, listVacationRules, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
-import { getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift } from '@/server/services/roster-service';
+import { getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift, submissionOverview } from '@/server/services/roster-service';
 import { fillGap, listGaps, publishMonth, suggestMonth, suggestWeek } from '@/server/services/suggest-service';
 import { createTestDatabase } from '../helpers/db';
 
@@ -122,5 +122,22 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     const pub = await publishMonth(db, planner, 'winterthur', month, now);
     expect(pub.published.length + pub.blocked.length).toBeGreaterThanOrEqual(1);
     await expect(publishMonth(db, a, 'winterthur', month, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('a Standardwoche counts as the report of casual staff: coverage and overview use it', async () => {
+    const [u] = await db.select().from(users).where(eq(users.email, 'aushilfe@asiaway.test'));
+    const casual = (await loadPrincipalForUser(db, u!.id))!;
+    const week = '2027-05-03';
+    await saveNeeds(db, planner, 'winterthur', Array.from({ length: 7 }, () => ({ lunchPeople: 5, dinnerPeople: 5 })));
+    const before = await getCoverage(db, planner, 'winterthur', week);
+    const overviewBefore = (await submissionOverview(db, planner, 'winterthur', '2027-05')).find((o) => o.person.userId === casual.userId)!;
+    expect(overviewBefore.hasPattern).toBe(false);
+    const pat = (await getPattern(db, casual, casual.userId)).map((d) => (d.weekday === 1 ? { ...d, kind: 'AVAILABLE' as const, fromMin: t('17:30'), toMin: t('22:00') } : d));
+    await savePattern(db, casual, casual.userId, pat);
+    const after = await getCoverage(db, planner, 'winterthur', week);
+    expect(after.days[0]!.offeredDinner).toBe(before.days[0]!.offeredDinner + 1); // Monday evening
+    expect(after.days[0]!.offeredLunch).toBe(before.days[0]!.offeredLunch);
+    expect(after.silent).not.toContain('Aushilfe Muster');
+    expect((await submissionOverview(db, planner, 'winterthur', '2027-05')).find((o) => o.person.userId === casual.userId)!.hasPattern).toBe(true);
   });
 });
