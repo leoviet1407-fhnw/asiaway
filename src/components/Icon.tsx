@@ -1,4 +1,4 @@
-export type IconName = 'home' | 'cart' | 'scan' | 'box' | 'truck' | 'camera' | 'check' | 'plus' | 'minus' | 'alert' | 'file' | 'cash' | 'calendar' | 'more' | 'clock' | 'users' | 'swap' | 'sun' | 'receipt' | 'chart' | 'ticket';
+export type IconName = 'home' | 'cart' | 'scan' | 'box' | 'truck' | 'camera' | 'check' | 'plus' | 'minus' | 'alert' | 'file' | 'cash' | 'calendar' | 'more' | 'clock' | 'users' | 'swap' | 'sun' | 'receipt' | 'chart' | 'ticket' | 'eye' | 'eye-off';
 
 const PATHS: Record<IconName, string> = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -21,6 +21,8 @@ const PATHS: Record<IconName, string> = {
   receipt: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   ticket: 'M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4zM14 7v10',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  'eye-off': 'M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.1 6.1A17 17 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 4.3-1',
   file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
 };
 

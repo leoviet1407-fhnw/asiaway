@@ -752,6 +752,10 @@ export const EN: Record<string, string> = {
 
   // --- Frozen weeks ---
   'Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.': 'This week is locked: it is already planned. Planning starts with next week.',
+  // --- Show password ---
+  'Passwort anzeigen': 'Show password',
+  'Passwort verbergen': 'Hide password',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { loginAction } from '../actions';
 import { useT } from '@/i18n/client';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export function LoginForm() {
   const t = useT();
@@ -19,7 +20,7 @@ export function LoginForm() {
         <label className="label" htmlFor="password">
           {t('Passwort')}
         </label>
-        <input id="password" name="password" type="password" autoComplete="current-password" required className="w-full" />
+        <PasswordInput id="password" name="password" autoComplete="current-password" required className="w-full" />
       </div>
       {state?.error && (
         <p role="alert" className="rounded-btn bg-danger-50 p-2 text-sm text-danger-500">
