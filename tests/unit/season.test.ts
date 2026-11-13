@@ -143,4 +143,32 @@ describe('roster suggestion', () => {
       expect(tired!.endMin).toBeGreaterThanOrEqual(14 * 60 + 30); // but at least the lunch service
     });
   });
+
+  describe('everybody works at least one Sunday a month', () => {
+    const SUN_WEEK = '2026-11-23'; // Sunday 29 Nov
+    const mk = (userId: string, sundays: number) => ({ userId, name: userId, employmentType: 'FULL_TIME' as const, pensumPercent: 100, plannedMinutes: 0, sundays });
+    const days = ['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29'];
+    const needsSun = (n: number) => days.map((_, i) => (i === 6 ? { lunchPeople: n, dinnerPeople: 0 } : { lunchPeople: 0, dinnerPeople: 0 }));
+    const offersFor = (ids: string[]): AvailabilityDay[] => ids.map((id) => ({ userId: id, date: '2026-11-29', kind: 'AVAILABLE', fromMin: null, toMin: null }));
+
+    it('on a Sunday the people with the fewest Sundays this month come first', () => {
+      const people = [mk('twice', 2), mk('never', 0), mk('once', 1)];
+      const one = suggestShifts({ weekStart: SUN_WEEK, people, needs: needsSun(1), offers: offersFor(['twice', 'never', 'once']), away: () => false });
+      expect(one.shifts.map((x) => x.userId)).toEqual(['never']);
+      const two = suggestShifts({ weekStart: SUN_WEEK, people, needs: needsSun(2), offers: offersFor(['twice', 'never', 'once']), away: () => false });
+      expect(two.shifts.map((x) => x.userId).sort()).toEqual(['never', 'once']);
+    });
+
+    it('over a month everybody gets a Sunday: the rotation moves on week by week', () => {
+      const ids = ['a', 'b', 'c', 'd'];
+      const sundays = new Map(ids.map((id) => [id, 0]));
+      for (const sunday of ['2026-11-01', '2026-11-08', '2026-11-15', '2026-11-22']) {
+        const monday = new Date(new Date(`${sunday}T00:00:00Z`).getTime() - 6 * 86400000).toISOString().slice(0, 10);
+        const people = ids.map((id) => mk(id, sundays.get(id)!));
+        const r = suggestShifts({ weekStart: monday, people, needs: [0, 0, 0, 0, 0, 0, 1].map((n) => ({ lunchPeople: n, dinnerPeople: 0 })), offers: ids.map((id) => ({ userId: id, date: sunday, kind: 'AVAILABLE' as const, fromMin: null, toMin: null })), away: () => false });
+        for (const sh of r.shifts) sundays.set(sh.userId, sundays.get(sh.userId)! + 1);
+      }
+      expect([...sundays.values()]).toEqual([1, 1, 1, 1]);
+    });
+  });
 });

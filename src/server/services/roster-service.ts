@@ -14,6 +14,7 @@ import {
   worksAtSiteOn,
   FROZEN_MESSAGE,
   dayHoursOf,
+  weekdayNo,
   isFrozen,
   requiredBreakMin,
   weekDates,
@@ -281,6 +282,21 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
     for (const s of weekShifts) {
       if (s.userId && lastDayOf.has(s.userId) && s.date > lastDayOf.get(s.userId)!) {
         violations.push({ severity: 'error', code: 'LEFT', userId: s.userId, date: s.date, message: `${people.find((x) => x.userId === s.userId)?.name ?? ''}, ${s.date.slice(8)}.${s.date.slice(5, 7)}.: arbeitet nach dem letzten Arbeitstag nicht mehr.` });
+      }
+    }
+    // Everybody with a Pensum works at least one Sunday a month: warn in the week of the last Sunday
+    const sunday = dates[6]!;
+    if (!dayHoursOf(siteId, sunday).closed && addDays(sunday, 7).slice(0, 7) !== sunday.slice(0, 7)) {
+      const monthRows = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, `${sunday.slice(0, 7)}-01`), lte(shifts.workDate, sunday))) : [];
+      const sundayDays = await getSiteDays(db, ids);
+      const monthName = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'][Number(sunday.slice(5, 7)) - 1];
+      for (const m of people as TeamMember[]) {
+        if (m.site !== siteId || !(m.employmentType === 'FULL_TIME' || m.employmentType === 'PART_TIME') || (m.lastDay && m.lastDay < sunday)) continue;
+        const allowed = sundayDays.get(m.userId)?.get(siteId);
+        if (allowed && allowed.length > 0 && !allowed.includes(7)) continue;
+        if (!monthRows.some((s) => s.userId === m.userId && weekdayNo(s.workDate) === 7)) {
+          violations.push({ severity: 'warn', code: 'SUNDAY', userId: m.userId, date: sunday, message: `${m.name}: hat im ${monthName} noch keinen Sonntag eingeteilt.` });
+        }
       }
     }
     // Someone planned on a day the restaurant is closed

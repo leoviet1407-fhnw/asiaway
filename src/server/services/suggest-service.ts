@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { FROZEN_MESSAGE, ROSTER_SITES, dayHoursOf, requiredBreakMin, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { FROZEN_MESSAGE, ROSTER_SITES, dayHoursOf, requiredBreakMin, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, weekdayNo, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { needFor } from '../../domain/season';
 import { findGaps, suggestShifts, type GapInfo, type Service, type SuggestGap, type SuggestPerson } from '../../domain/suggest';
@@ -53,6 +53,11 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
   const away = ids.length ? await db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, dates[6]!), gte(absences.endDate, dates[0]!))) : [];
   const other = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), ne(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
   const planned = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
+  // Sundays each person already works this month (all sites, not counting this week): everybody works at least one
+  const sundayDate = dates[6]!;
+  const monthStart = `${sundayDate.slice(0, 7)}-01`;
+  const monthShifts = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, monthStart), lte(shifts.workDate, sundayDate))) : [];
+  const sundaysOf = (userId: string) => new Set(monthShifts.filter((s) => s.userId === userId && weekdayNo(s.workDate) === 7 && s.workDate < dates[0]!).map((s) => s.workDate)).size;
   const people: SuggestPerson[] = team.map((m) => ({
     userId: m.userId,
     name: m.name,
@@ -61,6 +66,7 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
     plannedMinutes: other.filter((s) => s.userId === m.userId).reduce((sum, s) => sum + shiftNetMinutes(s), 0),
     usualFromMin: m.usualFromMin,
     usualToMin: m.usualToMin,
+    sundays: sundaysOf(m.userId),
   }));
   const busy = other.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin }));
   const dayHours = (date: string) => dayHoursOf(siteId, date);

@@ -205,4 +205,17 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     expect((await db.select().from(shifts)).filter((x) => x.workDate >= '2027-09-13' && x.workDate <= '2027-09-19').some((x) => x.userId === a.userId)).toBe(false);
     expect(prev).toBe('2027-09-06');
   });
+
+  it('warns in the week of the last Sunday when somebody with a Pensum has no Sunday that month', async () => {
+    const week = '2027-10-25'; // Sunday 31 Oct 2027 is the last one of the month
+    const hasWarn = async () => (await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'SUNDAY' && v.userId === b.userId);
+    expect(await hasWarn()).toBe(true);
+    await saveShift(db, planner, { site: 'winterthur', date: '2027-10-17', userId: b.userId, startMin: t('11:00'), endMin: t('16:00'), breakMin: 0, station: 'Sonntag OG', roleLabel: null }, now); // Sunday 17 Oct
+    expect(await hasWarn()).toBe(false);
+    // somebody who works at the site only on weekdays is not asked for a Sunday
+    await saveSiteDays(db, planner, a.userId, { winterthur: [1, 2, 3, 4, 5] });
+    expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'SUNDAY' && v.userId === a.userId)).toBe(false);
+    // the weeks before the last Sunday do not warn
+    expect((await getWeekView(db, planner, 'winterthur', '2027-10-18')).violations.some((v) => v.code === 'SUNDAY')).toBe(false);
+  });
 });

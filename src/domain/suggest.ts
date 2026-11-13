@@ -10,7 +10,7 @@
  */
 import { LUNCH_WINDOW, DINNER_WINDOW, offerCovers, type DayNeed } from './availability';
 import { weeklyMinutes } from './hours';
-import { requiredBreakMin, shiftNetMinutes, weekDates, type AvailabilityDay, type DayHours, type EmploymentType, type ServiceWindow } from './roster';
+import { requiredBreakMin, shiftNetMinutes, weekDates, weekdayNo, type AvailabilityDay, type DayHours, type EmploymentType, type ServiceWindow } from './roster';
 
 export type Service = 'LUNCH' | 'DINNER';
 
@@ -24,6 +24,8 @@ export interface SuggestPerson {
   /** Usual shift times; used instead of the service window when set. */
   readonly usualFromMin?: number | null;
   readonly usualToMin?: number | null;
+  /** Sundays the person already works this month (not counting this week): everybody works at least one. */
+  readonly sundays?: number;
 }
 
 export interface SuggestedShift {
@@ -86,6 +88,8 @@ export function suggestShifts(input: {
   const minutes = new Map(input.people.map((p) => [p.userId, p.plannedMinutes + (input.existing ?? []).filter((e) => e.userId === p.userId).reduce((n, e) => n + shiftNetMinutes({ startMin: e.startMin, endMin: e.endMin, breakMin: e.breakMin ?? 0 }), 0)]));
   const shifts: SuggestedShift[] = [];
   const gaps: SuggestGap[] = [];
+  const sundayCount = new Map(input.people.map((p) => [p.userId, p.sundays ?? 0]));
+  for (const e of (input.existing ?? []).filter((x) => x.userId && weekdayNo(x.date) === 7)) sundayCount.set(e.userId!, (sundayCount.get(e.userId!) ?? 0) + 1);
   const workingToday = new Map<string, Set<string>>();
   const coveredDinner = new Map<string, Set<string>>(); // people whose lunch shift already covers dinner
 
@@ -115,8 +119,9 @@ export function suggestShifts(input: {
               return { p, span, left, hasToday: today.has(p.userId) };
             })
             .filter((c): c is NonNullable<typeof c> => c !== null)
-            // already working today first (one block of the day), then the most hours still owed; casual staff last
-            .sort((a, b) => Number(b.hasToday) - Number(a.hasToday) || b.left - a.left || a.p.name.localeCompare(b.p.name));
+            // on a Sunday the people with the fewest Sundays this month come first (everybody works at least one);
+            // then already working today (one block of the day), then the most hours still owed; casual staff last
+            .sort((a, b) => (weekdayNo(date) === 7 ? (sundayCount.get(a.p.userId) ?? 0) - (sundayCount.get(b.p.userId) ?? 0) : 0) || Number(b.hasToday) - Number(a.hasToday) || b.left - a.left || a.p.name.localeCompare(b.p.name));
           const pick = candidates[0];
           if (!pick) break;
           const offer = input.offers.find((o) => o.userId === pick.p.userId && o.date === date);
@@ -132,6 +137,7 @@ export function suggestShifts(input: {
             while (end > span.end && net(span.start, end) > remaining) end -= 15;
             if (end > span.end) span = { start: span.start, end };
           }
+          if (weekdayNo(date) === 7 && !today.has(pick.p.userId)) sundayCount.set(pick.p.userId, (sundayCount.get(pick.p.userId) ?? 0) + 1);
           chosen.add(pick.p.userId);
           today.add(pick.p.userId);
           minutes.set(pick.p.userId, (minutes.get(pick.p.userId) ?? 0) + net(span.start, span.end));
@@ -178,6 +184,7 @@ export function findGaps(input: {
   dayHours?: (date: string) => DayHours;
 }): GapInfo[] {
   const out: GapInfo[] = [];
+  const people = input.people;
   weekDates(input.weekStart).forEach((date, i) => {
     const dh = input.dayHours?.(date) ?? DEFAULT_DAY;
     if (dh.closed) return;
@@ -200,7 +207,7 @@ export function findGaps(input: {
         const done = p.plannedMinutes + input.planned.filter((s) => s.userId === p.userId).reduce((n, s) => n + shiftNetMinutes({ startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin ?? 0 }), 0);
         candidates.push({ userId: p.userId, name: p.name, startMin: span.start, endMin: span.end, leftMinutes: t === null ? null : t - done, worksThatDay: day.some((s) => s.userId === p.userId) });
       }
-      candidates.sort((a, b) => Number(b.worksThatDay) - Number(a.worksThatDay) || (b.leftMinutes ?? -1) - (a.leftMinutes ?? -1) || a.name.localeCompare(b.name));
+      candidates.sort((a, b) => (weekdayNo(date) === 7 ? (people.find((x) => x.userId === a.userId)?.sundays ?? 0) - (people.find((x) => x.userId === b.userId)?.sundays ?? 0) : 0) || Number(b.worksThatDay) - Number(a.worksThatDay) || (b.leftMinutes ?? -1) - (a.leftMinutes ?? -1) || a.name.localeCompare(b.name));
       out.push({ date, service, missing, candidates });
     }
   });

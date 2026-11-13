@@ -870,4 +870,5 @@ export const PATTERNS: [RegExp, string][] = [
   [/^(.+), (\d{2}\.\d{2}\.): arbeitet an diesem Wochentag normalerweise nicht hier\.$/, '$1, $2: does not normally work here on this weekday.'],
   [/^(.+), (\d{2}\.\d{2}\.): arbeitet nach dem letzten Arbeitstag nicht mehr\.$/, '$1, $2: no longer works after the last working day.'],
   [/^(.+), (\d{2}\.\d{2}\.): an diesem Tag ist das Restaurant geschlossen\.$/, '$1, $2: the restaurant is closed on this day.'],
+  [/^(.+): hat im (\S+) noch keinen Sonntag eingeteilt\.$/, '$1: has no Sunday planned in $2 yet.'],
 ];
