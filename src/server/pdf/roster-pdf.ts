@@ -196,14 +196,18 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
             const x = M + labelW + i * 2 * colW + (lunch ? 0 : colW);
             const list = cell(d, lunch);
             box(page, x, y - rowH, colW, rowH, list.length ? hex(station.color) : GREY);
+            // every person gets an equal band, centred in it (one person = centred in the whole cell),
+            // and a thin line separates the persons
+            const band = rowH / Math.max(1, list.length);
             list.forEach((s, k) => {
-              const baseY = y - 7.4 - k * 13.2;
+              const mid = y - k * band - band / 2;
+              if (k > 0) page.drawLine({ start: { x: x + 4, y: y - k * band }, end: { x: x + colW - 4, y: y - k * band }, thickness: 0.5, color: ink, opacity: 0.35 });
               if (!s.userId) {
-                centered(page, 'OFFEN', x + colW / 2, baseY, 6.6, bold, RED);
+                centered(page, 'OFFEN', x + colW / 2, mid + 1.8, 6.6, bold, RED);
               } else {
-                centered(page, fit(names.get(s.userId) ?? '?', bold, 6.8, colW - 3), x + colW / 2, baseY, 6.8, bold, ink);
+                centered(page, fit(names.get(s.userId) ?? '?', bold, 6.8, colW - 3), x + colW / 2, mid + 1.8, 6.8, bold, ink);
               }
-              centered(page, `${formatTime(s.startMin)}-${formatTime(s.endMin)}${breakNote(s)}`, x + colW / 2, baseY - 6.2, 5.2, regular, ink);
+              centered(page, `${formatTime(s.startMin)}-${formatTime(s.endMin)}${breakNote(s)}`, x + colW / 2, mid - 5.4, 5.2, regular, ink);
             });
           }
         });
