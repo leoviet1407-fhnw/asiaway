@@ -269,6 +269,8 @@ export const staffProfiles = pgTable('staff_profiles', {
   usualFromMin: integer('usual_from_min'),
   usualToMin: integer('usual_to_min'),
   phone: text('phone'),
+  /** Last day the person is planned (inclusive); null = stays. */
+  lastDay: date('last_day'),
   active: boolean('active').notNull().default(true),
   sort: integer('sort').notNull().default(0),
 });

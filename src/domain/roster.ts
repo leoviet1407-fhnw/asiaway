@@ -183,6 +183,15 @@ export interface Shift {
   readonly roleLabel: string | null;
 }
 
+/**
+ * The break every shift has by law: more than 5.5 h = 15 min, more than 7 h = 30 min, more than 9 h = 60 min.
+ * It is not fixed in time: staff take it whenever they want during the shift.
+ */
+export function requiredBreakMin(startMin: number, endMin: number): number {
+  const len = endMin - startMin;
+  return len > 9 * 60 ? 60 : len > 7 * 60 ? 30 : len > 5.5 * 60 ? 15 : 0;
+}
+
 export function shiftNetMinutes(s: Pick<Shift, 'startMin' | 'endMin' | 'breakMin'>): number {
   return Math.max(0, s.endMin - s.startMin - s.breakMin);
 }
@@ -290,7 +299,7 @@ export function validateRoster(input: RosterInput): Violation[] {
       // Breaks by length of each shift
       for (const s of list) {
         const len = s.endMin - s.startMin;
-        const need = len > 9 * 60 ? 60 : len > 7 * 60 ? 30 : len > 5.5 * 60 ? 15 : 0;
+        const need = requiredBreakMin(s.startMin, s.endMin);
         if (s.breakMin < need) {
           out.push({ severity: 'warn', code: 'BREAK', userId: person.userId, date, message: `${person.name}, ${dm(date)}: bei ${formatHours(len)} Schicht sind mindestens ${need} Min. Pause nötig.` });
         }

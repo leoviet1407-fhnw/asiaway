@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isAdmin, isPlanner, type Principal } from '../../domain/roles';
-import { checkShiftTimes, mondayOf } from '../../domain/roster';
+import { checkShiftTimes, mondayOf, requiredBreakMin } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
@@ -143,7 +143,7 @@ export async function decideChangeRequest(db: AppDatabase, p: Principal, id: str
       const t = tx as unknown as AppDatabase;
       if (c.kind === 'SHIFT_CHANGE') {
         if (!c.shiftId || c.startMin == null || c.endMin == null) throw domainError('VALIDATION_FAILED', 'Anfrage ist unvollständig.');
-        await t.update(shifts).set({ startMin: c.startMin, endMin: c.endMin, breakMin: c.breakMin, updatedAt: now }).where(eq(shifts.id, c.shiftId));
+        await t.update(shifts).set({ startMin: c.startMin, endMin: c.endMin, breakMin: Math.max(c.breakMin, requiredBreakMin(c.startMin, c.endMin)), updatedAt: now }).where(eq(shifts.id, c.shiftId));
       } else if (c.kind === 'SHIFT_CANCEL') {
         if (!c.shiftId) throw domainError('VALIDATION_FAILED', 'Anfrage ist unvollständig.');
         // The shift stays in the plan as an open shift so the Leitung can find someone else

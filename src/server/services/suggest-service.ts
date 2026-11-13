@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { FROZEN_MESSAGE, ROSTER_SITES, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { FROZEN_MESSAGE, ROSTER_SITES, requiredBreakMin, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { needFor } from '../../domain/season';
 import { findGaps, suggestShifts, type GapInfo, type Service, type SuggestGap, type SuggestPerson } from '../../domain/suggest';
@@ -41,12 +41,13 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
   }
   // Some people work here only on certain weekdays (e.g. Belle at Oerlikon only on Saturdays)
   const days = await getSiteDays(db, ids);
+  const lastDays = new Map(team.filter((m) => m.lastDay).map((m) => [m.userId, m.lastDay!]));
   // A person who is fixed to another site on a weekday (e.g. Belle at Oerlikon on Saturdays) is kept free for it
   const reservedElsewhere = (userId: string, date: string) =>
     [...(days.get(userId) ?? [])].some(([site, allowed]) => site !== siteId && allowed.length > 0 && worksAtSiteOn(allowed, date));
   for (let i = offers.length - 1; i >= 0; i--) {
     const o = offers[i]!;
-    if (!worksAtSiteOn(days.get(o.userId)?.get(siteId), o.date) || reservedElsewhere(o.userId, o.date)) offers.splice(i, 1);
+    if (!worksAtSiteOn(days.get(o.userId)?.get(siteId), o.date) || reservedElsewhere(o.userId, o.date) || (lastDays.has(o.userId) && o.date > lastDays.get(o.userId)!)) offers.splice(i, 1);
   }
   const away = ids.length ? await db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, dates[6]!), gte(absences.endDate, dates[0]!))) : [];
   const other = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), ne(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
@@ -91,7 +92,7 @@ export async function suggestWeek(db: AppDatabase, p: Principal, siteId: string,
   if (weekStart < firstPlannableWeek(todayIso(now))) throw domainError('VALIDATION_FAILED', FROZEN_MESSAGE);
   const { ctx, result } = await compute(db, p, siteId, weekStart);
   for (const s of result.shifts) {
-    await saveShift(db, p, { site: siteId, date: s.date, userId: s.userId, startMin: s.startMin, endMin: s.endMin, breakMin: 0, station: stationFor(siteId, ctx.team.find((m) => m.userId === s.userId)), roleLabel: null }, now);
+    await saveShift(db, p, { site: siteId, date: s.date, userId: s.userId, startMin: s.startMin, endMin: s.endMin, breakMin: requiredBreakMin(s.startMin, s.endMin), station: stationFor(siteId, ctx.team.find((m) => m.userId === s.userId)), roleLabel: null }, now);
   }
   await audit(db, p.userId, 'roster.suggest', 'site', siteId, { weekStart, created: result.shifts.length, gaps: result.gaps.length });
   return { created: result.shifts.length, gaps: result.gaps };
@@ -177,6 +178,6 @@ export async function fillGap(db: AppDatabase, p: Principal, siteId: string, dat
   const candidate = gap?.candidates.find((c) => c.userId === userId);
   if (!gap || !candidate) throw domainError('VALIDATION_FAILED', 'Diese Person kann den Dienst nicht übernehmen.');
   const team = await listTeam(db, siteId);
-  return saveShift(db, p, { site: siteId, date, userId, startMin: candidate.startMin, endMin: candidate.endMin, breakMin: 0, station: stationFor(siteId, team.find((m) => m.userId === userId)), roleLabel: null }, now);
+  return saveShift(db, p, { site: siteId, date, userId, startMin: candidate.startMin, endMin: candidate.endMin, breakMin: requiredBreakMin(candidate.startMin, candidate.endMin), station: stationFor(siteId, team.find((m) => m.userId === userId)), roleLabel: null }, now);
 }
 

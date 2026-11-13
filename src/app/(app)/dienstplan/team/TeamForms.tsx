@@ -8,7 +8,7 @@ import { useT } from '@/i18n/client';
 
 const TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'];
 
-export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean; usualStation: string | null; usualFromMin: number | null; usualToMin: number | null; phone: string | null; stations: string[]; siteDays: Record<string, number[]> } }) {
+export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean; usualStation: string | null; usualFromMin: number | null; usualToMin: number | null; phone: string | null; lastDay: string | null; stations: string[]; siteDays: Record<string, number[]> } }) {
   const t = useT();
   const [state, action, pending] = useActionState(saveProfileAction, undefined);
   const [type, setType] = useState<EmploymentType>(member.employmentType);
@@ -48,6 +48,10 @@ export function ProfileForm({ member }: { member: { userId: string; name: string
         <div>
           <label className="label" htmlFor={`ut-${member.userId}`}>{t('bis')}</label>
           <input id={`ut-${member.userId}`} name="usualTo" inputMode="numeric" className="w-full" placeholder="21:30" defaultValue={member.usualToMin === null ? '' : `${String(Math.floor(member.usualToMin / 60)).padStart(2, '0')}:${String(member.usualToMin % 60).padStart(2, '0')}`} />
+        </div>
+        <div>
+          <label className="label" htmlFor={`ld-${member.userId}`}>{t('Letzter Arbeitstag (leer = bleibt)')}</label>
+          <input id={`ld-${member.userId}`} name="lastDay" type="date" className="w-full" defaultValue={member.lastDay ?? ''} />
         </div>
         <div>
           <label className="label" htmlFor={`ph-${member.userId}`}>{t('Handy (WhatsApp)')}</label>

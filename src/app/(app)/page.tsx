@@ -138,6 +138,7 @@ export default async function HomePage() {
                     <div>
                       <div className="font-semibold text-navy">{dayWord(s.date)}</div>
                       <div className="text-lg font-bold text-navy">{formatTime(s.startMin)}–{formatTime(s.endMin)}</div>
+                      {s.breakMin > 0 && <div className="text-xs text-charcoal-muted">{t('Pause {n} Min. – wann Sie möchten', { n: s.breakMin })}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="rounded px-2.5 py-1 text-sm font-semibold" style={{ background: st?.color ?? '#e3e1df', color: st?.textColor ?? '#09141d' }}>

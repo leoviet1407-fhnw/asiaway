@@ -501,6 +501,7 @@ function profileFrom(form: FormData) {
     usualFromMin: parseTime(String(form.get('usualFrom') ?? '')),
     usualToMin: parseTime(String(form.get('usualTo') ?? '')),
     phone: String(form.get('phone') ?? '').trim() || null,
+    lastDay: String(form.get('lastDay') ?? '').trim() || null,
     employmentType,
     pensumPercent: Number.isFinite(pensum) && pensum > 0 ? pensum : null,
     active: form.get('active') === 'on',

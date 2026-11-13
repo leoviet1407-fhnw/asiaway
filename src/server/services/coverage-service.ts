@@ -112,11 +112,12 @@ export async function getCoverage(db: AppDatabase, p: Principal, siteId: string,
     .filter((m) => worksByPlan(m))
     .flatMap((m) => dates.filter((date) => !av.some((a) => a.userId === m.userId && a.date === date) && !fromPattern.some((a) => a.userId === m.userId && a.date === date)).map((date): AvailabilityDay => ({ userId: m.userId, date, kind: 'AVAILABLE', fromMin: null, toMin: null })));
   const siteDays = await getSiteDays(db, ids);
+  const lastDays = new Map(team.filter((m) => m.lastDay).map((m) => [m.userId, m.lastDay!]));
   const isAway = (userId: string, date: string) => away.some((a) => a.userId === userId && a.startDate <= date && date <= a.endDate);
   const planned = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
 
   const days: CoverageDay[] = dates.map((date, i) => {
-    const offers = [...av, ...fromPattern, ...implicit].filter((a) => a.date === date && !isAway(a.userId, date) && worksAtSiteOn(siteDays.get(a.userId)?.get(siteId), date));
+    const offers = [...av, ...fromPattern, ...implicit].filter((a) => a.date === date && !isAway(a.userId, date) && worksAtSiteOn(siteDays.get(a.userId)?.get(siteId), date) && !(lastDays.has(a.userId) && date > lastDays.get(a.userId)!));
     const day = planned.filter((s) => s.workDate === date && s.userId);
     const inWindow = (w: { fromMin: number; toMin: number }) => new Set(day.filter((s) => s.startMin < w.toMin && s.endMin > w.fromMin).map((s) => s.userId)).size;
     return {

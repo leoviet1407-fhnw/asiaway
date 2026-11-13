@@ -761,6 +761,11 @@ export const EN: Record<string, string> = {
   'Behält, was schon geplant ist, und füllt nur die fehlenden Plätze.': 'Keeps what is already planned and fills only the missing places.',
   'Vorschlag: {n} Schichten ergänzt. Bitte prüfen und anpassen.': 'Suggestion: {n} shifts added. Please check and adjust.',
 
+  // --- Breaks, last working day ---
+  'Letzter Arbeitstag (leer = bleibt)': 'Last working day (empty = stays)',
+  'Pause {n} Min. – wann Sie möchten': 'Break {n} min – whenever you like',
+  'Diese Person arbeitet an diesem Tag nicht mehr (letzter Arbeitstag überschritten).': 'This person no longer works on this day (last working day has passed).',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',
@@ -863,4 +868,5 @@ export const PATTERNS: [RegExp, string][] = [
   [/^Barcode (\S+) gehört schon zu einem anderen Artikel$/, 'Barcode $1 already belongs to another item'],
   [/^Am (\S+) \((.+)\) sind schon (\d+) Personen abwesend, erlaubt sind (\d+)\. Bitte andere Tage wählen oder die Leitung fragen\.$/, 'On $1 ($2) $3 people are already away; $4 are allowed. Please choose other days or ask the management.'],
   [/^(.+), (\d{2}\.\d{2}\.): arbeitet an diesem Wochentag normalerweise nicht hier\.$/, '$1, $2: does not normally work here on this weekday.'],
+  [/^(.+), (\d{2}\.\d{2}\.): arbeitet nach dem letzten Arbeitstag nicht mehr\.$/, '$1, $2: no longer works after the last working day.'],
 ];

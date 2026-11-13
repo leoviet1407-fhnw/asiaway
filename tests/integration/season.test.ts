@@ -9,7 +9,7 @@ import { seedSampleData } from '@/server/seed/sample-data';
 import { applyPattern, fillMissingFromPatterns, getPattern, getSiteDays, savePattern, saveSiteDays } from '@/server/services/pattern-service';
 import { getCoverage, saveNeeds } from '@/server/services/coverage-service';
 import { deleteVacationRule, listSpecialDays, listVacationRules, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
-import { getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift, submissionOverview } from '@/server/services/roster-service';
+import { copyWeek, getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift, submissionOverview } from '@/server/services/roster-service';
 import { fillGap, listGaps, publishMonth, suggestMonth, suggestWeek } from '@/server/services/suggest-service';
 import { createTestDatabase } from '../helpers/db';
 
@@ -181,5 +181,28 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     expect(r.created).toBe(rows.length - 1); // everything else was filled (Tuesday to Friday)
     expect(r.gaps).toEqual([]);
     expect((await suggestWeek(db, planner, 'winterthur', week, now)).created).toBe(0);
+  });
+
+  it('copying last week leaves out people who are leaving; every shift gets its break', async () => {
+    const prev = '2027-09-06';
+    await saveSiteDays(db, planner, a.userId, { winterthur: [1, 2, 3, 4, 5, 6, 7] });
+    await saveSiteDays(db, planner, b.userId, { winterthur: [1, 2, 3, 4, 5, 6, 7] });
+    // a long shift gets the legal break by itself (10:30–22:00 = 11.5 h: 60 min), a short one needs none
+    const longId = await saveShift(db, planner, { site: 'winterthur', date: '2027-09-06', userId: a.userId, startMin: t('10:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    await saveShift(db, planner, { site: 'winterthur', date: '2027-09-07', userId: b.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    await saveShift(db, planner, { site: 'winterthur', date: '2027-09-08', userId: a.userId, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    expect((await db.select().from(shifts).where(eq(shifts.id, longId)))[0]!.breakMin).toBe(60);
+    // a is leaving: last day is the Wednesday of that week, so copying into next week leaves a out
+    await saveProfile(db, planner, a.userId, { site: 'winterthur', employmentType: 'FULL_TIME', pensumPercent: 100, active: true, lastDay: '2027-09-08' });
+    await expect(saveShift(db, planner, { site: 'winterthur', date: '2027-09-14', userId: a.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    const n = await copyWeek(db, planner, 'winterthur', '2027-09-13', now);
+    expect(n).toBe(1); // only b's shift
+    const copied = (await db.select().from(shifts)).filter((x) => x.workDate >= '2027-09-13' && x.workDate <= '2027-09-19');
+    expect(copied.every((x) => x.userId === b.userId)).toBe(true);
+    // the suggestion does not offer a after the last day either
+    await saveNeeds(db, planner, 'winterthur', Array.from({ length: 7 }, (_, i) => (i === 1 ? { lunchPeople: 2, dinnerPeople: 0 } : { lunchPeople: 0, dinnerPeople: 0 })));
+    await suggestWeek(db, planner, 'winterthur', '2027-09-13', now);
+    expect((await db.select().from(shifts)).filter((x) => x.workDate >= '2027-09-13' && x.workDate <= '2027-09-19').some((x) => x.userId === a.userId)).toBe(false);
+    expect(prev).toBe('2027-09-06');
   });
 });

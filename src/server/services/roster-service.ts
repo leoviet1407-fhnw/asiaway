@@ -14,6 +14,7 @@ import {
   worksAtSiteOn,
   FROZEN_MESSAGE,
   isFrozen,
+  requiredBreakMin,
   weekDates,
   type Absence,
   type AbsenceStatus,
@@ -90,6 +91,7 @@ export interface TeamMember extends RosterPerson {
   usualFromMin: number | null;
   usualToMin: number | null;
   phone: string | null;
+  lastDay: string | null;
 }
 
 export async function listTeam(db: AppDatabase, siteId: string, { includeInactive = false } = {}): Promise<TeamMember[]> {
@@ -111,6 +113,7 @@ export async function listTeam(db: AppDatabase, siteId: string, { includeInactiv
       usualFromMin: r.p.usualFromMin,
       usualToMin: r.p.usualToMin,
       phone: r.p.phone,
+      lastDay: r.p.lastDay,
       active: r.p.active && r.u.active,
       employmentType: r.p.employmentType as EmploymentType,
       pensumPercent: r.p.pensumPercent,
@@ -121,6 +124,8 @@ export interface ProfileInput {
   site: string;
   /** Further sites this person is planned at. */
   extraSites?: string[];
+  /** Last day the person is planned (YYYY-MM-DD); empty = stays. */
+  lastDay?: string | null;
   usualStation?: string | null;
   usualFromMin?: number | null;
   usualToMin?: number | null;
@@ -133,6 +138,7 @@ export interface ProfileInput {
 function checkProfile(input: ProfileInput) {
   if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
   if ((input.extraSites ?? []).some((x) => x === input.site || !ROSTER_SITES.some((s) => s.id === x))) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
+  if (input.lastDay && !/^\d{4}-\d{2}-\d{2}$/.test(input.lastDay)) throw domainError('VALIDATION_FAILED', 'Das Datum ist ungültig.');
   if ((input.usualFromMin == null) !== (input.usualToMin == null) || (input.usualFromMin != null && !(input.usualToMin! > input.usualFromMin && input.usualFromMin >= 0 && input.usualToMin! <= 30 * 60))) {
     throw domainError('VALIDATION_FAILED', 'Die üblichen Zeiten sind ungültig.');
   }
@@ -152,6 +158,7 @@ export async function saveProfile(db: AppDatabase, p: Principal, userId: string,
     usualFromMin: input.usualFromMin ?? null,
     usualToMin: input.usualToMin ?? null,
     phone: input.phone?.trim() || null,
+    lastDay: input.lastDay || null,
     employmentType: input.employmentType,
     pensumPercent: input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME' ? input.pensumPercent : null,
     active: input.active,
@@ -268,6 +275,13 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
     // Shifts of the same people at the other site count for rest time and weekly hours
     const everywhere = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
     violations = validateRoster({ weekStart, people, shifts: everywhere.map(toShift), availability: avail, absences: abs });
+    // Someone planned after their last working day
+    const lastDayOf = new Map((await db.select({ id: staffProfiles.userId, lastDay: staffProfiles.lastDay }).from(staffProfiles).where(inArray(staffProfiles.userId, ids.length ? ids : ['00000000-0000-0000-0000-000000000000']))).filter((x) => x.lastDay).map((x) => [x.id, x.lastDay!]));
+    for (const s of weekShifts) {
+      if (s.userId && lastDayOf.has(s.userId) && s.date > lastDayOf.get(s.userId)!) {
+        violations.push({ severity: 'error', code: 'LEFT', userId: s.userId, date: s.date, message: `${people.find((x) => x.userId === s.userId)?.name ?? ''}, ${s.date.slice(8)}.${s.date.slice(5, 7)}.: arbeitet nach dem letzten Arbeitstag nicht mehr.` });
+      }
+    }
     // Someone planned on a weekday they normally do not work at this site
     const siteDayRows = await getSiteDays(db, ids);
     for (const s of weekShifts) {
@@ -302,6 +316,7 @@ export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftI
   if (input.userId) {
     const profile = await getProfile(db, input.userId);
     if (!profile || !worksAt(profile, input.site) || !profile.active) throw domainError('VALIDATION_FAILED', 'Diese Person gehört nicht zum Team dieses Standorts.');
+    if (profile.lastDay && input.date > profile.lastDay) throw domainError('VALIDATION_FAILED', 'Diese Person arbeitet an diesem Tag nicht mehr (letzter Arbeitstag überschritten).');
   }
   const values = {
     site: input.site,
@@ -309,7 +324,7 @@ export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftI
     userId: input.userId,
     startMin: input.startMin,
     endMin: input.endMin,
-    breakMin: input.breakMin,
+    breakMin: Math.max(input.breakMin, requiredBreakMin(input.startMin, input.endMin)), // every shift has its break; staff take it when they want
     station: input.station,
     roleLabel: input.roleLabel?.trim() || null,
     updatedAt: now,
@@ -364,9 +379,12 @@ export async function copyWeek(db: AppDatabase, p: Principal, siteId: string, we
   const from = addDays(weekStart, -7);
   const existing = await db.select({ id: shifts.id }).from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, weekStart), lte(shifts.workDate, addDays(weekStart, 6)))).limit(1);
   if (existing.length > 0) throw domainError('VALIDATION_FAILED', 'Diese Woche hat schon Schichten.');
-  const rows = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, from), lte(shifts.workDate, addDays(from, 6))));
+  const all = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, from), lte(shifts.workDate, addDays(from, 6))));
+  // people who are leaving are not copied after their last day
+  const leaving = new Map((await db.select({ id: staffProfiles.userId, lastDay: staffProfiles.lastDay }).from(staffProfiles)).filter((x) => x.lastDay).map((x) => [x.id, x.lastDay!]));
+  const rows = all.filter((r) => !(r.userId && leaving.has(r.userId) && addDays(r.workDate, 7) > leaving.get(r.userId)!));
   if (rows.length === 0) return 0;
-  await db.insert(shifts).values(rows.map((r) => ({ site: r.site, workDate: addDays(r.workDate, 7), userId: r.userId, startMin: r.startMin, endMin: r.endMin, breakMin: r.breakMin, station: r.station, roleLabel: r.roleLabel, createdBy: p.userId })));
+  await db.insert(shifts).values(rows.map((r) => ({ site: r.site, workDate: addDays(r.workDate, 7), userId: r.userId, startMin: r.startMin, endMin: r.endMin, breakMin: Math.max(r.breakMin, requiredBreakMin(r.startMin, r.endMin)), station: r.station, roleLabel: r.roleLabel, createdBy: p.userId })));
   await audit(db, p.userId, 'roster.copy', 'roster_week', `${siteId}:${weekStart}`, { count: rows.length });
   return rows.length;
 }
