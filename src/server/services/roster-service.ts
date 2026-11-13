@@ -33,6 +33,7 @@ import type { AppDatabase } from '../db/client';
 import {
   absences,
   availability,
+  availabilityPatterns,
   availabilitySubmissions,
   rosterWeeks,
   shifts,
@@ -232,6 +233,13 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
       ? await db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates[6]!)))
       : [];
     avail = av.map((a) => ({ userId: a.userId, date: a.workDate, kind: a.kind as AvailabilityKind, fromMin: a.fromMin, toMin: a.toMin }));
+    // Days without an entry count as the person's Standardwoche, if they have one
+    const patterns = ids.length ? await db.select().from(availabilityPatterns).where(inArray(availabilityPatterns.userId, ids)) : [];
+    for (const pat of patterns) {
+      dates.forEach((date, i) => {
+        if (pat.weekday === i + 1 && !avail.some((a) => a.userId === pat.userId && a.date === date)) avail.push({ userId: pat.userId, date, kind: pat.kind as AvailabilityKind, fromMin: pat.fromMin, toMin: pat.toMin });
+      });
+    }
     // Shifts of the same people at the other site count for rest time and weekly hours
     const everywhere = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
     violations = validateRoster({ weekStart, people, shifts: everywhere.map(toShift), availability: avail, absences: abs });

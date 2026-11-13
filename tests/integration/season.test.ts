@@ -9,7 +9,7 @@ import { seedSampleData } from '@/server/seed/sample-data';
 import { applyPattern, fillMissingFromPatterns, getPattern, savePattern } from '@/server/services/pattern-service';
 import { getCoverage, saveNeeds } from '@/server/services/coverage-service';
 import { deleteVacationRule, listSpecialDays, listVacationRules, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
-import { getAvailabilityMonth, requestAbsence, saveProfile } from '@/server/services/roster-service';
+import { getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift } from '@/server/services/roster-service';
 import { suggestWeek } from '@/server/services/suggest-service';
 import { createTestDatabase } from '../helpers/db';
 
@@ -89,5 +89,17 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     await expect(suggestWeek(db, planner, 'winterthur', weekStart, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' }); // not an empty week any more
     await expect(suggestWeek(db, a, 'winterthur', '2027-01-18', now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     void t;
+  });
+
+  it('an Aushilfe with a Standardwoche can be planned without a monthly report', async () => {
+    const [u] = await db.select().from(users).where(eq(users.email, 'oerlikon@asiaway.test'));
+    const casual = (await loadPrincipalForUser(db, u!.id))!;
+    await saveProfile(db, planner, casual.userId, { site: 'winterthur', employmentType: 'ON_CALL', pensumPercent: null, active: true });
+    const week = '2027-03-01';
+    await saveShift(db, planner, { site: 'winterthur', date: '2027-03-02', userId: casual.userId, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'NO_OFFER' && v.userId === casual.userId)).toBe(true);
+    const pat = (await getPattern(db, casual, casual.userId)).map((d) => (d.weekday === 2 ? { ...d, kind: 'AVAILABLE' as const, fromMin: null, toMin: null } : d));
+    await savePattern(db, casual, casual.userId, pat);
+    expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'NO_OFFER' && v.userId === casual.userId)).toBe(false);
   });
 });
