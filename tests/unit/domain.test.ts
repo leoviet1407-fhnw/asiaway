@@ -19,7 +19,7 @@ import {
   orderStatusAfterReceipt,
   summarize,
 } from '@/domain/receiving';
-import { canAccessLocation, isOrderer, locationsFor, type Principal } from '@/domain/roles';
+import { canAccessLocation, isOrderer, isRestaurant, locationsFor, type Principal } from '@/domain/roles';
 
 const staffOer: Principal = { userId: 'u1', name: 'A', email: 'a@x', grants: [{ role: 'STAFF', locationId: 'oerlikon' }] };
 const orderer: Principal = { userId: 'u2', name: 'B', email: 'b@x', grants: [{ role: 'ORDERER', locationId: null }] };
@@ -66,6 +66,21 @@ describe('roles', () => {
     expect(isOrderer(staffOer)).toBe(false);
     expect(isOrderer(admin)).toBe(true);
     expect(locationsFor(staffOer, [{ id: 'oerlikon' }, { id: 'winti-vn' }]).map((l) => l.id)).toEqual(['oerlikon']);
+  });
+});
+
+describe('Winterthur orders together', () => {
+  const vn: Principal = { userId: 'v', name: 'V', email: 'v@x', grants: [{ role: 'STAFF', locationId: 'winti-vn' }] };
+  const th: Principal = { userId: 't', name: 'T', email: 't@x', grants: [{ role: 'STAFF', locationId: 'winti-th' }] };
+  it('lets staff of both restaurants order and receive for the building, but not for Oerlikon', () => {
+    expect(canAccessLocation(vn, 'winterthur')).toBe(true);
+    expect(canAccessLocation(th, 'winterthur')).toBe(true);
+    expect(canAccessLocation(vn, 'winti-th')).toBe(false); // closing and stock stay per restaurant
+    expect(canAccessLocation(vn, 'oerlikon')).toBe(false);
+    expect(canAccessLocation(staffOer, 'winterthur')).toBe(false);
+    expect(canEditOrder(th, { status: 'DRAFT', locationId: 'winterthur' })).toBe(true);
+    expect(isRestaurant('winterthur')).toBe(false);
+    expect(isRestaurant('winti-vn')).toBe(true);
   });
 });
 

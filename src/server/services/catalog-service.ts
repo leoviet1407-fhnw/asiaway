@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { isValidGtin, normalizeCode } from '../../domain/ean';
 import { domainError } from '../../domain/errors';
-import { isAdmin, type Principal } from '../../domain/roles';
+import { isAdmin, isRestaurant, type Principal } from '../../domain/roles';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import { itemBarcodes, items, locations, supplierItems, suppliers } from '../db/schema';
@@ -18,6 +18,16 @@ export const STORAGE_AREA_ORDER: StorageArea[] = ['COLD', 'FREEZER', 'DRY', 'BAR
 
 export async function listLocations(db: AppDatabase) {
   return db.select().from(locations).orderBy(asc(locations.sort));
+}
+
+/** Where orders are placed: Oerlikon and Winterthur (both Winterthur restaurants together). */
+export async function listOrderLocations(db: AppDatabase) {
+  return (await listLocations(db)).filter((l) => l.id === 'oerlikon' || l.id === 'winterthur');
+}
+
+/** The restaurants themselves (daily closing, later stock). */
+export async function listRestaurants(db: AppDatabase) {
+  return (await listLocations(db)).filter((l) => isRestaurant(l.id));
 }
 
 export async function listSuppliers(db: AppDatabase, { includeInactive = false } = {}) {

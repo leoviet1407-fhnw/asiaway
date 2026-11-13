@@ -56,7 +56,7 @@ describe('draft orders', () => {
     const b = await openDraft(db, staffOer, 'oerlikon', asiaId);
     expect(a.created).toBe(true);
     expect(b).toEqual({ id: a.id, created: false });
-    const other = await openDraft(db, staffWvn, 'winti-vn', asiaId);
+    const other = await openDraft(db, staffWvn, 'winterthur', asiaId);
     expect(other.id).not.toBe(a.id);
   });
 
@@ -128,7 +128,7 @@ describe('review and send', () => {
   });
 
   it('keeps the order SUBMITTED when the email fails', async () => {
-    const { id } = await openDraft(db, staffWvn, 'winti-vn', frischId);
+    const { id } = await openDraft(db, staffWvn, 'winterthur', frischId);
     await setLineQty(db, staffWvn, id, itemId['F-3001']!, 10);
     await submitOrder(db, staffWvn, id);
     const mailer = new MemoryMailer();
@@ -142,7 +142,7 @@ describe('review and send', () => {
   });
 
   it('refuses to submit an empty draft; orderer can return and cancel', async () => {
-    const { id } = await openDraft(db, staffWvn, 'winti-vn', asiaId);
+    const { id } = await openDraft(db, staffWvn, 'winterthur', asiaId);
     // This draft was created in the first test; empty it.
     for (const line of (await getOrder(db, staffWvn, id)).lines) await setLineQty(db, staffWvn, id, line.itemId, 0);
     await expect(submitOrder(db, staffWvn, id)).rejects.toMatchObject({ code: 'EMPTY_ORDER' });
@@ -161,7 +161,7 @@ describe('review and send', () => {
     expect(mine.every((o) => o.locationId === 'oerlikon')).toBe(true);
     const all = await listOrders(db, orderer);
     expect(new Set(all.map((o) => o.locationId)).size).toBeGreaterThan(1);
-    const theirs = all.find((o) => o.locationId === 'winti-vn')!;
+    const theirs = all.find((o) => o.locationId === 'winterthur')!;
     await expect(getOrder(db, staffOer, theirs.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

@@ -8,7 +8,7 @@ import { formatDateTime, formatDay, todayIso } from '@/lib/dates';
 import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { listLocations } from '@/server/services/catalog-service';
+import { listRestaurants } from '@/server/services/catalog-service';
 import { getClosing, listClosingPhotos } from '@/server/services/closing-service';
 import { ClosingForm } from '../ClosingForm';
 import { ClosingActions } from './ClosingActions';
@@ -28,7 +28,7 @@ export default async function ClosingPage({ params, searchParams }: { params: Pr
     throw error;
   }
   const photos = await listClosingPhotos(database, p, id);
-  const locations = locationsFor(p, await listLocations(database));
+  const locations = locationsFor(p, await listRestaurants(database));
   const approved = closing.status === 'APPROVED';
   const tone = differenceTone(closing.result.differenceCents);
   const chf = (c: number) => (c / 100).toFixed(2);

@@ -6,7 +6,7 @@ import { formatDay, todayIso } from '@/lib/dates';
 import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { listLocations } from '@/server/services/catalog-service';
+import { listRestaurants } from '@/server/services/catalog-service';
 import { listClosings, sumClosings } from '@/server/services/closing-service';
 
 export const metadata = { title: 'Tagesabschluss' };
@@ -24,7 +24,7 @@ export default async function ClosingsPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const database = await db();
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : todayIso().slice(0, 7);
-  const locs = locationsFor(p, await listLocations(database));
+  const locs = locationsFor(p, await listRestaurants(database));
   const locationId = locs.some((l) => l.id === params.ort) ? params.ort : undefined;
   const list = await listClosings(database, p, { month, ...(locationId ? { locationId } : {}) });
   const sum = sumClosings(list);

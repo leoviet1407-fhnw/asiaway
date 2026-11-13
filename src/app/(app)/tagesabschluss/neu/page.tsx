@@ -3,7 +3,7 @@ import { locationsFor } from '@/domain/roles';
 import { todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { listLocations } from '@/server/services/catalog-service';
+import { listRestaurants } from '@/server/services/catalog-service';
 import { ClosingForm } from '../ClosingForm';
 
 export const metadata = { title: 'Neuer Abschluss' };
@@ -11,7 +11,7 @@ export const metadata = { title: 'Neuer Abschluss' };
 export default async function NewClosingPage({ searchParams }: { searchParams: Promise<{ ort?: string; datum?: string }> }) {
   const p = await requirePrincipal();
   const params = await searchParams;
-  const locations = locationsFor(p, await listLocations(await db()));
+  const locations = locationsFor(p, await listRestaurants(await db()));
   if (locations.length === 0) return <p className="card">Ihrem Konto ist kein Standort zugeordnet.</p>;
   const today = todayIso();
   const location = locations.find((l) => l.id === params.ort) ?? locations[0]!;

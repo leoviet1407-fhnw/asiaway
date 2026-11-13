@@ -41,7 +41,7 @@ beforeAll(async () => {
   for (const i of await db.select().from(items)) itemId[i.sku] = i.id;
   const asia = (await db.select().from(suppliers)).find((s) => s.name.startsWith('Muster Asia'))!;
 
-  const { id } = await openDraft(db, staffTh, 'winti-th', asia.id);
+  const { id } = await openDraft(db, staffTh, 'winterthur', asia.id);
   await setLineQty(db, staffTh, id, itemId['A-1005']!, 2); // fish sauce, case of 12
   await setLineQty(db, staffTh, id, itemId['A-1009']!, 2); // coconut milk
   await setLineQty(db, staffTh, id, itemId['A-1010']!, 3); // red curry

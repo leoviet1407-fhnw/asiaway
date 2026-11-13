@@ -22,9 +22,23 @@ export function isOrderer(p: Principal): boolean {
   return p.grants.some((g) => g.role === 'ORDERER' || g.role === 'ADMIN');
 }
 
+/**
+ * Winterthur orders for the whole building: the location "winterthur" covers
+ * both restaurants, so staff of either one can order and receive for it.
+ */
+export const COMBINED_LOCATIONS: Readonly<Record<string, readonly string[]>> = {
+  winterthur: ['winti-vn', 'winti-th'],
+};
+
+/** The locations that are real restaurants (stock, daily closing), not combined order locations. */
+export function isRestaurant(locationId: string): boolean {
+  return !(locationId in COMBINED_LOCATIONS);
+}
+
 /** Whether the user works at this location at all (prepare drafts, receive goods). */
 export function canAccessLocation(p: Principal, locationId: string): boolean {
-  return p.grants.some((g) => g.locationId === null || g.locationId === locationId);
+  const covered = COMBINED_LOCATIONS[locationId] ?? [];
+  return p.grants.some((g) => g.locationId === null || g.locationId === locationId || (g.locationId !== null && covered.includes(g.locationId)));
 }
 
 /** The locations this user can act for, out of all locations, in the given order. */

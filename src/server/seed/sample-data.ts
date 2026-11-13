@@ -21,6 +21,7 @@ import { openDraft, sendOrder, setLineQty, submitOrder, updateOrderDetails } fro
 
 export const LOCATIONS = [
   { id: 'oerlikon', name: 'Oerlikon', shortName: 'OER', address: 'Musterstrasse 1, 8050 Zürich', deliveryNote: 'Anlieferung Hintereingang, Mo–Sa 8–11 Uhr', sort: 1 },
+  { id: 'winterthur', name: 'Winterthur', shortName: 'WIN', address: 'Archplatz 2, 8400 Winterthur', deliveryNote: null, sort: 2 },
   { id: 'winti-vn', name: 'Winterthur Vietnamesisch', shortName: 'WVN', address: 'Musterweg 2, 8400 Winterthur', deliveryNote: '1. OG – Lift benutzen', sort: 2 },
   { id: 'winti-th', name: 'Winterthur Thai', shortName: 'WTH', address: 'Musterweg 2, 8400 Winterthur', deliveryNote: 'Erdgeschoss, Eingang Thai', sort: 3 },
 ] as const;
@@ -187,7 +188,7 @@ export async function seedSampleData(
 
   // Winterthur VN: submitted, waiting for the orderer
   const wvn = await principal('winti-vn@asiaway.test');
-  const d2 = await openDraft(db, wvn, 'winti-vn', supplierIds.frisch!);
+  const d2 = await openDraft(db, wvn, 'winterthur', supplierIds.frisch!);
   await setLineQty(db, wvn, d2.id, itemIds['F-3001']!, 10);
   await setLineQty(db, wvn, d2.id, itemIds['F-3004']!, 3);
   await setLineQty(db, wvn, d2.id, itemIds['F-3007']!, 6.5);
@@ -197,7 +198,7 @@ export async function seedSampleData(
 
   // Winterthur Thai: sent, ready to receive
   const wth = await principal('winti-th@asiaway.test');
-  const d3 = await openDraft(db, wth, 'winti-th', supplierIds.asia!);
+  const d3 = await openDraft(db, wth, 'winterthur', supplierIds.asia!);
   await setLineQty(db, wth, d3.id, itemIds['A-1009']!, 2);
   await setLineQty(db, wth, d3.id, itemIds['A-1010']!, 3);
   await setLineQty(db, wth, d3.id, itemIds['A-1011']!, 3);

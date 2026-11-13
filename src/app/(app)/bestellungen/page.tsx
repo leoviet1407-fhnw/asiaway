@@ -5,7 +5,7 @@ import { locationsFor } from '@/domain/roles';
 import { formatDay } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { listLocations } from '@/server/services/catalog-service';
+import { listOrderLocations } from '@/server/services/catalog-service';
 import { listOrders } from '@/server/services/order-service';
 import { OrderStatusChip } from '@/components/StatusChip';
 
@@ -24,7 +24,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const database = await db();
   const filter = FILTERS.find((f) => f.key === params.status) ?? FILTERS[0]!;
-  const locs = locationsFor(p, await listLocations(database));
+  const locs = locationsFor(p, await listOrderLocations(database));
   const locationId = locs.some((l) => l.id === params.ort) ? params.ort : undefined;
   const orders = await listOrders(database, p, { statuses: filter.statuses, locationId });
   const href = (status: string, ort?: string) => `/bestellungen?status=${status}${ort ? `&ort=${ort}` : ''}`;

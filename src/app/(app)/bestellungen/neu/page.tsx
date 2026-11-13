@@ -2,7 +2,7 @@ import { formatChf } from '@/domain/qty';
 import { locationsFor } from '@/domain/roles';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { listLocations, listSuppliers } from '@/server/services/catalog-service';
+import { listOrderLocations, listSuppliers } from '@/server/services/catalog-service';
 import { NewOrderForm } from './NewOrderForm';
 
 export const metadata = { title: 'Neue Bestellung' };
@@ -10,7 +10,7 @@ export const metadata = { title: 'Neue Bestellung' };
 export default async function NewOrderPage() {
   const p = await requirePrincipal();
   const database = await db();
-  const locations = locationsFor(p, await listLocations(database));
+  const locations = locationsFor(p, await listOrderLocations(database));
   const suppliers = await listSuppliers(database);
   return (
     <div className="mx-auto max-w-lg space-y-4">
