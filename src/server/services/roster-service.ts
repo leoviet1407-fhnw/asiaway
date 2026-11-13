@@ -492,6 +492,8 @@ export async function requestAbsence(db: AppDatabase, p: Principal, input: Absen
 export async function decideAbsence(db: AppDatabase, p: Principal, absenceId: string, approve: boolean, now = new Date()): Promise<void> {
   requirePlanner(p);
   if (!/^[0-9a-f-]{36}$/i.test(absenceId)) throw domainError('NOT_FOUND', 'Absence not found');
+  const [own] = await db.select({ userId: absences.userId }).from(absences).where(eq(absences.id, absenceId)).limit(1);
+  if (own && own.userId === p.userId && !isAdmin(p)) throw domainError('FORBIDDEN', 'Eigene Ferien bestätigt eine andere Person der Leitung.');
   const [row] = await db.update(absences).set({ status: approve ? 'APPROVED' : 'REJECTED', decidedBy: p.userId, decidedAt: now }).where(eq(absences.id, absenceId)).returning({ id: absences.id });
   if (!row) throw domainError('NOT_FOUND', 'Absence not found');
   await audit(db, p.userId, approve ? 'absence.approve' : 'absence.reject', 'absence', absenceId);

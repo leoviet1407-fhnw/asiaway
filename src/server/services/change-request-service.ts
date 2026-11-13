@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
-import { isPlanner, type Principal } from '../../domain/roles';
+import { isAdmin, isPlanner, type Principal } from '../../domain/roles';
 import { checkShiftTimes, mondayOf } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
@@ -136,6 +136,8 @@ export async function decideChangeRequest(db: AppDatabase, p: Principal, id: str
   const [c] = await db.select().from(changeRequests).where(eq(changeRequests.id, id)).limit(1);
   if (!c) throw domainError('NOT_FOUND', 'Request not found');
   if (c.status !== 'REQUESTED') throw domainError('VALIDATION_FAILED', 'Diese Anfrage ist schon entschieden.');
+  // Planners who also work in service (Belle, Xuan) do not approve their own requests; the admin may
+  if (c.userId === p.userId && !isAdmin(p)) throw domainError('FORBIDDEN', 'Eigene Anfragen entscheidet eine andere Person der Leitung.');
   if (approve) {
     await db.transaction(async (tx) => {
       const t = tx as unknown as AppDatabase;

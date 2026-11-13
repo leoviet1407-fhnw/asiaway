@@ -606,6 +606,9 @@ export const EN: Record<string, string> = {
   'Änderungen der Arbeitszeit bitte als Anfrage melden.': 'Please report changes to worked time as a request.',
   'Bitte Zeiten wie 08:00 eingeben.': 'Please enter times like 08:00.',
 
+  'Eigene Anfragen entscheidet eine andere Person der Leitung.': 'Your own requests are decided by another person of the management.',
+  'Die eigenen Stunden gibt eine andere Person der Leitung frei.': 'Your own hours are approved by another person of the management.',
+  'Eigene Ferien bestätigt eine andere Person der Leitung.': 'Your own holiday is confirmed by another person of the management.',
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

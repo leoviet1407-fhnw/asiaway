@@ -92,4 +92,13 @@ describe('change requests', () => {
     await decideChangeRequest(db, planner, extra, true, now);
     expect((await getMonthHours(db, staff, staff.userId, '2026-11')).totals.workedMinutes).toBe(480);
   });
+
+  it('a planner who also works in service cannot approve their own request', async () => {
+    const [u] = await db.select().from(users).where(eq(users.email, 'besteller@asiaway.test'));
+    await saveProfile(db, planner, u!.id, { site: 'winterthur', employmentType: 'PART_TIME', pensumPercent: 80, active: true });
+    const mine = await saveShift(db, planner, { site: 'winterthur', date: '2026-11-18', userId: u!.id, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    await publishWeek(db, planner, 'winterthur', '2026-11-16', now).catch(() => undefined);
+    const id = await requestChange(db, planner, { kind: 'SHIFT_CANCEL', shiftId: mine, reason: 'krank' }, now);
+    await expect(decideChangeRequest(db, planner, id, true, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
 });

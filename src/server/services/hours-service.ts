@@ -7,7 +7,7 @@ import {
   type VacationBalance,
 } from '../../domain/hours';
 import { domainError } from '../../domain/errors';
-import { isPlanner, type Principal } from '../../domain/roles';
+import { isAdmin, isPlanner, type Principal } from '../../domain/roles';
 import { checkShiftTimes, monthDates, shiftNetMinutes, type AbsenceType, type Shift } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
@@ -231,6 +231,7 @@ export async function deleteEntry(db: AppDatabase, p: Principal, entryId: string
 export async function approveMonth(db: AppDatabase, p: Principal, userId: string, month: string, now = new Date()): Promise<void> {
   if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung kann freigeben.');
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
+  if (userId === p.userId && !isAdmin(p)) throw domainError('FORBIDDEN', 'Die eigenen Stunden gibt eine andere Person der Leitung frei.');
   await db.insert(timeMonthApprovals).values({ userId, month, approvedBy: p.userId, approvedAt: now }).onConflictDoNothing();
   await audit(db, p.userId, 'hours.approve', 'user', userId, { month });
 }
