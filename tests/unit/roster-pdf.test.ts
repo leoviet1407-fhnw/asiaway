@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
-import { renderRosterPdf } from '@/server/pdf/roster-pdf';
+import { orderPeople, renderRosterPdf } from '@/server/pdf/roster-pdf';
 import type { RosterPerson, Shift } from '@/domain/roster';
 
 const person = (userId: string, over: Partial<RosterPerson> = {}): RosterPerson => ({ userId, name: userId, employmentType: 'FULL_TIME', pensumPercent: 100, ...over });
@@ -31,5 +31,20 @@ describe('roster PDF', () => {
     const b = await renderRosterPdf({ siteId: 'oerlikon', siteName: 'Oerlikon', weekStart: '2026-12-28', people: [], shifts: [], generatedAt: new Date() });
     expect(a.byteLength).toBeGreaterThan(2000);
     expect(b.byteLength).toBeGreaterThan(2000);
+  });
+
+  it('orders people: Leitung on top, then Pensum from high to low, Aushilfen at the bottom', () => {
+    const mix = [
+      person('Zoe', { employmentType: 'ON_CALL', pensumPercent: null }),
+      person('Yen', { employmentType: 'PART_TIME', pensumPercent: 70 }),
+      person('Verni', { employmentType: 'PART_TIME', pensumPercent: 50 }),
+      person('Xuan', { employmentType: 'MANAGEMENT', pensumPercent: null }),
+      person('Mersi', { employmentType: 'PART_TIME', pensumPercent: 80 }),
+      person('April', { employmentType: 'FULL_TIME', pensumPercent: 100 }),
+      person('Belle', { employmentType: 'PART_TIME', pensumPercent: 80 }),
+      person('Anna', { employmentType: 'ON_CALL', pensumPercent: null }),
+      person('Edmond', { employmentType: 'FULL_TIME', pensumPercent: 100 }),
+    ];
+    expect(orderPeople(mix).map((p) => p.name)).toEqual(['Xuan', 'April', 'Edmond', 'Belle', 'Mersi', 'Yen', 'Verni', 'Anna', 'Zoe']);
   });
 });

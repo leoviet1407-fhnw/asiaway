@@ -82,6 +82,15 @@ export interface RosterPdfInput {
   specialDays?: readonly { date: string; label: string; closed: boolean }[];
 }
 
+/**
+ * The order of people in the PDF: the Leitung (Geschäftsleitung, e.g. Xuan) on top, then everybody
+ * with a Pensum from high to low (100 %, 80 %, 70 %, 50 %), the Aushilfen at the bottom; by name within a group.
+ */
+export function orderPeople<T extends Pick<RosterPerson, 'name' | 'employmentType' | 'pensumPercent'>>(people: readonly T[]): T[] {
+  const group = (p: T) => (p.employmentType === 'MANAGEMENT' ? 0 : p.employmentType === 'ON_CALL' ? 2 : 1);
+  return [...people].sort((a, b) => group(a) - group(b) || (group(a) === 1 ? (b.pensumPercent ?? 0) - (a.pensumPercent ?? 0) : 0) || a.name.localeCompare(b.name, 'de'));
+}
+
 export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Dienstplan ${input.siteName} ${input.weekStart}`);
@@ -233,7 +242,7 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
   }
 
   // ---- Page 2: plan by person ------------------------------------------------------------
-  const byPerson = [...input.people].sort((a, b) => Number(a.employmentType === 'ON_CALL' || a.employmentType === 'MANAGEMENT') - Number(b.employmentType === 'ON_CALL' || b.employmentType === 'MANAGEMENT'));
+  const byPerson = orderPeople(input.people);
   const minutesOf = (id: string) => input.shifts.filter((s) => s.userId === id).reduce((n, s) => n + shiftNetMinutes(s), 0);
   const absenceOn = (id: string, date: string) => absences.find((a) => a.userId === id && a.startDate <= date && date <= a.endDate);
   {
