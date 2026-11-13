@@ -12,6 +12,8 @@ import {
   stationsOf,
   validateRoster,
   worksAtSiteOn,
+  FROZEN_MESSAGE,
+  isFrozen,
   weekDates,
   type Absence,
   type AbsenceStatus,
@@ -58,6 +60,11 @@ export async function sitesFor(db: AppDatabase, p: Principal) {
   if (isPlanner(p)) return [...ROSTER_SITES];
   const profile = await getProfile(db, p.userId);
   return ROSTER_SITES.filter((s) => worksAt(profile, s.id));
+}
+
+/** The current and past weeks cannot be planned any more. */
+function assertPlannable(date: string, now: Date) {
+  if (isFrozen(date, todayIso(now))) throw domainError('VALIDATION_FAILED', FROZEN_MESSAGE);
 }
 
 function requirePlanner(p: Principal) {
@@ -286,6 +293,7 @@ export interface SaveShiftInput {
 
 export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftInput, now = new Date()): Promise<string> {
   requirePlanner(p);
+  if (isoDate(input.date)) assertPlannable(input.date, now);
   if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
   if (!isoDate(input.date)) throw domainError('VALIDATION_FAILED', 'Datum ist ungültig.');
   const problem = checkShiftTimes(input.startMin, input.endMin, input.breakMin);
@@ -317,9 +325,11 @@ export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftI
   return row!.id;
 }
 
-export async function deleteShift(db: AppDatabase, p: Principal, shiftId: string): Promise<void> {
+export async function deleteShift(db: AppDatabase, p: Principal, shiftId: string, now = new Date()): Promise<void> {
   requirePlanner(p);
   if (!/^[0-9a-f-]{36}$/i.test(shiftId)) throw domainError('NOT_FOUND', 'Shift not found');
+  const [existing] = await db.select({ date: shifts.workDate }).from(shifts).where(eq(shifts.id, shiftId)).limit(1);
+  if (existing) assertPlannable(existing.date, now);
   const [row] = await db.delete(shifts).where(eq(shifts.id, shiftId)).returning({ id: shifts.id, date: shifts.workDate });
   if (!row) throw domainError('NOT_FOUND', 'Shift not found');
   await audit(db, p.userId, 'shift.delete', 'shift', row.id, { date: row.date });
@@ -328,6 +338,7 @@ export async function deleteShift(db: AppDatabase, p: Principal, shiftId: string
 /** Publishes a week so staff can see it. Refused while there are errors. */
 export async function publishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<void> {
   requirePlanner(p);
+  assertPlannable(weekStart, now);
   const view = await getWeekView(db, p, siteId, weekStart);
   if (hasBlockingViolation(view.violations)) {
     throw domainError('ROSTER_BLOCKED', 'Plan has errors', { errors: view.violations.filter((v) => v.severity === 'error').length });
@@ -339,15 +350,17 @@ export async function publishWeek(db: AppDatabase, p: Principal, siteId: string,
   await audit(db, p.userId, 'roster.publish', 'roster_week', `${siteId}:${weekStart}`);
 }
 
-export async function unpublishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string): Promise<void> {
+export async function unpublishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<void> {
   requirePlanner(p);
+  assertPlannable(weekStart, now);
   await db.update(rosterWeeks).set({ status: 'DRAFT' }).where(and(eq(rosterWeeks.site, siteId), eq(rosterWeeks.weekStart, weekStart)));
   await audit(db, p.userId, 'roster.unpublish', 'roster_week', `${siteId}:${weekStart}`);
 }
 
 /** Copies last week's shifts into an empty week (a starting point to adjust). Returns how many. */
-export async function copyWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string): Promise<number> {
+export async function copyWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<number> {
   requirePlanner(p);
+  assertPlannable(weekStart, now);
   const from = addDays(weekStart, -7);
   const existing = await db.select({ id: shifts.id }).from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, weekStart), lte(shifts.workDate, addDays(weekStart, 6)))).limit(1);
   if (existing.length > 0) throw domainError('VALIDATION_FAILED', 'Diese Woche hat schon Schichten.');

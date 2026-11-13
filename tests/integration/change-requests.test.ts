@@ -13,6 +13,8 @@ import { publishWeek, saveProfile, saveShift } from '@/server/services/roster-se
 import { createTestDatabase } from '../helpers/db';
 
 const t = (s: string) => parseTime(s)!;
+/** These past shifts were planned weeks ahead (the current week is frozen now). */
+const early = new Date('2026-10-01T09:00:00Z');
 
 describe('change requests', () => {
   let db: AppDatabase;
@@ -36,9 +38,9 @@ describe('change requests', () => {
     staff = await principal('winti-vn@asiaway.test');
     other = await principal('winti-th@asiaway.test');
     await saveProfile(db, planner, staff.userId, { site: 'winterthur', employmentType: 'FULL_TIME', pensumPercent: 100, active: true });
-    pastShift = await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    pastShift = await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, early);
     futureShift = await saveShift(db, planner, { site: 'winterthur', date: '2026-11-17', userId: staff.userId, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
-    await publishWeek(db, planner, 'winterthur', '2026-11-09', now);
+    await publishWeek(db, planner, 'winterthur', '2026-11-09', early);
     await publishWeek(db, planner, 'winterthur', '2026-11-16', now);
   }, 60_000);
   afterAll(async () => close());

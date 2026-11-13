@@ -4,6 +4,7 @@ import { parseTime, weekDates } from '@/domain/roster';
 import type { Principal } from '@/domain/roles';
 import type { AppDatabase } from '@/server/db/client';
 import { shifts, users } from '@/server/db/schema';
+import { copyWeek, deleteShift, publishWeek, saveShift, unpublishWeek } from '@/server/services/roster-service';
 import { loadPrincipalForUser } from '@/server/auth/session';
 import { seedSampleData } from '@/server/seed/sample-data';
 import { weeksOfMonth } from '@/domain/availability';
@@ -147,5 +148,23 @@ describe('everything is connected', () => {
     await submitMonth(db, casual, '2027-02', now);
     expect((await getAvailabilityMonth(db, casual, casual.userId, '2027-02')).submittedAt).not.toBeNull();
     expect(weekDates('2026-12-07')).toHaveLength(7);
+  });
+
+  it('9. the current week is frozen: planning starts with next week', async () => {
+    // today is Friday 13 Nov 2026: the week of 9 Nov is already planned and cannot be changed, 16 Nov can
+    const input = { site: 'winterthur', userId: full.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null };
+    await expect(saveShift(db, planner, { ...input, date: '2026-11-13' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', message: expect.stringContaining('gesperrt') });
+    await expect(saveShift(db, planner, { ...input, date: '2026-11-09' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(publishWeek(db, planner, 'winterthur', '2026-11-09', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(unpublishWeek(db, planner, 'winterthur', '2026-11-09', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(copyWeek(db, planner, 'winterthur', '2026-11-09', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    const next = await saveShift(db, planner, { ...input, date: '2026-11-16' }, now);
+    await deleteShift(db, planner, next, now);
+    // the month suggestion leaves the current week alone and starts with 16 Nov
+    const r = await suggestMonth(db, planner, 'winterthur', '2026-11', now);
+    expect(r.weeks.find((w) => w.weekStart === '2026-11-09')!.skipped).toBe('PAST');
+    expect(r.weeks.find((w) => w.weekStart === '2026-11-16')!.skipped).toBeNull();
+    // planning is open again once that week has begun? No: from Monday 16 Nov that week is frozen too
+    await expect(saveShift(db, planner, { ...input, date: '2026-11-17' }, new Date('2026-11-16T08:00:00Z'))).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 });

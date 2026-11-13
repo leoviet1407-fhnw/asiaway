@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { ROSTER_SITES, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { FROZEN_MESSAGE, ROSTER_SITES, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { needFor } from '../../domain/season';
 import { findGaps, suggestShifts, type GapInfo, type Service, type SuggestGap, type SuggestPerson } from '../../domain/suggest';
@@ -89,6 +89,7 @@ export async function previewWeek(db: AppDatabase, p: Principal, siteId: string,
 }
 
 export async function suggestWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<SuggestionResult> {
+  if (weekStart < firstPlannableWeek(todayIso(now))) throw domainError('VALIDATION_FAILED', FROZEN_MESSAGE);
   const { ctx, result } = await compute(db, p, siteId, weekStart);
   for (const s of result.shifts) {
     await saveShift(db, p, { site: siteId, date: s.date, userId: s.userId, startMin: s.startMin, endMin: s.endMin, breakMin: 0, station: stationFor(siteId, ctx.team.find((m) => m.userId === s.userId)), roleLabel: null }, now);
@@ -105,10 +106,10 @@ export interface MonthSuggestion {
 export async function suggestMonth(db: AppDatabase, p: Principal, siteId: string, month: string, now = new Date()): Promise<MonthSuggestion> {
   if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
-  const thisWeek = mondayOf(todayIso(now));
+  const firstWeek = firstPlannableWeek(todayIso(now)); // the current week is frozen: planning starts next week
   const weeks: MonthSuggestion['weeks'] = [];
   for (const weekStart of weeksOfMonth(month)) {
-    if (weekStart < thisWeek) {
+    if (weekStart < firstWeek) {
       weeks.push({ weekStart, created: 0, skipped: 'PAST', gaps: [] });
       continue;
     }
@@ -138,6 +139,7 @@ export async function publishMonth(db: AppDatabase, p: Principal, siteId: string
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
   const out: MonthPublish = { published: [], blocked: [], empty: [] };
   for (const weekStart of weeksOfMonth(month)) {
+    if (weekStart < firstPlannableWeek(todayIso(now))) continue; // frozen weeks are left alone
     const dates = weekDates(weekStart);
     const any = await db.select({ id: shifts.id }).from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))).limit(1);
     if (any.length === 0) {

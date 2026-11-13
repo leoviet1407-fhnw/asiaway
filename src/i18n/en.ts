@@ -750,6 +750,8 @@ export const EN: Record<string, string> = {
   'An welchen Tagen arbeitet diese Person? Nur an diesen Tagen wird sie eingeteilt, an den anderen nicht. Leer lassen = jeden Tag.': 'On which days does this person work? She or he is only planned on these days, not on the others. Leave empty = every day.',
   'Standortwochentag': 'Site weekday',
 
+  // --- Frozen weeks ---
+  'Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.': 'This week is locked: it is already planned. Planning starts with next week.',
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

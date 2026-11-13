@@ -31,6 +31,8 @@ import { decideAbsence, publishWeek, requestAbsence, saveProfile, saveShift } fr
 import { createTestDatabase } from '../helpers/db';
 
 const t = (s: string) => parseTime(s)!;
+/** These past shifts were planned weeks ahead (the current week is frozen now). */
+const early = new Date('2026-10-01T09:00:00Z');
 
 describe('vacation and overtime rules', () => {
   it('counts weekdays only', () => {
@@ -93,14 +95,14 @@ describe('hours service', () => {
     staff = await principal('winti-vn@asiaway.test');
     other = await principal('winti-th@asiaway.test');
     await saveProfile(db, planner, staff.userId, { site: 'winterthur', employmentType: 'FULL_TIME', pensumPercent: 100, active: true });
-    shiftId = await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
-    await saveShift(db, planner, { site: 'winterthur', date: '2026-11-11', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    shiftId = await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, early);
+    await saveShift(db, planner, { site: 'winterthur', date: '2026-11-11', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, early);
   });
   afterAll(async () => close());
 
   it('offers only published shifts, and counts past ones as worked as planned', async () => {
     expect((await getMonthHours(db, staff, staff.userId, '2026-11', now)).planned).toEqual([]);
-    await publishWeek(db, planner, 'winterthur', '2026-11-09', now);
+    await publishWeek(db, planner, 'winterthur', '2026-11-09', early);
     // Shifts that are over count as worked as planned by themselves: nobody has to tap anything
     const month = await getMonthHours(db, staff, staff.userId, '2026-11', now);
     expect(month.planned).toHaveLength(2);

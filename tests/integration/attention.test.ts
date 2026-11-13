@@ -13,6 +13,8 @@ import { getMonthHours, approveMonth } from '@/server/services/hours-service';
 import { createTestDatabase } from '../helpers/db';
 
 const t = (s: string) => parseTime(s)!;
+/** These past shifts were planned weeks ahead (the current week is frozen now). */
+const early = new Date('2026-10-01T09:00:00Z');
 
 describe('what the Leitung still has to do', () => {
   let db: AppDatabase;
@@ -52,8 +54,8 @@ describe('what the Leitung still has to do', () => {
   });
 
   it('hours of past published shifts are recorded by themselves, and last month still needs approval', async () => {
-    await saveShift(db, planner, { site: 'winterthur', date: '2026-10-20', userId: staff.userId, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
-    await publishWeek(db, planner, 'winterthur', '2026-10-19', now);
+    await saveShift(db, planner, { site: 'winterthur', date: '2026-10-20', userId: staff.userId, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, early);
+    await publishWeek(db, planner, 'winterthur', '2026-10-19', early);
     expect((await getPlannerTodos(db, planner, now)).some((x) => x.key === 'APPROVE' && x.detail.includes('Mitarbeiter Winti VN'))).toBe(true);
     const oct = await getMonthHours(db, staff, staff.userId, '2026-10', now);
     expect(oct.entries).toHaveLength(1);

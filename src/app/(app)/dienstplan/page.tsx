@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
-import { formatTime, mondayOf, addDays, stationsOf, ROSTER_SITES } from '@/domain/roster';
+import { formatTime, mondayOf, addDays, stationsOf, ROSTER_SITES, isFrozen } from '@/domain/roster';
 import { isPlanner } from '@/domain/roles';
 import { formatDay, todayIso } from '@/lib/dates';
 import { withBase } from '@/lib/base-path';
@@ -41,10 +41,11 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
   const week = mondayOf(params.woche && /^\d{4}-\d{2}-\d{2}$/.test(params.woche) ? params.woche : today);
   const view = await getWeekView(database, p, site.id, week);
   const mine = profile ? await listMyShifts(database, p, today, addDays(today, 14)) : [];
-  const gaps = planner && !view.hidden ? await listGaps(database, p, site.id, week) : [];
+  const frozen = isFrozen(week, today); // the current and past weeks are planned already
+  const gaps = planner && !view.hidden && !frozen ? await listGaps(database, p, site.id, week) : [];
   // WhatsApp: the whole week to a group, or one message per person with their own shifts
   let whatsapp: { group: string; people: { id: string; name: string; link: string; hasNumber: boolean }[] } | null = null;
-  if (planner && !view.hidden && view.status === 'PUBLISHED') {
+  if (planner && !view.hidden && view.status === 'PUBLISHED' && !frozen) {
     const host = (await headers()).get('host');
     const url = host ? `https://${host}/dienstplan?site=${site.id}&woche=${week}` : '';
     const team = await listTeam(database, site.id);
@@ -147,9 +148,10 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
             availability={view.availability}
             absences={view.absences}
             violations={view.violations}
-            editable={planner}
+            editable={planner && !frozen}
           />
-          {planner && <GapPanel site={site.id} gaps={gaps} />}
+          {planner && frozen && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.')}</p>}
+          {planner && !frozen && <GapPanel site={site.id} gaps={gaps} />}
           {whatsapp && (
             <details className="card">
               <summary className="cursor-pointer text-lg font-semibold text-navy">{t('Per WhatsApp mitteilen')}</summary>

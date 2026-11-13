@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { ROSTER_SITES, addDays, dueMonth, mondayOf, mustReportTimes } from '../../domain/roster';
+import { ROSTER_SITES, addDays, dueMonth, firstPlannableWeek, mustReportTimes } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import type { AppDatabase } from '../db/client';
 import { absences, rosterWeeks, shifts, timeMonthApprovals } from '../db/schema';
@@ -30,8 +30,8 @@ const dm = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.`;
 export async function getPlannerTodos(db: AppDatabase, p: Principal, now = new Date()): Promise<Todo[]> {
   if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
   const today = todayIso(now);
-  const thisWeek = mondayOf(today);
-  const upcoming = [0, 1, 2, 3].map((i) => addDays(thisWeek, i * 7));
+  const firstWeek = firstPlannableWeek(today); // the current week is frozen: planning starts next week
+  const upcoming = [0, 1, 2, 3].map((i) => addDays(firstWeek, i * 7));
   const out: Todo[] = [];
 
   const requests = await countOpenRequests(db, p);

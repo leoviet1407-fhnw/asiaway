@@ -28,8 +28,10 @@ describe('overview', () => {
     planner = await principal('besteller@asiaway.test');
     staff = await principal('winti-vn@asiaway.test');
     const t = (s: string) => parseTime(s)!;
-    await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
-    await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('17:00'), endMin: t('22:00'), breakMin: 30, station: '1. OG', roleLabel: null }, now);
+/** These past shifts were planned weeks ahead (the current week is frozen now). */
+const early = new Date('2026-10-01T09:00:00Z');
+    await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, early);
+    await saveShift(db, planner, { site: 'winterthur', date: '2026-11-10', userId: staff.userId, startMin: t('17:00'), endMin: t('22:00'), breakMin: 30, station: '1. OG', roleLabel: null }, early);
     await saveClosing(db, staff, { locationId: 'winti-vn', businessDate: '2026-11-12', station: '1. OG', cashCountedCents: 72800, startFloatCents: 30000, eftCents: 226725, mobileCents: 0, posGrossCents: 258460, note: null }, now);
   });
   afterAll(async () => close());

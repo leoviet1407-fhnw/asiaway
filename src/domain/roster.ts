@@ -26,6 +26,14 @@ export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'ON_CALL' | 'MANAGEMENT
  * Staff with a Pensum only enter their holiday and work the plan. Casual staff (Aushilfen)
  * enter the times they can work. The Leitung (no Pensum, not casual) enters nothing.
  */
+/**
+ * The current week is frozen: it was planned a week ahead and cannot be changed any more.
+ * Planning starts with next week. (Staff can still ask for a change; the Leitung approves it.)
+ */
+export const firstPlannableWeek = (today: string): string => addDays(mondayOf(today), 7);
+export const isFrozen = (date: string, today: string): boolean => date < firstPlannableWeek(today);
+export const FROZEN_MESSAGE = 'Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.';
+
 /** Weekday number: 1 = Monday … 7 = Sunday. */
 export const weekdayNo = (iso: string): number => ((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
 
