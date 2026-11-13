@@ -737,6 +737,19 @@ export const EN: Record<string, string> = {
   '{site}: Stunden vom Vormonat freigeben ({n})': '{site}: approve last month\'s hours ({n})',
   'Ihre Schichten zählen automatisch wie geplant. War es anders (länger oder kürzer)? Dann „Ändern“ und eine Änderung anfragen – die Leitung bestätigt sie.': 'Your shifts count as planned automatically. Was it different (longer or shorter)? Then tap "Ändern" and request a change – the management confirms it.',
 
+  // --- Fixed days per site ---
+  'Arbeitet in {site} an': 'Works in {site} on',
+  'Mo': 'Mon',
+  'Di': 'Tue',
+  'Mi': 'Wed',
+  'Do': 'Thu',
+  'Fr': 'Fri',
+  'Sa': 'Sat',
+  'So': 'Sun',
+  'Feste Arbeitstage': 'Fixed working days',
+  'An welchen Tagen arbeitet diese Person? Nur an diesen Tagen wird sie eingeteilt, an den anderen nicht. Leer lassen = jeden Tag.': 'On which days does this person work? She or he is only planned on these days, not on the others. Leave empty = every day.',
+  'Standortwochentag': 'Site weekday',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',
@@ -838,4 +851,5 @@ export const PATTERNS: [RegExp, string][] = [
   [/^Ungültiger Barcode (\S+) \(Prüfziffer\)$/, 'Invalid barcode $1 (check digit)'],
   [/^Barcode (\S+) gehört schon zu einem anderen Artikel$/, 'Barcode $1 already belongs to another item'],
   [/^Am (\S+) \((.+)\) sind schon (\d+) Personen abwesend, erlaubt sind (\d+)\. Bitte andere Tage wählen oder die Leitung fragen\.$/, 'On $1 ($2) $3 people are already away; $4 are allowed. Please choose other days or ask the management.'],
+  [/^(.+), (\d{2}\.\d{2}\.): arbeitet an diesem Wochentag normalerweise nicht hier\.$/, '$1, $2: does not normally work here on this weekday.'],
 ];

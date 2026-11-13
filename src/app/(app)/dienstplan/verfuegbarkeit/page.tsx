@@ -74,6 +74,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         </div>
       )}
 
+      {!reports && planner && <PatternPanel key={`pattern-${userId}`} userId={userId} rows={patternRows} fixedDays />}
+
       {reports && (
       <>
       <div className="rounded-btn bg-navy p-4 text-white">

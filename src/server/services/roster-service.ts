@@ -11,6 +11,7 @@ import {
   monthDates,
   stationsOf,
   validateRoster,
+  worksAtSiteOn,
   weekDates,
   type Absence,
   type AbsenceStatus,
@@ -25,6 +26,7 @@ import {
 import { todayIso } from '../../lib/dates';
 import { hashPassword } from '../auth/password';
 import { assertVacationAllowed } from './season-service';
+import { getSiteDays } from './pattern-service';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import {
@@ -259,6 +261,13 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
     // Shifts of the same people at the other site count for rest time and weekly hours
     const everywhere = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
     violations = validateRoster({ weekStart, people, shifts: everywhere.map(toShift), availability: avail, absences: abs });
+    // Someone planned on a weekday they normally do not work at this site
+    const siteDayRows = await getSiteDays(db, ids);
+    for (const s of weekShifts) {
+      if (s.userId && !worksAtSiteOn(siteDayRows.get(s.userId)?.get(siteId), s.date)) {
+        violations.push({ severity: 'warn', code: 'SITE_DAY', userId: s.userId, date: s.date, message: `${people.find((x) => x.userId === s.userId)?.name ?? ''}, ${s.date.slice(8)}.${s.date.slice(5, 7)}.: arbeitet an diesem Wochentag normalerweise nicht hier.` });
+      }
+    }
   }
   return { site: siteId, weekStart, status, publishedAt: week?.publishedAt ?? null, people, shifts: weekShifts, availability: avail, absences: abs, violations, hidden: false };
 }

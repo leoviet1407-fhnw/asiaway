@@ -26,6 +26,15 @@ export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'ON_CALL' | 'MANAGEMENT
  * Staff with a Pensum only enter their holiday and work the plan. Casual staff (Aushilfen)
  * enter the times they can work. The Leitung (no Pensum, not casual) enters nothing.
  */
+/** Weekday number: 1 = Monday … 7 = Sunday. */
+export const weekdayNo = (iso: string): number => ((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+
+/**
+ * Whether a person may be planned at a site on a date. \`allowed\` are the weekdays set for that
+ * site; none set (undefined or empty) means every day.
+ */
+export const worksAtSiteOn = (allowed: readonly number[] | undefined, date: string): boolean => !allowed || allowed.length === 0 || allowed.includes(weekdayNo(date));
+
 export const mustReportTimes = (type: EmploymentType): boolean => type === 'ON_CALL';
 export const worksByPlan = (p: { employmentType: EmploymentType; pensumPercent: number | null }): boolean => (p.employmentType === 'FULL_TIME' || p.employmentType === 'PART_TIME') && p.pensumPercent !== null;
 
@@ -70,7 +79,8 @@ export interface RosterStation {
 export const ROSTER_STATIONS: Record<string, readonly RosterStation[]> = {
   oerlikon: [
     { name: 'Service', title: 'Service', color: '#ffc000' },
-    { name: 'Küche', title: 'Küche', color: '#a9d18e' },
+    { name: 'Buffet', title: 'Buffet', color: '#a9d18e' },
+    { name: 'Küche', title: 'Küche', color: '#b4d7a0' },
     { name: 'Bar', title: 'Bar', color: '#c3d0ea' },
     { name: 'Reinigung', title: 'Reinigung', color: '#ffe699' },
     { name: 'Office', title: 'Office – Administration', color: '#adb9ca' },

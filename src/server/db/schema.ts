@@ -436,3 +436,9 @@ export const vacationRules = pgTable('vacation_rules', {
   label: text('label').notNull(),
   maxPeople: integer('max_people').notNull(),
 });
+
+export const siteDays = pgTable('site_days', {
+  userId: uuid('user_id').notNull(),
+  site: text('site').notNull(),
+  weekday: integer('weekday').notNull(),
+});

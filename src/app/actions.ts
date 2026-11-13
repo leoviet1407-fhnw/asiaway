@@ -26,7 +26,7 @@ import {
   saveYearlyBalance,
 } from '@/server/services/hours-service';
 import { deriveNeedsFromWeek, saveNeeds } from '@/server/services/coverage-service';
-import { applyPattern, fillMissingFromPatterns, savePattern } from '@/server/services/pattern-service';
+import { applyPattern, fillMissingFromPatterns, savePattern, saveSiteDays } from '@/server/services/pattern-service';
 import { deleteSpecialDay, deleteVacationRule, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
 import { fillGap, publishMonth, suggestMonth, suggestWeek } from '@/server/services/suggest-service';
 import { decideChangeRequest, requestChange, withdrawChangeRequest, type ChangeKind } from '@/server/services/change-request-service';
@@ -510,7 +510,15 @@ function profileFrom(form: FormData) {
 export async function saveProfileAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
   try {
     const p = await requirePrincipal();
-    await saveProfile(await db(), p, String(form.get('userId')), profileFrom(form));
+    const input = profileFrom(form);
+    const userId = String(form.get('userId'));
+    await saveProfile(await db(), p, userId, input);
+    // Weekdays per site: only for the sites the person works at
+    const perSite: Record<string, number[]> = {};
+    for (const site of [input.site, ...input.extraSites]) {
+      if (form.has(`daysSite:${site}`)) perSite[site] = form.getAll(`days:${site}`).map(Number);
+    }
+    if (Object.keys(perSite).length > 0) await saveSiteDays(await db(), p, userId, perSite);
     revalidatePath('/dienstplan', 'layout');
     return { saved: true };
   } catch (error) {

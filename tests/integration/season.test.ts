@@ -6,7 +6,7 @@ import type { AppDatabase } from '@/server/db/client';
 import { shifts, users } from '@/server/db/schema';
 import { loadPrincipalForUser } from '@/server/auth/session';
 import { seedSampleData } from '@/server/seed/sample-data';
-import { applyPattern, fillMissingFromPatterns, getPattern, savePattern } from '@/server/services/pattern-service';
+import { applyPattern, fillMissingFromPatterns, getPattern, getSiteDays, savePattern, saveSiteDays } from '@/server/services/pattern-service';
 import { getCoverage, saveNeeds } from '@/server/services/coverage-service';
 import { deleteVacationRule, listSpecialDays, listVacationRules, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
 import { getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift, submissionOverview } from '@/server/services/roster-service';
@@ -139,5 +139,31 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     expect(after.days[0]!.offeredLunch).toBe(before.days[0]!.offeredLunch);
     expect(after.silent).not.toContain('Aushilfe Muster');
     expect((await submissionOverview(db, planner, 'winterthur', '2027-05')).find((o) => o.person.userId === casual.userId)!.hasPattern).toBe(true);
+  });
+
+  it('people who work at a site only on certain weekdays are planned only then', async () => {
+    const week = '2027-06-07';
+    await saveNeeds(db, planner, 'winterthur', Array.from({ length: 7 }, () => ({ lunchPeople: 1, dinnerPeople: 0 })));
+    await saveSiteDays(db, planner, a.userId, { winterthur: [4, 5] }); // a works here only on Thursdays and Fridays
+    await saveSiteDays(db, planner, b.userId, { winterthur: [2, 3] });
+    expect((await getSiteDays(db, [a.userId])).get(a.userId)?.get('winterthur')).toEqual([4, 5]);
+    await expect(saveSiteDays(db, a, a.userId, { winterthur: [1] })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const r = await suggestWeek(db, planner, 'winterthur', week, now);
+    const rows = (await db.select().from(shifts)).filter((x) => x.workDate >= week && x.workDate <= '2027-06-13');
+    // a only Thu/Fri, b only Tue/Wed; the other days stay empty (nobody else is available)
+    for (const x of rows) {
+      const day = new Date(`${x.workDate}T00:00:00Z`).getUTCDay();
+      if (x.userId === a.userId) expect([4, 5]).toContain(day);
+      if (x.userId === b.userId) expect([2, 3]).toContain(day);
+    }
+    expect(r.created).toBe(4);
+    expect(r.gaps.length).toBe(3);
+    // planning someone on another weekday is a warning in the week view
+    await saveShift(db, planner, { site: 'winterthur', date: '2027-06-14', userId: a.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    const view = await getWeekView(db, planner, 'winterthur', '2027-06-14');
+    expect(view.violations.some((v) => v.code === 'SITE_DAY' && v.userId === a.userId)).toBe(true);
+    // all seven days = no restriction
+    await saveSiteDays(db, planner, a.userId, { winterthur: [1, 2, 3, 4, 5, 6, 7] });
+    expect((await getSiteDays(db, [a.userId])).get(a.userId)?.get('winterthur')).toBeUndefined();
   });
 });

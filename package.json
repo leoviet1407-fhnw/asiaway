@@ -16,6 +16,7 @@
     "db:bootstrap": "tsx scripts/bootstrap.ts",
     "seed:catalog": "tsx scripts/seed-catalog.ts",
     "user:add": "tsx scripts/add-user.ts",
+    "user:rename": "tsx scripts/rename-user.ts",
     "items:import": "tsx scripts/import-items.ts",
     "icons": "tsx scripts/make-icons.ts"
   },

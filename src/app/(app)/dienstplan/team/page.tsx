@@ -8,6 +8,7 @@ import { db } from '@/server/db';
 import { listPendingAbsences, listTeam, submissionOverview } from '@/server/services/roster-service';
 import { AbsenceDecision, BalanceForm, NewMemberForm, ProfileForm } from './TeamForms';
 import { formatOvertime, vacationNeedsAttention } from '@/domain/hours';
+import { getSiteDays } from '@/server/services/pattern-service';
 import { getYearlyBalance, teamBalances } from '@/server/services/hours-service';
 import { getT } from '@/i18n/server';
 
@@ -34,6 +35,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     listPendingAbsences(database, p, site.id),
     listTeam(database, site.id, { includeInactive: true }),
   ]);
+  const siteDaysMap = await getSiteDays(database, team.map((m) => m.userId));
   const yearly = await Promise.all(team.map((m) => getYearlyBalance(database, m.userId, year)));
   const href = (m: string, s = site.id) => `/dienstplan/team?site=${s}&monat=${m}`;
   // Only casual staff report the times they can work; people with a Pensum enter holiday only
@@ -132,7 +134,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <ul className="space-y-3">
           {team.map((m, i) => (
             <li key={m.userId} className="card space-y-3">
-              <ProfileForm member={{ ...m, stations: stationsOf(m.site).map((s) => s.name) }} />
+              <ProfileForm member={{ ...m, stations: stationsOf(m.site).map((s) => s.name), siteDays: Object.fromEntries(siteDaysMap.get(m.userId) ?? []) }} />
               <BalanceForm userId={m.userId} year={year} vacationDays={yearly[i]!.vacationDays} vacationCarry={yearly[i]!.vacationCarry} overtimeCarryHours={yearly[i]!.overtimeCarryMin / 60} />
             </li>
           ))}

@@ -94,3 +94,35 @@ export async function fillMissingFromPatterns(db: AppDatabase, p: Principal, sit
   }
   return { people, days };
 }
+
+// --- Weekdays per site ("Belle works at Oerlikon only on Saturdays") -------------------------------------
+import { siteDays } from '../db/schema';
+import { ROSTER_SITES } from '../../domain/roster';
+
+/** user -> site -> allowed weekdays; a site missing for a user means no restriction. */
+export type SiteDaysMap = Map<string, Map<string, number[]>>;
+
+export async function getSiteDays(db: AppDatabase, userIds: readonly string[]): Promise<SiteDaysMap> {
+  const map: SiteDaysMap = new Map();
+  if (userIds.length === 0) return map;
+  for (const r of await db.select().from(siteDays).where(inArray(siteDays.userId, [...userIds]))) {
+    const bySite = map.get(r.userId) ?? new Map<string, number[]>();
+    bySite.set(r.site, [...(bySite.get(r.site) ?? []), r.weekday].sort());
+    map.set(r.userId, bySite);
+  }
+  return map;
+}
+
+/** Saves the weekdays a person works at each site. All seven days (or none) means no restriction. */
+export async function saveSiteDays(db: AppDatabase, p: Principal, userId: string, perSite: Record<string, number[]>): Promise<void> {
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
+  await db.transaction(async (tx) => {
+    for (const [site, raw] of Object.entries(perSite)) {
+      if (!ROSTER_SITES.some((s) => s.id === site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
+      const days = [...new Set(raw)].filter((d) => Number.isInteger(d) && d >= 1 && d <= 7);
+      await tx.delete(siteDays).where(and(eq(siteDays.userId, userId), eq(siteDays.site, site)));
+      if (days.length > 0 && days.length < 7) await tx.insert(siteDays).values(days.map((weekday) => ({ userId, site, weekday })));
+    }
+  });
+  await audit(db, p.userId, 'site-days.save', 'user', userId, perSite);
+}

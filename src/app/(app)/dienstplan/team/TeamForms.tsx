@@ -8,7 +8,7 @@ import { useT } from '@/i18n/client';
 
 const TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'];
 
-export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean; usualStation: string | null; usualFromMin: number | null; usualToMin: number | null; phone: string | null; stations: string[] } }) {
+export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean; usualStation: string | null; usualFromMin: number | null; usualToMin: number | null; phone: string | null; stations: string[]; siteDays: Record<string, number[]> } }) {
   const t = useT();
   const [state, action, pending] = useActionState(saveProfileAction, undefined);
   const [type, setType] = useState<EmploymentType>(member.employmentType);
@@ -54,6 +54,24 @@ export function ProfileForm({ member }: { member: { userId: string; name: string
           <input id={`ph-${member.userId}`} name="phone" inputMode="tel" className="w-full" placeholder="079 123 45 67" defaultValue={member.phone ?? ''} />
         </div>
       </div>
+      {[member.site, ...member.extraSites].map((siteId) => {
+        const site = ROSTER_SITES.find((s) => s.id === siteId);
+        if (!site) return null;
+        const allowed = member.siteDays[siteId] ?? [];
+        return (
+          <fieldset key={siteId} className="col-span-full">
+            <legend className="label">{t('Arbeitet in {site} an', { site: site.name })}</legend>
+            <input type="hidden" name={`daysSite:${siteId}`} value="1" />
+            <div className="flex flex-wrap gap-2">
+              {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d, i) => (
+                <label key={d} className="flex items-center gap-1 text-sm">
+                  <input type="checkbox" name={`days:${siteId}`} value={i + 1} defaultChecked={allowed.length === 0 || allowed.includes(i + 1)} className="min-h-0 accent-brand-600" /> {t(d)}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        );
+      })}
       {ROSTER_SITES.filter((s) => s.id !== member.site).map((s) => (
         <label key={s.id} className="col-span-full flex items-center gap-1 text-sm">
           <input type="checkbox" name="extraSite" value={s.id} defaultChecked={member.extraSites.includes(s.id)} className="min-h-0 accent-brand-600" /> {t('Arbeitet auch in {site}', { site: s.name })}

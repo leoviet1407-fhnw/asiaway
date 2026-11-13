@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { ROSTER_SITES, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { ROSTER_SITES, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { needFor } from '../../domain/season';
 import { findGaps, suggestShifts, type GapInfo, type Service, type SuggestGap, type SuggestPerson } from '../../domain/suggest';
@@ -10,6 +10,7 @@ import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import { absences, availability, availabilityPatterns, shifts } from '../db/schema';
 import { getNeeds } from './coverage-service';
+import { getSiteDays } from './pattern-service';
 import { listTeam, publishWeek, saveShift, type TeamMember } from './roster-service';
 import { listSpecialDays } from './season-service';
 
@@ -38,6 +39,9 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
       else if (worksByPlan(m)) offers.push({ userId: m.userId, date, kind: 'AVAILABLE', fromMin: null, toMin: null });
     });
   }
+  // Some people work here only on certain weekdays (e.g. Belle at Oerlikon only on Saturdays)
+  const days = await getSiteDays(db, ids);
+  for (let i = offers.length - 1; i >= 0; i--) if (!worksAtSiteOn(days.get(offers[i]!.userId)?.get(siteId), offers[i]!.date)) offers.splice(i, 1);
   const away = ids.length ? await db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, dates[6]!), gte(absences.endDate, dates[0]!))) : [];
   const other = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), ne(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
   const planned = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
