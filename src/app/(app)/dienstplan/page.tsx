@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
-import { formatTime, mondayOf, addDays, stationsOf, ROSTER_SITES, isFrozen } from '@/domain/roster';
+import { formatTime, mondayOf, addDays, stationsOf, ROSTER_SITES, isFrozen, firstPlannableWeek } from '@/domain/roster';
 import { isPlanner } from '@/domain/roles';
 import { formatDay, todayIso } from '@/lib/dates';
 import { withBase } from '@/lib/base-path';
@@ -38,7 +38,8 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
   }
   const site = sites.find((s) => s.id === params.site) ?? sites.find((s) => s.id === profile?.site) ?? sites[0]!;
   const today = todayIso();
-  const week = mondayOf(params.woche && /^\d{4}-\d{2}-\d{2}$/.test(params.woche) ? params.woche : today);
+  // The Leitung opens the first week that can still be planned (next week); staff see the current week
+  const week = mondayOf(params.woche && /^\d{4}-\d{2}-\d{2}$/.test(params.woche) ? params.woche : planner ? firstPlannableWeek(today) : today);
   const view = await getWeekView(database, p, site.id, week);
   const mine = profile ? await listMyShifts(database, p, today, addDays(today, 14)) : [];
   const frozen = isFrozen(week, today); // the current and past weeks are planned already

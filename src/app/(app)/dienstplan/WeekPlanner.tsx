@@ -139,7 +139,7 @@ export function WeekPlanner(props: Props) {
               })
             }
           >
-            {t('Plan vorschlagen')}
+            {t('Diese Woche vorschlagen')}
           </button>
           <button
             className="btn-secondary min-h-0 px-3 py-1.5 text-sm"

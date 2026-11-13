@@ -756,6 +756,7 @@ export const EN: Record<string, string> = {
   'Passwort anzeigen': 'Show password',
   'Passwort verbergen': 'Hide password',
 
+  'Diese Woche vorschlagen': 'Suggest this week',
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',
