@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
-import { isAdmin, isOrderer, type Principal } from '../../domain/roles';
+import { isAdmin, isPlanner, type Principal } from '../../domain/roles';
 import { weekStatus, weeksOfMonth, weeksToCheck } from '../../domain/availability';
 import {
   LEAD_DAYS,
@@ -41,8 +41,7 @@ import {
 } from '../db/schema';
 
 // --- Who may do what --------------------------------------------------------------------
-/** Planners (Besteller/Leitung and admins) make the plan, for every site. */
-export const isPlanner = isOrderer;
+export { isPlanner };
 
 /** Whether a profile belongs to the roster of a site (main site or one of the extra sites). */
 export const worksAt = (profile: { site: string; extraSites?: readonly string[] | null } | null | undefined, siteId: string) =>

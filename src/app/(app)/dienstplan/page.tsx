@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { formatTime, mondayOf, addDays, stationsOf, ROSTER_SITES } from '@/domain/roster';
-import { isOrderer } from '@/domain/roles';
+import { isPlanner } from '@/domain/roles';
 import { formatDay, todayIso } from '@/lib/dates';
 import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
@@ -20,7 +20,7 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const database = await db();
   const sites = await sitesFor(database, p);
-  const planner = isOrderer(p);
+  const planner = isPlanner(p);
   const profile = await getProfile(database, p.userId);
 
   if (sites.length === 0) {

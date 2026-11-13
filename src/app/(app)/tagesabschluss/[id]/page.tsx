@@ -55,6 +55,10 @@ export default async function ClosingPage({ params, searchParams }: { params: Pr
 
       {gespeichert && <p className="rounded-btn bg-ok-50 p-3 font-semibold text-ok-500">{t('Gespeichert.')}</p>}
 
+      <a href={withBase(`/tagesabschluss/${id}/pdf`)} target="_blank" rel="noreferrer" className={`${approved ? 'btn-primary' : 'btn-secondary'} w-full`}>
+        {t('Drucken (PDF)')}
+      </a>
+
       {approved ? (
         <section className="card space-y-2">
           <Row label={t('Cashbestand (Kassa)')} value={chf(closing.cashCountedCents)} />

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { dueMonth, firstOpenDate, shiftMonth } from '@/domain/roster';
-import { isOrderer } from '@/domain/roles';
+import { isPlanner } from '@/domain/roles';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
@@ -23,7 +23,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const p = await requirePrincipal();
   const params = await searchParams;
   const database = await db();
-  const planner = isOrderer(p);
+  const planner = isPlanner(p);
   const today = todayIso();
 
   // The planner may open a colleague's page to enter their wishes.

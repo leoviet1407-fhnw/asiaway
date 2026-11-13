@@ -27,7 +27,7 @@ const email = values.email?.trim();
 const name = values.name?.trim();
 const roles = values.role ?? [];
 if (!email || !name || roles.length === 0) {
-  console.error('Usage: npm run user:add -- --email … --name … --role STAFF|ORDERER|ADMIN [--location oerlikon|winti-vn|winti-th]');
+  console.error('Usage: npm run user:add -- --email … --name … --role STAFF|ORDERER|PLANNER|ADMIN [--location oerlikon|winti-vn|winti-th]');
   process.exit(1);
 }
 
@@ -36,10 +36,10 @@ try {
   const known = new Set((await db.select().from(locations)).map((l) => l.id));
   const grants = roles.map((role, i) => {
     const r = role.toUpperCase();
-    if (r !== 'STAFF' && r !== 'ORDERER' && r !== 'ADMIN') throw new Error(`Unknown role ${role}`);
+    if (r !== 'STAFF' && r !== 'ORDERER' && r !== 'PLANNER' && r !== 'ADMIN') throw new Error(`Unknown role ${role}`);
     const loc = r === 'STAFF' ? values.location?.[i] ?? values.location?.[0] : null;
     if (r === 'STAFF' && (!loc || !known.has(loc))) throw new Error(`STAFF needs --location (one of ${[...known].join(', ')})`);
-    return { role: r as 'STAFF' | 'ORDERER' | 'ADMIN', locationId: loc ?? null };
+    return { role: r as 'STAFF' | 'ORDERER' | 'PLANNER' | 'ADMIN', locationId: loc ?? null };
   });
   const generated = !process.env.ADD_USER_PASSWORD;
   const password = process.env.ADD_USER_PASSWORD || randomBytes(9).toString('base64url');

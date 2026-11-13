@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { formatOvertime, formatWorked } from '@/domain/hours';
-import { isOrderer } from '@/domain/roles';
+import { isPlanner } from '@/domain/roles';
 import { shiftMonth } from '@/domain/roster';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -23,7 +23,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
   const p = await requirePrincipal();
   const params = await searchParams;
   const database = await db();
-  const planner = isOrderer(p);
+  const planner = isPlanner(p);
   const today = todayIso();
 
   let userId = p.userId;

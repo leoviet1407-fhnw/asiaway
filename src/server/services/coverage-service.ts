@@ -10,7 +10,7 @@ import {
   type DayNeed,
 } from '../../domain/availability';
 import { domainError } from '../../domain/errors';
-import { isOrderer, type Principal } from '../../domain/roles';
+import { isPlanner, type Principal } from '../../domain/roles';
 import { ROSTER_SITES, weekDates, shiftNetMinutes, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeklyMinutes } from '../../domain/hours';
 import { audit } from '../audit';
@@ -19,7 +19,7 @@ import { absences, availability, shifts, staffingNeeds } from '../db/schema';
 import { listTeam } from './roster-service';
 
 function requirePlanner(p: Principal) {
-  if (!isOrderer(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
 }
 
 function requireSite(siteId: string) {

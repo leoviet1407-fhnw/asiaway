@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { isOrderer } from '@/domain/roles';
+import { isOrderer, isPlanner } from '@/domain/roles';
 import { formatChf } from '@/domain/qty';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -7,6 +7,7 @@ import { db } from '@/server/db';
 import { addDays, dueMonth, formatTime, stationsOf } from '@/domain/roster';
 import { getAvailabilityMonth, getProfile, getWeekStatuses, listMyShifts } from '@/server/services/roster-service';
 import { getMonthHours } from '@/server/services/hours-service';
+import { countOpenRequests } from '@/server/services/change-request-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -27,6 +28,7 @@ export default async function HomePage() {
   const submitted = await listOrders(database, p, { statuses: ['SUBMITTED'] });
   const deliveries = await listReceivable(database, p);
   const orderer = isOrderer(p);
+  const planner = isPlanner(p);
   const profile = await getProfile(database, p.userId);
   const today = todayIso();
   const month = dueMonth(today);
@@ -35,6 +37,7 @@ export default async function HomePage() {
   let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
   let availability: { done: boolean; missingDays: number; shortWeeks: number } | null = null;
   let unconfirmed = 0;
+  const openRequests = profile || planner ? await countOpenRequests(database, p) : 0;
   if (profile) {
     myShifts = await listMyShifts(database, p, today, addDays(today, 13));
     const [status, reportMonth, hours] = await Promise.all([
@@ -52,6 +55,13 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl">{t('Hallo')} {p.name.split(' ')[0]}</h1>
+
+      {planner && openRequests > 0 && (
+        <Link href="/dienstplan/anfragen" className="block rounded-btn bg-navy p-4 text-white">
+          <div className="font-semibold">{t('{n} Änderungsanfragen warten', { n: openRequests })}</div>
+          <div className="text-sm text-white/85">{t('Mitarbeiter möchten Schichten oder Arbeitszeiten ändern.')}</div>
+        </Link>
+      )}
 
       {profile && availability && (
         <div className="space-y-3">
@@ -98,9 +108,12 @@ export default async function HomePage() {
                       <div className="font-semibold text-navy">{dayWord(s.date)}</div>
                       <div className="text-lg font-bold text-navy">{formatTime(s.startMin)}–{formatTime(s.endMin)}</div>
                     </div>
-                    <span className="rounded px-2.5 py-1 text-sm font-semibold" style={{ background: st?.color ?? '#e3e1df', color: st?.textColor ?? '#09141d' }}>
-                      {s.roleLabel ?? s.station}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="rounded px-2.5 py-1 text-sm font-semibold" style={{ background: st?.color ?? '#e3e1df', color: st?.textColor ?? '#09141d' }}>
+                        {s.roleLabel ?? s.station}
+                      </span>
+                      <Link href={`/dienstplan/anfragen?shift=${s.id}`} className="text-sm text-brand-600 underline">{t('Ändern')}</Link>
+                    </div>
                   </li>
                 );
               })}
@@ -114,11 +127,12 @@ export default async function HomePage() {
           <>
             <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} primary />
             <Action href="/dienstplan/stunden" icon="cash" label={t('Meine Stunden')} badge={unconfirmed} />
+            <Action href="/dienstplan/anfragen" icon="calendar" label={t('Änderungsanfragen')} badge={openRequests} />
             <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="calendar" label={t('Verfügbarkeit & Ferien')} />
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
             <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
             <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} />
-            {orderer && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
+            {planner && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
             <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
           </>
         ) : (
@@ -127,7 +141,8 @@ export default async function HomePage() {
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
             <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
             <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} />
-            {orderer && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
+            {planner && <Action href="/dienstplan/anfragen" icon="calendar" label={t('Änderungsanfragen')} badge={openRequests} />}
+            {planner && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
             <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
           </>
         )}

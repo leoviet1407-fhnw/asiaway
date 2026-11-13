@@ -7,15 +7,13 @@ import {
   type VacationBalance,
 } from '../../domain/hours';
 import { domainError } from '../../domain/errors';
-import { isOrderer, type Principal } from '../../domain/roles';
+import { isPlanner, type Principal } from '../../domain/roles';
 import { checkShiftTimes, monthDates, shiftNetMinutes, type AbsenceType, type Shift } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import { absences, rosterWeeks, shifts, timeEntries, timeMonthApprovals, yearlyBalances } from '../db/schema';
 import { getProfile, listTeam } from './roster-service';
-
-const isPlanner = isOrderer;
 
 function canSee(p: Principal, userId: string) {
   if (userId !== p.userId && !isPlanner(p)) throw domainError('FORBIDDEN', 'Not allowed');
@@ -158,6 +156,7 @@ export interface SaveEntryInput {
 
 /** An entry that is not tied to a planned shift (extra hours, or a shift that ran differently). */
 export async function saveEntry(db: AppDatabase, p: Principal, input: SaveEntryInput, now = new Date()): Promise<string> {
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Änderungen der Arbeitszeit bitte als Anfrage melden.');
   await assertEditable(db, p, input.userId, input.date, now);
   const problem = checkShiftTimes(input.startMin, input.endMin, input.breakMin);
   if (problem) throw domainError('VALIDATION_FAILED', problem);
@@ -199,6 +198,7 @@ export async function correctShift(
   input: { startMin: number; endMin: number; breakMin: number; note: string | null },
   now = new Date(),
 ): Promise<string> {
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Änderungen der Arbeitszeit bitte als Anfrage melden.');
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
   if (!shift || !shift.userId) throw domainError('NOT_FOUND', 'Shift not found');
   await assertEditable(db, p, shift.userId, shift.workDate, now);
@@ -217,6 +217,7 @@ export async function correctShift(
 }
 
 export async function deleteEntry(db: AppDatabase, p: Principal, entryId: string): Promise<void> {
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Änderungen der Arbeitszeit bitte als Anfrage melden.');
   if (!/^[0-9a-f-]{36}$/i.test(entryId)) throw domainError('NOT_FOUND', 'Entry not found');
   const [row] = await db.select().from(timeEntries).where(eq(timeEntries.id, entryId)).limit(1);
   if (!row) throw domainError('NOT_FOUND', 'Entry not found');

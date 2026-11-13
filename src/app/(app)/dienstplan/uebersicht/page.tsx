@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { formatOvertime, formatWorked } from '@/domain/hours';
-import { isOrderer, roleLabel } from '@/domain/roles';
+import { isPlanner, roleLabel } from '@/domain/roles';
 import { EMPLOYMENT_LABEL, ROSTER_SITES, addDays, mondayOf, shiftMonth, weekdayShort } from '@/domain/roster';
 import { formatChf } from '@/domain/qty';
 import { getT } from '@/i18n/server';
@@ -23,7 +23,7 @@ const OK = '#1f6b3a';
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ site?: string; monat?: string; woche?: string }> }) {
   const t = await getT();
   const p = await requirePrincipal();
-  if (!isOrderer(p)) redirect('/dienstplan');
+  if (!isPlanner(p)) redirect('/dienstplan');
   const params = await searchParams;
   const today = todayIso();
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : today.slice(0, 7);

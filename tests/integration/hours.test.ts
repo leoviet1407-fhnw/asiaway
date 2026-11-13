@@ -113,12 +113,15 @@ describe('hours service', () => {
 
   it('records corrections and extra work, but not the future or other people', async () => {
     const [, second] = (await getMonthHours(db, staff, staff.userId, '2026-11')).planned;
-    await correctShift(db, staff, second!.id, { startMin: t('10:30'), endMin: t('16:00'), breakMin: 30, note: 'Gäste blieben länger' }, now);
-    await saveEntry(db, staff, { userId: staff.userId, date: '2026-11-12', startMin: t('08:00'), endMin: t('11:00'), breakMin: 0, note: 'Inventur' }, now);
+    // Staff cannot edit worked time themselves: they ask, the Leitung records it
+    await expect(correctShift(db, staff, second!.id, { startMin: t('10:30'), endMin: t('16:00'), breakMin: 30, note: 'x' }, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(saveEntry(db, staff, { userId: staff.userId, date: '2026-11-12', startMin: t('08:00'), endMin: t('11:00'), breakMin: 0, note: 'x' }, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await correctShift(db, planner, second!.id, { startMin: t('10:30'), endMin: t('16:00'), breakMin: 30, note: 'Gäste blieben länger' }, now);
+    await saveEntry(db, planner, { userId: staff.userId, date: '2026-11-12', startMin: t('08:00'), endMin: t('11:00'), breakMin: 0, note: 'Inventur' }, now);
     const month = await getMonthHours(db, staff, staff.userId, '2026-11');
     expect(month.totals.workedMinutes).toBe(240 + 300 + 180);
-    await expect(saveEntry(db, staff, { userId: staff.userId, date: '2026-11-14', startMin: t('10:00'), endMin: t('12:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    await expect(saveEntry(db, staff, { userId: staff.userId, date: '2026-11-12', startMin: t('12:00'), endMin: t('11:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(saveEntry(db, planner, { userId: staff.userId, date: '2026-11-14', startMin: t('10:00'), endMin: t('12:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(saveEntry(db, planner, { userId: staff.userId, date: '2026-11-12', startMin: t('12:00'), endMin: t('11:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     await expect(saveEntry(db, other, { userId: staff.userId, date: '2026-11-12', startMin: t('08:00'), endMin: t('11:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(getMonthHours(db, other, staff.userId, '2026-11')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
@@ -133,10 +136,10 @@ describe('hours service', () => {
     expect(approved.yearBalanceMinutes).toBe(approved.totals.overtimeMinutes);
     expect(approved.totals.overtimeMinutes).toBe(720 - monthTotalsTarget());
     const entryId = approved.entries[0]!.id;
-    await expect(deleteEntry(db, staff, entryId)).rejects.toMatchObject({ code: 'MONTH_LOCKED' });
-    await expect(saveEntry(db, staff, { userId: staff.userId, date: '2026-11-12', startMin: t('08:00'), endMin: t('09:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'MONTH_LOCKED' });
+    await expect(deleteEntry(db, planner, entryId)).rejects.toMatchObject({ code: 'MONTH_LOCKED' });
+    await expect(saveEntry(db, planner, { userId: staff.userId, date: '2026-11-12', startMin: t('08:00'), endMin: t('09:00'), breakMin: 0, note: null }, now)).rejects.toMatchObject({ code: 'MONTH_LOCKED' });
     await reopenMonth(db, planner, staff.userId, '2026-11');
-    await deleteEntry(db, staff, entryId);
+    await deleteEntry(db, planner, entryId);
   });
 
   it('adds the opening overtime balance of the year', async () => {

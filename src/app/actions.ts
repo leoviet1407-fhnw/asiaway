@@ -25,6 +25,7 @@ import {
   saveYearlyBalance,
 } from '@/server/services/hours-service';
 import { deriveNeedsFromWeek, saveNeeds } from '@/server/services/coverage-service';
+import { decideChangeRequest, requestChange, withdrawChangeRequest, type ChangeKind } from '@/server/services/change-request-service';
 import {
   cancelAbsence,
   copyWeek,
@@ -651,6 +652,51 @@ export async function deriveNeedsAction(site: string, weekStart: string): Promis
     const p = await requirePrincipal();
     await deriveNeedsFromWeek(await db(), p, site, weekStart);
     revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+// --- Change requests: staff ask, the Leitung decides ----------------------------------------
+export async function requestChangeAction(input: { kind: ChangeKind; shiftId?: string; date?: string; start?: string; end?: string; breakMin?: number; reason: string }): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    const t = await getT();
+    let startMin: number | null = null;
+    let endMin: number | null = null;
+    if (input.kind !== 'SHIFT_CANCEL') {
+      startMin = parseTime(input.start ?? '');
+      endMin = parseTime(input.end ?? '');
+      if (startMin === null || endMin === null) return { ok: false, error: t('Bitte Zeiten wie 08:00 eingeben.') };
+    }
+    await requestChange(await db(), p, { kind: input.kind, shiftId: input.shiftId ?? null, date: input.date ?? null, startMin, endMin, breakMin: Number.isFinite(input.breakMin) ? input.breakMin ?? 0 : 0, reason: input.reason });
+    revalidatePath('/', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function decideChangeAction(id: string, approve: boolean): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await decideChangeRequest(await db(), p, id, approve);
+    revalidatePath('/', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function withdrawChangeAction(id: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await withdrawChangeRequest(await db(), p, id);
+    revalidatePath('/', 'layout');
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;

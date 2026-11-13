@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { coverageState, type CoverageState } from '@/domain/availability';
-import { isOrderer } from '@/domain/roles';
+import { isPlanner } from '@/domain/roles';
 import { ROSTER_SITES, addDays, mondayOf, weekDates, weekdayShort } from '@/domain/roster';
 import { getT } from '@/i18n/server';
 import { formatDay, todayIso } from '@/lib/dates';
@@ -25,7 +25,7 @@ const STYLE: Record<CoverageState, string> = {
 export default async function CoveragePage({ searchParams }: { searchParams: Promise<{ site?: string; woche?: string }> }) {
   const t = await getT();
   const p = await requirePrincipal();
-  if (!isOrderer(p)) redirect('/dienstplan');
+  if (!isPlanner(p)) redirect('/dienstplan');
   const params = await searchParams;
   const site = ROSTER_SITES.find((s) => s.id === params.site) ?? ROSTER_SITES.find((s) => s.id === 'winterthur')!;
   const weekStart = mondayOf(params.woche && /^\d{4}-\d{2}-\d{2}$/.test(params.woche) ? params.woche : addDays(todayIso(), 28));

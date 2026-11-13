@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { monthTargetMinutes, type VacationBalance } from '../../domain/hours';
 import { domainError } from '../../domain/errors';
-import { isOrderer, type Principal, type Role } from '../../domain/roles';
+import { isPlanner, type Principal, type Role } from '../../domain/roles';
 import { ROSTER_SITES, addDays, monthDates, shiftNetMinutes, weekDates, type EmploymentType } from '../../domain/roster';
 import type { AppDatabase } from '../db/client';
 import { dailyClosings, locations, shifts, staffProfiles, timeEntries, userRoles, users } from '../db/schema';
@@ -9,7 +9,7 @@ import { getMonthHours, getVacationBalance } from './hours-service';
 
 /** Overview for the Leitung and admins: the whole team, hours, holidays, overtime, staffing and sales. */
 function requirePlanner(p: Principal) {
-  if (!isOrderer(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
+  if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
 }
 
 export interface StaffRow {

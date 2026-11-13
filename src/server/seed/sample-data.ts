@@ -91,7 +91,7 @@ const ITEMS: SampleItem[] = [
 
 export const SAMPLE_USERS = [
   { email: 'admin@asiaway.test', name: 'Admin (Muster)', grants: [{ role: 'ADMIN' as const, locationId: null }] },
-  { email: 'besteller@asiaway.test', name: 'Besteller (Muster)', grants: [{ role: 'ORDERER' as const, locationId: null }] },
+  { email: 'besteller@asiaway.test', name: 'Besteller (Muster)', grants: [{ role: 'ORDERER' as const, locationId: null }, { role: 'PLANNER' as const, locationId: null }] },
   { email: 'oerlikon@asiaway.test', name: 'Mitarbeiter Oerlikon', grants: [{ role: 'STAFF' as const, locationId: 'oerlikon' }] },
   { email: 'winti-vn@asiaway.test', name: 'Mitarbeiter Winti VN', grants: [{ role: 'STAFF' as const, locationId: 'winti-vn' }] },
   { email: 'winti-th@asiaway.test', name: 'Mitarbeiter Winti Thai', grants: [{ role: 'STAFF' as const, locationId: 'winti-th' }] },

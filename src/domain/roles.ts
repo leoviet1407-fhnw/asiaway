@@ -1,4 +1,4 @@
-export type Role = 'STAFF' | 'ORDERER' | 'ADMIN';
+export type Role = 'STAFF' | 'ORDERER' | 'PLANNER' | 'ADMIN';
 
 export interface RoleGrant {
   readonly role: Role;
@@ -20,6 +20,11 @@ export function isAdmin(p: Principal): boolean {
 /** Orderers (and admins) review and send orders for every location. */
 export function isOrderer(p: Principal): boolean {
   return p.grants.some((g) => g.role === 'ORDERER' || g.role === 'ADMIN');
+}
+
+/** Only planners (the Leitung with the PLANNER role) and admins make the roster and approve hours and changes. */
+export function isPlanner(p: Principal): boolean {
+  return p.grants.some((g) => g.role === 'PLANNER' || g.role === 'ADMIN');
 }
 
 /**
@@ -47,5 +52,5 @@ export function locationsFor<T extends { id: string }>(p: Principal, all: readon
 }
 
 export function roleLabel(role: Role): string {
-  return { STAFF: 'Mitarbeiter', ORDERER: 'Besteller', ADMIN: 'Admin' }[role];
+  return { STAFF: 'Mitarbeiter', ORDERER: 'Besteller', PLANNER: 'Planung', ADMIN: 'Admin' }[role];
 }

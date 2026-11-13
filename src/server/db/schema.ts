@@ -24,7 +24,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
   fromDriver: (value) => Buffer.from(value),
 });
 
-export const role = pgEnum('role', ['STAFF', 'ORDERER', 'ADMIN']);
+export const role = pgEnum('role', ['STAFF', 'ORDERER', 'PLANNER', 'ADMIN']);
 export const storageArea = pgEnum('storage_area', ['COLD', 'FREEZER', 'DRY', 'BAR']);
 export const orderChannel = pgEnum('order_channel', ['EMAIL', 'WHATSAPP', 'PORTAL']);
 export const orderStatus = pgEnum('order_status', [
@@ -389,3 +389,19 @@ export const schema = {
   timeMonthApprovals,
   staffingNeeds,
 };
+
+export const changeRequests = pgTable('change_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  kind: text('kind').notNull(),
+  shiftId: uuid('shift_id'),
+  workDate: date('work_date').notNull(),
+  startMin: integer('start_min'),
+  endMin: integer('end_min'),
+  breakMin: integer('break_min').notNull().default(0),
+  reason: text('reason').notNull(),
+  status: text('status').notNull().default('REQUESTED'),
+  decidedBy: uuid('decided_by'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

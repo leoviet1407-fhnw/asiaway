@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, shiftMonth } from '@/domain/roster';
-import { isAdmin, isOrderer } from '@/domain/roles';
+import { isAdmin, isPlanner } from '@/domain/roles';
 import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
@@ -21,7 +21,7 @@ const monthName = (m: string, lang: 'de' | 'en') => monthLabel(m, lang);
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ site?: string; monat?: string }> }) {
   const t = await getT();
   const p = await requirePrincipal();
-  if (!isOrderer(p)) redirect('/dienstplan');
+  if (!isPlanner(p)) redirect('/dienstplan');
   const params = await searchParams;
   const database = await db();
   const site = ROSTER_SITES.find((s) => s.id === params.site) ?? ROSTER_SITES[1]!;
