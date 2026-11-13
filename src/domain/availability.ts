@@ -3,14 +3,14 @@
  * Pure functions, no database.
  *
  * Staff choose the days and times they can work. Per week the hours offered
- * must reach the contract: weekly hours = 42 h × pensum (100 % = 42 h). A whole
- * offered day counts as a standard day of 8.4 h (42 h / 5 days), a time window
+ * must reach the contract: weekly hours = 42.5 h × pensum (100 % = 42.5 h). A whole
+ * offered day counts as a standard day of 8.5 h (42.5 h / 5 days), a time window
  * counts its own length. Holiday and sick weekdays count as a standard day.
  */
 import { WEEKLY_HOURS_AT_100, weeklyMinutes } from './hours';
 import { addDays, weekDates, type Absence, type AvailabilityDay } from './roster';
 
-/** One standard working day: 42 h / 5 = 8.4 h. */
+/** One standard working day: 42.5 h / 5 = 8.5 h. */
 export const STANDARD_DAY_MINUTES = (WEEKLY_HOURS_AT_100 * 60) / 5;
 
 /** The two services of a restaurant day: Lunch 10:30–14:30, Dinner 17:30–22:00. */

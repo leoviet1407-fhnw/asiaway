@@ -51,20 +51,20 @@ describe('vacation and overtime rules', () => {
     expect(vacationNeedsAttention(b, '2026-08-15')).toBe(false);
   });
 
-  it('derives contract hours from 42 h at 100 %', () => {
-    expect(weeklyMinutes(100)).toBe(2520);
-    expect(weeklyMinutes(80)).toBe(2016); // 33.6 h
-    expect(dailyCreditMinutes(80)).toBe(403); // 6.72 h
-    expect(monthTargetMinutes(100, '2026-11')).toBe(Math.round((2520 * 30) / 7)); // 180 h
+  it('derives contract hours from 42.5 h at 100 %', () => {
+    expect(weeklyMinutes(100)).toBe(2550);
+    expect(weeklyMinutes(80)).toBe(2040); // 34 h
+    expect(dailyCreditMinutes(80)).toBe(408); // 6.8 h
+    expect(monthTargetMinutes(100, '2026-11')).toBe(Math.round((2550 * 30) / 7)); // 182.1 h
   });
 
   it('overtime = worked + credited vacation/sick − target; none without a pensum', () => {
     const base = { month: '2026-11', pensumPercent: 100, absences: [] as { startDate: string; endDate: string; type: 'VACATION' | 'SICK' | 'OTHER' }[] };
-    expect(monthTotals({ ...base, workedMinutes: 190 * 60 }).overtimeMinutes).toBe(190 * 60 - 10800);
+    expect(monthTotals({ ...base, workedMinutes: 190 * 60 }).overtimeMinutes).toBe(190 * 60 - 10929);
     const withVacation = monthTotals({ ...base, workedMinutes: 160 * 60, absences: [{ startDate: '2026-11-02', endDate: '2026-11-06', type: 'VACATION' }] });
     expect(withVacation.creditDays).toBe(5);
-    expect(withVacation.creditMinutes).toBe(5 * 504);
-    expect(withVacation.overtimeMinutes).toBe(160 * 60 + 5 * 504 - 10800);
+    expect(withVacation.creditMinutes).toBe(5 * 510);
+    expect(withVacation.overtimeMinutes).toBe(160 * 60 + 5 * 510 - 10929);
     expect(monthTotals({ ...base, workedMinutes: 100, absences: [{ startDate: '2026-11-02', endDate: '2026-11-06', type: 'OTHER' }] }).creditDays).toBe(0);
     expect(monthTotals({ ...base, pensumPercent: null, workedMinutes: 600 })).toMatchObject({ targetMinutes: null, overtimeMinutes: null });
     expect(formatOvertime(210)).toBe('+3 h 30 min');

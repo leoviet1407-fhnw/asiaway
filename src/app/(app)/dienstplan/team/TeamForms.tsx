@@ -8,7 +8,7 @@ import { useT } from '@/i18n/client';
 
 const TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'];
 
-export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean } }) {
+export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean; usualStation: string | null; usualFromMin: number | null; usualToMin: number | null; phone: string | null; stations: string[] } }) {
   const t = useT();
   const [state, action, pending] = useActionState(saveProfileAction, undefined);
   const [type, setType] = useState<EmploymentType>(member.employmentType);
@@ -33,6 +33,27 @@ export function ProfileForm({ member }: { member: { userId: string; name: string
       <label className="flex items-center gap-1 text-sm">
         <input type="checkbox" name="active" defaultChecked={member.active} className="min-h-0 accent-brand-600" /> {t('aktiv')}
       </label>
+      <div className="col-span-full grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div>
+          <label className="label" htmlFor={`us-${member.userId}`}>{t('Übliche Station')}</label>
+          <select id={`us-${member.userId}`} name="usualStation" className="w-full" defaultValue={member.usualStation ?? ''}>
+            <option value="">{t('Keine feste')}</option>
+            {member.stations.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor={`uf-${member.userId}`}>{t('Übliche Zeit von')}</label>
+          <input id={`uf-${member.userId}`} name="usualFrom" inputMode="numeric" className="w-full" placeholder="17:00" defaultValue={member.usualFromMin === null ? '' : `${String(Math.floor(member.usualFromMin / 60)).padStart(2, '0')}:${String(member.usualFromMin % 60).padStart(2, '0')}`} />
+        </div>
+        <div>
+          <label className="label" htmlFor={`ut-${member.userId}`}>{t('bis')}</label>
+          <input id={`ut-${member.userId}`} name="usualTo" inputMode="numeric" className="w-full" placeholder="21:30" defaultValue={member.usualToMin === null ? '' : `${String(Math.floor(member.usualToMin / 60)).padStart(2, '0')}:${String(member.usualToMin % 60).padStart(2, '0')}`} />
+        </div>
+        <div>
+          <label className="label" htmlFor={`ph-${member.userId}`}>{t('Handy (WhatsApp)')}</label>
+          <input id={`ph-${member.userId}`} name="phone" inputMode="tel" className="w-full" placeholder="079 123 45 67" defaultValue={member.phone ?? ''} />
+        </div>
+      </div>
       {ROSTER_SITES.filter((s) => s.id !== member.site).map((s) => (
         <label key={s.id} className="col-span-full flex items-center gap-1 text-sm">
           <input type="checkbox" name="extraSite" value={s.id} defaultChecked={member.extraSites.includes(s.id)} className="min-h-0 accent-brand-600" /> {t('Arbeitet auch in {site}', { site: s.name })}

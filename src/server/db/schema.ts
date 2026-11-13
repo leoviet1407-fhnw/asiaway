@@ -264,6 +264,11 @@ export const staffProfiles = pgTable('staff_profiles', {
   pensumPercent: integer('pensum_percent'),
   /** Other roster sites this person is planned at (e.g. the Leitung works at both). */
   extraSites: text('extra_sites').array().notNull().default(sql`'{}'::text[]`),
+  /** Usual station and usual shift times: used when the plan is suggested. */
+  usualStation: text('usual_station'),
+  usualFromMin: integer('usual_from_min'),
+  usualToMin: integer('usual_to_min'),
+  phone: text('phone'),
   active: boolean('active').notNull().default(true),
   sort: integer('sort').notNull().default(0),
 });

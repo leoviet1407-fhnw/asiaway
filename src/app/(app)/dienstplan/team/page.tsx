@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, shiftMonth } from '@/domain/roster';
+import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, shiftMonth, stationsOf } from '@/domain/roster';
 import { isAdmin, isPlanner } from '@/domain/roles';
 import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -131,7 +131,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <ul className="space-y-3">
           {team.map((m, i) => (
             <li key={m.userId} className="card space-y-3">
-              <ProfileForm member={m} />
+              <ProfileForm member={{ ...m, stations: stationsOf(m.site).map((s) => s.name) }} />
               <BalanceForm userId={m.userId} year={year} vacationDays={yearly[i]!.vacationDays} vacationCarry={yearly[i]!.vacationCarry} overtimeCarryHours={yearly[i]!.overtimeCarryMin / 60} />
             </li>
           ))}

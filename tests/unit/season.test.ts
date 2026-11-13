@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { easterSunday, swissHolidays, vacationConflict, needFor } from '@/domain/season';
-import { suggestShifts } from '@/domain/suggest';
+import { findGaps, suggestShifts } from '@/domain/suggest';
 import type { AvailabilityDay } from '@/domain/roster';
 
 describe('holiday season', () => {
@@ -52,7 +52,7 @@ describe('roster suggestion', () => {
     expect(shifts.filter((s) => s.service === 'LUNCH')).toHaveLength(5);
     expect(shifts.filter((s) => s.service === 'DINNER')).toHaveLength(5);
     const hours = (id: string) => shifts.filter((s) => s.userId === id).reduce((n, s) => n + (s.endMin - s.startMin), 0);
-    expect(hours('part')).toBeLessThanOrEqual(21 * 60 + 30); // 50 % of 42 h, with the slack of one shift
+    expect(hours('part')).toBeLessThanOrEqual(21 * 60 + 45); // 50 % of 42.5 h, with the slack of one shift
     expect(shifts.some((s) => s.userId === 'casual')).toBe(false);
   });
 
@@ -66,5 +66,29 @@ describe('roster suggestion', () => {
     expect(shifts).toEqual([{ userId: 'part', date: days[1], startMin: 17 * 60 + 30, endMin: 22 * 60, service: 'DINNER' }]);
     expect(gaps.some((g) => g.date === days[0] && g.service === 'LUNCH')).toBe(true);
     expect(gaps.some((g) => g.date === days[2])).toBe(true); // on holiday
+  });
+
+  it('uses a person\'s usual times and lets a long block cover both services', () => {
+    const usual = [
+      { ...people[0]!, usualFromMin: 12 * 60, usualToMin: 21 * 60 }, // 12:00–21:00 covers lunch and dinner
+      { userId: 'yen', name: 'Yen', employmentType: 'PART_TIME' as const, pensumPercent: 70, plannedMinutes: 0, usualFromMin: 17 * 60, usualToMin: 21 * 60 + 30 },
+    ];
+    const offers = [whole('full', days[0]!), whole('yen', days[0]!)];
+    const one = [{ lunchPeople: 1, dinnerPeople: 2 }, ...needs.slice(1).map(() => ({ lunchPeople: 0, dinnerPeople: 0 }))];
+    const { shifts, gaps } = suggestShifts({ weekStart: week, people: usual, needs: one, offers, away: () => false });
+    expect(shifts).toEqual([
+      { userId: 'full', date: days[0], startMin: 12 * 60, endMin: 21 * 60, service: 'LUNCH' },
+      { userId: 'yen', date: days[0], startMin: 17 * 60, endMin: 21 * 60 + 30, service: 'DINNER' },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+
+  it('lists who can fill a gap, most useful first', () => {
+    const offers = [whole('full', days[0]!), whole('part', days[0]!), whole('casual', days[0]!)];
+    const planned = [{ userId: 'full', date: days[0]!, startMin: 10 * 60 + 30, endMin: 14 * 60 + 30 }];
+    const g = findGaps({ weekStart: week, people, needs: [{ lunchPeople: 1, dinnerPeople: 2 }, ...needs.slice(1).map(() => ({ lunchPeople: 0, dinnerPeople: 0 }))], offers, away: (u) => u === 'part', planned });
+    expect(g).toHaveLength(1); // lunch is covered, dinner is short by 2
+    expect(g[0]).toMatchObject({ date: days[0], service: 'DINNER', missing: 2 });
+    expect(g[0]!.candidates.map((c) => c.userId)).toEqual(['full', 'casual']); // part is on holiday; full already works that day
   });
 });

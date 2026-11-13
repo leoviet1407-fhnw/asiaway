@@ -74,7 +74,7 @@ export interface Coverage {
   totals: {
     /** Hours the week needs: needed people × service hours. */
     needHours: number;
-    /** What the team's contracts add up to per week (42 h × pensum). */
+    /** What the team's contracts add up to per week (42.5 h × pensum). */
     contractHours: number;
     /** Hours staff have offered for the week. */
     offeredHours: number;

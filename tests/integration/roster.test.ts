@@ -128,7 +128,7 @@ describe('roster rules', () => {
     const by = (code: string) => v.filter((x) => x.code === code);
     expect(by('OUTSIDE_OFFER')[0]!.severity).toBe('error');
     expect(by('UNAVAILABLE').map((x) => [x.userId, x.severity]).sort()).toEqual([['aus', 'error'], ['fix', 'warn']]);
-    expect(by('NO_OFFER')[0]!.severity).toBe('error');
+    expect(by('NO_OFFER')[0]!.severity).toBe('warn'); // casual staff without a report: a note, the Leitung confirms by phone
     expect(by('ABSENCE')[0]!.severity).toBe('error');
   });
 
@@ -214,7 +214,8 @@ describe('roster service', () => {
   });
 
   it('refuses to publish a week with errors', async () => {
-    // The Aushilfe never reported availability, so this assignment is an error.
+    // The Aushilfe marked the day as not available, so this assignment is an error (no report at all is only a note).
+    await setAvailability(db, planner, { userId: staffTh.userId, date: '2026-11-24', kind: 'UNAVAILABLE', fromMin: null, toMin: null }, now);
     await saveShift(db, planner, { site: 'winterthur', date: '2026-11-24', userId: staffTh.userId, startMin: t('17:00'), endMin: t('21:00'), breakMin: 0, station: '1. OG', roleLabel: null }, now);
     await expect(publishWeek(db, planner, 'winterthur', '2026-11-23', now)).rejects.toMatchObject({ code: 'ROSTER_BLOCKED' });
     await setAvailability(db, planner, { userId: staffTh.userId, date: '2026-11-24', kind: 'AVAILABLE', fromMin: t('16:00'), toMin: t('22:00') }, now);
@@ -280,7 +281,7 @@ describe('roster service', () => {
   });
 
   it('a contracted person cannot send the month until every day is chosen and each week reaches the contract', async () => {
-    // January 2027: weeks start 04, 11, 18, 25. staffVn is 100 % = 42 h a week.
+    // January 2027: weeks start 04, 11, 18, 25. staffVn is 100 % = 42.5 h a week.
     const jan = '2027-01';
     const all = (await getWeekStatuses(db, staffVn, staffVn.userId, jan, now)).missingDays;
     expect(all.length).toBe(28); // four full weeks, nothing chosen yet
@@ -290,7 +291,7 @@ describe('roster service', () => {
     for (const d of all) await setAvailability(db, staffVn, { userId: staffVn.userId, date: d, kind: 'UNAVAILABLE', fromMin: null, toMin: null }, now);
     await expect(submitMonth(db, staffVn, jan, now)).rejects.toMatchObject({ message: expect.stringContaining('Zu wenig Stunden') });
 
-    // Four whole days a week is 33.6 h: still not 42 h.
+    // Four whole days a week is 34 h: still not 42.5 h.
     for (const monday of ['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25']) {
       for (const offset of [0, 1, 2, 3]) {
         const d = new Date(`${monday}T00:00:00Z`);
@@ -298,9 +299,9 @@ describe('roster service', () => {
         await setAvailability(db, staffVn, { userId: staffVn.userId, date: d.toISOString().slice(0, 10), kind: 'AVAILABLE', fromMin: null, toMin: null }, now);
       }
     }
-    await expect(submitMonth(db, staffVn, jan, now)).rejects.toMatchObject({ message: expect.stringContaining('33.6 h / 42.0 h') });
+    await expect(submitMonth(db, staffVn, jan, now)).rejects.toMatchObject({ message: expect.stringContaining('34.0 h / 42.5 h') });
 
-    // A fifth whole day each week reaches 42 h: now it can be sent.
+    // A fifth whole day each week reaches 42.5 h: now it can be sent.
     for (const monday of ['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25']) {
       const d = new Date(`${monday}T00:00:00Z`);
       d.setUTCDate(d.getUTCDate() + 4);

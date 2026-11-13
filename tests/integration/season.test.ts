@@ -10,7 +10,7 @@ import { applyPattern, fillMissingFromPatterns, getPattern, savePattern } from '
 import { getCoverage, saveNeeds } from '@/server/services/coverage-service';
 import { deleteVacationRule, listSpecialDays, listVacationRules, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
 import { getAvailabilityMonth, getWeekView, requestAbsence, saveProfile, saveShift } from '@/server/services/roster-service';
-import { suggestWeek } from '@/server/services/suggest-service';
+import { fillGap, listGaps, publishMonth, suggestMonth, suggestWeek } from '@/server/services/suggest-service';
 import { createTestDatabase } from '../helpers/db';
 
 const t = (s: string) => parseTime(s)!;
@@ -101,5 +101,26 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     const pat = (await getPattern(db, casual, casual.userId)).map((d) => (d.weekday === 2 ? { ...d, kind: 'AVAILABLE' as const, fromMin: null, toMin: null } : d));
     await savePattern(db, casual, casual.userId, pat);
     expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'NO_OFFER' && v.userId === casual.userId)).toBe(false);
+  });
+
+  it('suggests a month, lists the gaps, fills one with a tap and publishes the month', async () => {
+    const month = '2027-04';
+    const r = await suggestMonth(db, planner, 'winterthur', month, now);
+    expect(r.weeks.length).toBeGreaterThanOrEqual(4);
+    expect(r.weeks.every((w) => w.skipped === null)).toBe(true);
+    // b has no Standardwoche and no report: the second person of each service is missing
+    await saveNeeds(db, planner, 'winterthur', Array.from({ length: 7 }, (_, i) => (i < 5 ? { lunchPeople: 2, dinnerPeople: 1 } : { lunchPeople: 0, dinnerPeople: 0 })));
+    const gaps = await listGaps(db, planner, 'winterthur', '2027-04-05');
+    expect(gaps.some((g) => g.service === 'LUNCH' && g.missing === 1)).toBe(true);
+    const gap = gaps.find((g) => g.candidates.length > 0);
+    if (gap) {
+      await fillGap(db, planner, 'winterthur', gap.date, gap.service, gap.candidates[0]!.userId, now);
+      const after = await listGaps(db, planner, 'winterthur', '2027-04-05');
+      expect(after.find((g) => g.date === gap.date && g.service === gap.service)?.missing ?? 0).toBeLessThan(gap.missing);
+    }
+    await expect(fillGap(db, planner, 'winterthur', '2027-04-05', 'LUNCH', 'not-a-person', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    const pub = await publishMonth(db, planner, 'winterthur', month, now);
+    expect(pub.published.length + pub.blocked.length).toBeGreaterThanOrEqual(1);
+    await expect(publishMonth(db, a, 'winterthur', month, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

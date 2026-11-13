@@ -2,7 +2,7 @@
  * Vacation balance and overtime. Pure functions, no database.
  *
  * Decisions (confirmed): vacation is counted in WEEKDAYS (Mon–Fri), 25 a year by
- * default, which is five weeks whatever the pensum. A 100 % contract is 42 hours
+ * default, which is five weeks whatever the pensum. A 100 % contract is 42.5 hours
  * a week; the monthly target is the weekly hours times the days of the month / 7.
  * Vacation and sick weekdays count as worked at the average daily contract hours.
  * Only people with a pensum have a target and so an overtime balance.
@@ -10,7 +10,7 @@
 import { addDays, monthDates, type AbsenceType } from './roster';
 
 export const DEFAULT_VACATION_DAYS = 25;
-export const WEEKLY_HOURS_AT_100 = 42;
+export const WEEKLY_HOURS_AT_100 = 42.5;
 
 // --- Vacation ------------------------------------------------------------------------------
 const isWeekday = (iso: string) => {

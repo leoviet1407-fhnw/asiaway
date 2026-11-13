@@ -80,6 +80,10 @@ export interface TeamMember extends RosterPerson {
   site: string;
   extraSites: string[];
   active: boolean;
+  usualStation: string | null;
+  usualFromMin: number | null;
+  usualToMin: number | null;
+  phone: string | null;
 }
 
 export async function listTeam(db: AppDatabase, siteId: string, { includeInactive = false } = {}): Promise<TeamMember[]> {
@@ -97,6 +101,10 @@ export async function listTeam(db: AppDatabase, siteId: string, { includeInactiv
       email: r.u.email,
       site: r.p.site,
       extraSites: r.p.extraSites,
+      usualStation: r.p.usualStation,
+      usualFromMin: r.p.usualFromMin,
+      usualToMin: r.p.usualToMin,
+      phone: r.p.phone,
       active: r.p.active && r.u.active,
       employmentType: r.p.employmentType as EmploymentType,
       pensumPercent: r.p.pensumPercent,
@@ -107,6 +115,10 @@ export interface ProfileInput {
   site: string;
   /** Further sites this person is planned at. */
   extraSites?: string[];
+  usualStation?: string | null;
+  usualFromMin?: number | null;
+  usualToMin?: number | null;
+  phone?: string | null;
   employmentType: EmploymentType;
   pensumPercent: number | null;
   active: boolean;
@@ -115,6 +127,9 @@ export interface ProfileInput {
 function checkProfile(input: ProfileInput) {
   if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
   if ((input.extraSites ?? []).some((x) => x === input.site || !ROSTER_SITES.some((s) => s.id === x))) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
+  if ((input.usualFromMin == null) !== (input.usualToMin == null) || (input.usualFromMin != null && !(input.usualToMin! > input.usualFromMin && input.usualFromMin >= 0 && input.usualToMin! <= 30 * 60))) {
+    throw domainError('VALIDATION_FAILED', 'Die üblichen Zeiten sind ungültig.');
+  }
   const needsPensum = input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME';
   if (needsPensum && !(input.pensumPercent && input.pensumPercent >= 1 && input.pensumPercent <= 100)) {
     throw domainError('VALIDATION_FAILED', 'Das Pensum muss zwischen 1 und 100 % liegen.');
@@ -127,6 +142,10 @@ export async function saveProfile(db: AppDatabase, p: Principal, userId: string,
   const values = {
     site: input.site,
     extraSites: [...new Set(input.extraSites ?? [])],
+    usualStation: input.usualStation?.trim() || null,
+    usualFromMin: input.usualFromMin ?? null,
+    usualToMin: input.usualToMin ?? null,
+    phone: input.phone?.trim() || null,
     employmentType: input.employmentType,
     pensumPercent: input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME' ? input.pensumPercent : null,
     active: input.active,
@@ -422,7 +441,7 @@ export async function getWeekStatuses(db: AppDatabase, p: Principal, userId: str
 /**
  * Marks a month as reported ("Meldung abschicken"). Staff cannot send it half-done:
  * every day they can still change needs a choice, and each full week must reach
- * the hours of their contract (42 h × pensum).
+ * the hours of their contract (42.5 h × pensum).
  */
 export async function submitMonth(db: AppDatabase, p: Principal, month: string, now = new Date()): Promise<void> {
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');

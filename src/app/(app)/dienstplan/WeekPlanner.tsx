@@ -18,7 +18,7 @@ import {
   type Shift,
   type Violation,
 } from '@/domain/roster';
-import { deleteShiftAction, saveShiftAction, suggestWeekAction, weekStepAction } from '../../actions';
+import { deleteShiftAction, publishMonthAction, saveShiftAction, suggestMonthAction, suggestWeekAction, weekStepAction } from '../../actions';
 import { useT } from '@/i18n/client';
 
 interface Props {
@@ -140,6 +140,37 @@ export function WeekPlanner(props: Props) {
             }
           >
             {t('Plan vorschlagen')}
+          </button>
+          <button
+            className="btn-secondary min-h-0 px-3 py-1.5 text-sm"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const r = await suggestMonthAction(props.site, props.weekStart.slice(0, 7));
+                if (!r.ok) return setError(r.error);
+                setNotice(t('Monat vorgeschlagen: {n} Schichten in {w} Wochen.', { n: r.created ?? 0, w: r.weeks ?? 0 }) + ((r.gaps ?? 0) > 0 ? ` ${t('{n} Lücken, siehe unten.', { n: r.gaps ?? 0 })}` : '') + ((r.skipped ?? 0) > 0 ? ` ${t('{n} Wochen übersprungen (schon geplant oder vorbei).', { n: r.skipped ?? 0 })}` : ''));
+                router.refresh();
+              })
+            }
+          >
+            {t('Monat vorschlagen')}
+          </button>
+          <button
+            className="btn-secondary min-h-0 px-3 py-1.5 text-sm"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const r = await publishMonthAction(props.site, props.weekStart.slice(0, 7));
+                if (!r.ok) return setError(r.error);
+                const blocked = r.blocked ?? [];
+                setNotice(t('{n} Wochen veröffentlicht.', { n: r.published ?? 0 }) + (blocked.length ? ` ${t('Nicht veröffentlicht wegen Fehlern: Woche ab')} ${blocked.map((b) => `${b.weekStart.slice(8)}.${b.weekStart.slice(5, 7)}.`).join(', ')}.` : ''));
+                router.refresh();
+              })
+            }
+          >
+            {t('Monat veröffentlichen')}
           </button>
           {props.status === 'PUBLISHED' ? (
             <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'unpublish'))}>

@@ -312,7 +312,7 @@ export function validateRoster(input: RosterInput): Violation[] {
       const list = byDate.get(date)!;
       if (person.employmentType === 'ON_CALL') {
         if (!av) {
-          out.push({ severity: 'error', code: 'NO_OFFER', userId: person.userId, date, message: `${person.name} (Aushilfe), ${dm(date)}: keine Verfügbarkeit gemeldet.` });
+          out.push({ severity: 'warn', code: 'NO_OFFER', userId: person.userId, date, message: `${person.name} (Aushilfe), ${dm(date)}: noch nicht bestätigt (keine Verfügbarkeit gemeldet).` });
         } else if (av.kind === 'UNAVAILABLE') {
           out.push({ severity: 'error', code: 'UNAVAILABLE', userId: person.userId, date, message: `${person.name} (Aushilfe), ${dm(date)}: hat sich als nicht verfügbar gemeldet.` });
         } else if (av.fromMin !== null && av.toMin !== null && list.some((s) => s.startMin < av.fromMin! || s.endMin > av.toMin!)) {

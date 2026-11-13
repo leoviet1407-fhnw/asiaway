@@ -21,26 +21,26 @@ const day = (date: string, kind: 'AVAILABLE' | 'UNAVAILABLE', from?: string, to?
 const WEEK = '2026-12-14'; // Monday
 
 describe('hours offered against the contract', () => {
-  it('a whole day is a standard day of 8.4 h, a window counts its own length, "free" counts nothing', () => {
-    expect(STANDARD_DAY_MINUTES).toBe(504);
-    expect(offeredMinutes(day(WEEK, 'AVAILABLE'))).toBe(504);
+  it('a whole day is a standard day of 8.5 h, a window counts its own length, "free" counts nothing', () => {
+    expect(STANDARD_DAY_MINUTES).toBe(510);
+    expect(offeredMinutes(day(WEEK, 'AVAILABLE'))).toBe(510);
     expect(offeredMinutes(day(WEEK, 'AVAILABLE', '10:30', '14:30'))).toBe(240);
     expect(offeredMinutes(day(WEEK, 'UNAVAILABLE'))).toBe(0);
     expect(offeredMinutes(undefined)).toBe(0);
   });
 
-  it('five whole days make exactly 42 h: enough for 100 %', () => {
+  it('five whole days make exactly 42.5 h: enough for 100 %', () => {
     const days = ['14', '15', '16', '17', '18'].map((d) => day(`2026-12-${d}`, 'AVAILABLE'));
     const s = weekStatus({ weekStart: WEEK, pensumPercent: 100, availability: days, absences: [] });
-    expect(s).toMatchObject({ offeredMinutes: 2520, requiredMinutes: 2520, ok: true, missingMinutes: 0 });
+    expect(s).toMatchObject({ offeredMinutes: 2550, requiredMinutes: 2550, ok: true, missingMinutes: 0 });
   });
 
-  it('four whole days are enough for 80 % (33.6 h) but not for 100 %', () => {
+  it('four whole days are enough for 80 % (34 h) but not for 100 %', () => {
     const days = ['14', '15', '16', '17'].map((d) => day(`2026-12-${d}`, 'AVAILABLE'));
     expect(weekStatus({ weekStart: WEEK, pensumPercent: 80, availability: days, absences: [] }).ok).toBe(true);
     const hundred = weekStatus({ weekStart: WEEK, pensumPercent: 100, availability: days, absences: [] });
     expect(hundred.ok).toBe(false);
-    expect(hundred.missingMinutes).toBe(2520 - 4 * 504);
+    expect(hundred.missingMinutes).toBe(2550 - 4 * 510);
   });
 
   it('holiday and sick weekdays count as standard days; weekends do not', () => {
@@ -50,7 +50,7 @@ describe('hours offered against the contract', () => {
       availability: [day('2026-12-14', 'AVAILABLE')],
       absences: [{ startDate: '2026-12-15', endDate: '2026-12-20', type: 'VACATION' }],
     });
-    expect(s.creditMinutes).toBe(4 * 504); // Tue–Fri; Sat and Sun are not credited
+    expect(s.creditMinutes).toBe(4 * 510); // Tue–Fri; Sat and Sun are not credited
     expect(s.ok).toBe(true);
     expect(weekStatus({ weekStart: WEEK, pensumPercent: 100, availability: [], absences: [{ startDate: '2026-12-15', endDate: '2026-12-15', type: 'OTHER' }] }).creditMinutes).toBe(0);
   });

@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { DINNER_WINDOW, LUNCH_WINDOW, STANDARD_DAY_MINUTES, weekStatus } from '@/domain/availability';
 import { formatTime, isOpenForStaff, weekDates, weekdayShort, type AbsenceType, type AvailabilityDay } from '@/domain/roster';
 import { useT } from '@/i18n/client';
+import { WEEKLY_HOURS_AT_100 } from '@/domain/hours';
 import { setAvailabilityAction, submitMonthAction } from '../../../actions';
 
 interface Props {
@@ -52,7 +53,7 @@ function parseHm(value: string): number | null {
   return h > 29 || min > 59 ? null : h * 60 + min;
 }
 
-const weeklyNeed = (pensum: number) => Math.round((42 * 60 * pensum) / 100);
+const weeklyNeed = (pensum: number) => Math.round((WEEKLY_HOURS_AT_100 * 60 * pensum) / 100);
 
 /**
  * One week at a time: for every day pick Ganzer Tag, Mittag, Abend or Frei.

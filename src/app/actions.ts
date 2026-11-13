@@ -27,7 +27,7 @@ import {
 import { deriveNeedsFromWeek, saveNeeds } from '@/server/services/coverage-service';
 import { applyPattern, fillMissingFromPatterns, savePattern } from '@/server/services/pattern-service';
 import { deleteSpecialDay, deleteVacationRule, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
-import { suggestWeek } from '@/server/services/suggest-service';
+import { fillGap, publishMonth, suggestMonth, suggestWeek } from '@/server/services/suggest-service';
 import { decideChangeRequest, requestChange, withdrawChangeRequest, type ChangeKind } from '@/server/services/change-request-service';
 import {
   cancelAbsence,
@@ -496,6 +496,10 @@ function profileFrom(form: FormData) {
   return {
     site: String(form.get('site') ?? ''),
     extraSites: form.getAll('extraSite').map(String).filter(Boolean),
+    usualStation: String(form.get('usualStation') ?? '') || null,
+    usualFromMin: parseTime(String(form.get('usualFrom') ?? '')),
+    usualToMin: parseTime(String(form.get('usualTo') ?? '')),
+    phone: String(form.get('phone') ?? '').trim() || null,
     employmentType,
     pensumPercent: Number.isFinite(pensum) && pensum > 0 ? pensum : null,
     active: form.get('active') === 'on',
@@ -817,6 +821,43 @@ export async function suggestWeekAction(siteId: string, weekStart: string): Prom
     const r = await suggestWeek(await db(), p, siteId, weekStart);
     revalidatePath('/dienstplan', 'layout');
     return { ok: true, created: r.created, gaps: r.gaps };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function suggestMonthAction(siteId: string, month: string): Promise<ActionResult & { created?: number; weeks?: number; gaps?: number; skipped?: number }> {
+  try {
+    const p = await requirePrincipal();
+    const r = await suggestMonth(await db(), p, siteId, month);
+    revalidatePath('/dienstplan', 'layout');
+    const done = r.weeks.filter((w) => !w.skipped);
+    return { ok: true, created: done.reduce((n, w) => n + w.created, 0), weeks: done.length, gaps: done.reduce((n, w) => n + w.gaps.length, 0), skipped: r.weeks.length - done.length };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function publishMonthAction(siteId: string, month: string): Promise<ActionResult & { published?: number; blocked?: { weekStart: string; errors: number }[] }> {
+  try {
+    const p = await requirePrincipal();
+    const r = await publishMonth(await db(), p, siteId, month);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true, published: r.published.length, blocked: r.blocked };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function fillGapAction(siteId: string, date: string, service: 'LUNCH' | 'DINNER', userId: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await fillGap(await db(), p, siteId, date, service, userId);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
     return await fail(error);
