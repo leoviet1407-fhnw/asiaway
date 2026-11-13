@@ -46,6 +46,7 @@ export default async function HomePage() {
         <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
         <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
         <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} />
+        {orderer && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
         <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
       </div>
 

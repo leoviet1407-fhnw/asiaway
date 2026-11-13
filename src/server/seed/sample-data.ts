@@ -223,6 +223,13 @@ export async function seedSampleData(
   // A daily closing: the figures of the paper form of 12 Nov (1. OG)
   await saveClosing(db, wvn, { locationId: 'winti-vn', businessDate: addDaysIso(today, -1), station: '1. OG', cashCountedCents: 72800, startFloatCents: 30000, eftCents: 226725, mobileCents: 0, posGrossCents: 258460, note: null });
 
+  // Eleven more days of closings, so the overview charts have something to show
+  for (let i = 2; i <= 12; i++) {
+    const gross = 180_000 + ((i * 7919) % 95_000);
+    const eft = Math.round(gross * 0.82);
+    await saveClosing(db, wvn, { locationId: 'winti-vn', businessDate: addDaysIso(today, -i), station: '1. OG', cashCountedCents: 30_000 + (gross - eft) + (i % 3) * 1_000, startFloatCents: 30_000, eftCents: eft, mobileCents: 0, posGrossCents: gross, note: null });
+  }
+
   // Oerlikon: sent drinks order from Handel, for a second goods-in example
   const d4 = await openDraft(db, oer, 'oerlikon', supplierIds.handel!);
   await setLineQty(db, oer, d4.id, itemIds['H-4001']!, 3);
