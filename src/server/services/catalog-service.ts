@@ -50,6 +50,8 @@ export interface CatalogItem {
   stockUnit: string;
   isFresh: boolean;
   isKeyItem: boolean;
+  department: string | null;
+  itemGroup: string | null;
   active: boolean;
   barcodes: { code: string; unitsPerScan: number; label: string | null }[];
   offers: {
@@ -58,6 +60,7 @@ export interface CatalogItem {
     supplierName: string;
     supplierSku: string | null;
     orderUnit: string;
+    quantityUnit: string | null;
     packSize: number;
     priceCents: number;
   }[];
@@ -75,6 +78,7 @@ export async function listItems(db: AppDatabase, { supplierId, includeInactive =
       supplierName: suppliers.name,
       supplierSku: supplierItems.supplierSku,
       orderUnit: supplierItems.orderUnit,
+      quantityUnit: supplierItems.quantityUnit,
       packSize: supplierItems.packSize,
       priceCents: supplierItems.priceCents,
       active: supplierItems.active,
@@ -93,6 +97,8 @@ export async function listItems(db: AppDatabase, { supplierId, includeInactive =
       stockUnit: i.stockUnit,
       isFresh: i.isFresh,
       isKeyItem: i.isKeyItem,
+      department: i.department,
+      itemGroup: i.itemGroup,
       active: i.active,
       barcodes: codes
         .filter((c) => c.itemId === i.id)
@@ -105,6 +111,7 @@ export async function listItems(db: AppDatabase, { supplierId, includeInactive =
           supplierName: o.supplierName,
           supplierSku: o.supplierSku,
           orderUnit: o.orderUnit,
+          quantityUnit: o.quantityUnit,
           packSize: Number(o.packSize),
           priceCents: o.priceCents,
         })),
@@ -130,11 +137,13 @@ export interface ItemUpdate {
   stockUnit: string;
   isFresh: boolean;
   isKeyItem: boolean;
+  department: string | null;
+  itemGroup: string | null;
   active: boolean;
   /** Codes with their units per scan; replaces the item's barcodes. */
   barcodes: { code: string; unitsPerScan: number }[];
   /** Price per order unit for each existing offer. */
-  offers: { supplierItemId: string; priceCents: number; orderUnit: string; supplierSku: string | null }[];
+  offers: { supplierItemId: string; priceCents: number; orderUnit: string; quantityUnit: string | null; supplierSku: string | null }[];
 }
 
 export async function updateItem(db: AppDatabase, p: Principal, id: string, update: ItemUpdate): Promise<void> {
@@ -166,6 +175,8 @@ export async function updateItem(db: AppDatabase, p: Principal, id: string, upda
         stockUnit: update.stockUnit.trim() || 'Stk',
         isFresh: update.isFresh,
         isKeyItem: update.isKeyItem,
+        department: update.department?.trim() || null,
+        itemGroup: update.itemGroup?.trim() || null,
         active: update.active,
       })
       .where(eq(items.id, id));
@@ -176,7 +187,7 @@ export async function updateItem(db: AppDatabase, p: Principal, id: string, upda
     for (const offer of update.offers) {
       await tx
         .update(supplierItems)
-        .set({ priceCents: offer.priceCents, orderUnit: offer.orderUnit.trim(), supplierSku: offer.supplierSku?.trim() || null })
+        .set({ priceCents: offer.priceCents, orderUnit: offer.orderUnit.trim(), quantityUnit: offer.quantityUnit?.trim() || null, supplierSku: offer.supplierSku?.trim() || null })
         .where(and(eq(supplierItems.id, offer.supplierItemId), eq(supplierItems.itemId, id)));
     }
   });

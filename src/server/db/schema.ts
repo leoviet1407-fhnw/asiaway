@@ -44,6 +44,8 @@ export const locations = pgTable('locations', {
   address: text('address').notNull(),
   deliveryNote: text('delivery_note'),
   sort: integer('sort').notNull().default(0),
+  phone: text('phone'),
+  contactEmail: text('contact_email'),
 });
 
 export const users = pgTable('users', {
@@ -101,6 +103,8 @@ export const items = pgTable('items', {
   stockUnit: text('stock_unit').notNull().default('Stk'),
   isFresh: boolean('is_fresh').notNull().default(false),
   isKeyItem: boolean('is_key_item').notNull().default(false),
+  department: text('department'),
+  itemGroup: text('item_group'),
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -120,6 +124,7 @@ export const supplierItems = pgTable('supplier_items', {
   orderUnit: text('order_unit').notNull(),
   packSize: numeric('pack_size', { precision: 10, scale: 3 }).notNull().default('1'),
   priceCents: integer('price_cents').notNull().default(0),
+  quantityUnit: text('quantity_unit'),
   active: boolean('active').notNull().default(true),
 });
 
@@ -151,6 +156,7 @@ export const purchaseOrderLines = pgTable('purchase_order_lines', {
   qty: numeric('qty', { precision: 10, scale: 3 }).notNull(),
   orderUnit: text('order_unit').notNull(),
   unitPriceCents: integer('unit_price_cents').notNull().default(0),
+  quantityUnit: text('quantity_unit'),
   supplierSku: text('supplier_sku'),
   note: text('note'),
 });

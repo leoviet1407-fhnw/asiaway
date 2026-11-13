@@ -106,7 +106,7 @@ describe('review and send', () => {
     expect(mailer.sent).toHaveLength(1);
     const msg = mailer.sent[0]!;
     expect(msg.replyTo).toBe(orderer.email);
-    expect(msg.text).toContain('4 × Sack 20 kg');
+    expect(msg.text).toContain('4 Sack  Jasminreis 20 kg');
     const pdfBytes = msg.attachments![0]!.content;
     expect(Buffer.from(pdfBytes).subarray(0, 5).toString()).toBe('%PDF-');
     expect((await PDFDocument.load(pdfBytes)).getPageCount()).toBe(1);

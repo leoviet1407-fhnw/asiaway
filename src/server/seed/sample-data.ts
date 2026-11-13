@@ -132,7 +132,7 @@ export async function seedSampleData(
   for (const it of ITEMS) {
     const [row] = await db
       .insert(items)
-      .values({ sku: it.sku, nameDe: it.de, nameVi: it.vi, storageArea: it.area, stockUnit: it.unit, isFresh: Boolean(it.fresh), isKeyItem: Boolean(it.key) })
+      .values({ sku: it.sku, nameDe: it.de, nameVi: it.vi, storageArea: it.area, stockUnit: it.unit, isFresh: Boolean(it.fresh), isKeyItem: Boolean(it.key), department: it.area === 'BAR' ? 'BAR' : 'KÜCHE', itemGroup: { DRY: 'FOOD', COLD: 'FRISCH', FREEZER: 'TK PRODUKT', BAR: 'GETRÄNKE' }[it.area] })
       .returning({ id: items.id });
     itemIds[it.sku] = row!.id;
     await db.insert(supplierItems).values({
@@ -140,6 +140,7 @@ export async function seedSampleData(
       itemId: row!.id,
       supplierSku: `${it.supplier.toUpperCase().slice(0, 2)}-${it.sku.slice(2)}`,
       orderUnit: it.orderUnit,
+      quantityUnit: it.orderUnit.split(' ')[0],
       packSize: String(it.pack),
       priceCents: Math.round(it.price * 100),
     });

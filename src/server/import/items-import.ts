@@ -11,6 +11,7 @@ import { itemBarcodes, items, supplierItems, suppliers } from '../db/schema';
  * One CSV row per supplier item:
  *   sku, name_de, name_vi, storage_area, stock_unit, fresh, key_item,
  *   supplier, supplier_sku, order_unit, pack_size, price_chf, ean
+ * Optional: department (Abteilung), group (Gruppe), quantity_unit (Menge in: kg, Karton, Stück)
  * `ean` may hold several codes separated by "|"; a code may carry its units
  * per scan after a colon ("7610000000001:0.0833" for one bottle of a 12-case).
  * Separators "," and ";" are both accepted (Excel in Switzerland writes ";").
@@ -31,6 +32,9 @@ export interface ImportRow {
   supplier: string;
   supplierSku: string | null;
   orderUnit: string;
+  quantityUnit: string | null;
+  department: string | null;
+  group: string | null;
   packSize: number;
   priceCents: number;
   barcodes: { code: string; unitsPerScan: number }[];
@@ -94,6 +98,9 @@ export function parseItemsCsv(text: string): ParseResult {
       supplier: r.supplier!,
       supplierSku: r.supplier_sku || null,
       orderUnit: r.order_unit!,
+      quantityUnit: r.quantity_unit || null,
+      department: r.department || null,
+      group: r.group || null,
       packSize: pack!,
       priceCents: price!,
       barcodes,
@@ -136,7 +143,7 @@ export async function applyItemsImport(db: AppDatabase, rows: ImportRow[], { dry
       supplierIds.set(name, s!.id);
     }
     for (const row of rows) {
-      const values = { nameDe: row.nameDe, nameVi: row.nameVi, storageArea: row.storageArea, stockUnit: row.stockUnit, isFresh: row.isFresh, isKeyItem: row.isKeyItem, active: true };
+      const values = { nameDe: row.nameDe, nameVi: row.nameVi, storageArea: row.storageArea, stockUnit: row.stockUnit, isFresh: row.isFresh, isKeyItem: row.isKeyItem, department: row.department, itemGroup: row.group, active: true };
       let itemId = itemIds.get(row.sku);
       if (itemId) await tx.update(items).set(values).where(eq(items.id, itemId));
       else {
@@ -144,7 +151,7 @@ export async function applyItemsImport(db: AppDatabase, rows: ImportRow[], { dry
         itemId = it!.id;
         itemIds.set(row.sku, itemId);
       }
-      const offer = { supplierSku: row.supplierSku, orderUnit: row.orderUnit, packSize: String(row.packSize), priceCents: row.priceCents, active: true };
+      const offer = { supplierSku: row.supplierSku, orderUnit: row.orderUnit, quantityUnit: row.quantityUnit, packSize: String(row.packSize), priceCents: row.priceCents, active: true };
       await tx
         .insert(supplierItems)
         .values({ supplierId: supplierIds.get(row.supplier)!, itemId, ...offer })

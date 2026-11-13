@@ -90,6 +90,9 @@ export interface OrderLineView {
   isFresh: boolean;
   qty: number;
   orderUnit: string;
+  quantityUnit: string | null;
+  department: string | null;
+  itemGroup: string | null;
   unitPriceCents: number;
   supplierSku: string | null;
   note: string | null;
@@ -137,6 +140,9 @@ export async function getOrderLines(db: AppDatabase, orderId: string): Promise<O
       isFresh: items.isFresh,
       qty: purchaseOrderLines.qty,
       orderUnit: purchaseOrderLines.orderUnit,
+      quantityUnit: purchaseOrderLines.quantityUnit,
+      department: items.department,
+      itemGroup: items.itemGroup,
       unitPriceCents: purchaseOrderLines.unitPriceCents,
       supplierSku: purchaseOrderLines.supplierSku,
       note: purchaseOrderLines.note,
@@ -241,6 +247,7 @@ export async function setLineQty(
       supplierItemId: offer.id,
       qty: String(value),
       orderUnit: offer.orderUnit,
+      quantityUnit: offer.quantityUnit,
       unitPriceCents: offer.priceCents,
       supplierSku: offer.supplierSku,
       ...(note !== undefined ? { note: note?.trim() || null } : {}),
@@ -365,10 +372,12 @@ export async function buildOrderDocument(db: AppDatabase, p: Principal, orderId:
     createdAt: view.order.sentAt ?? now,
     deliveryDate: view.order.deliveryDate,
     note: view.order.note,
-    location: { name: view.location.name, address: view.location.address, deliveryNote: view.location.deliveryNote },
-    supplier: { name: view.supplier.name, customerNumber: view.supplier.customerNumber },
+    location: { name: view.location.name, address: view.location.address, deliveryNote: view.location.deliveryNote, phone: view.location.phone, contactEmail: view.location.contactEmail },
+    supplier: { name: view.supplier.name, customerNumber: view.supplier.customerNumber, orderEmail: view.supplier.orderEmail, ccEmail: recipients(view.supplier).cc },
     orderedBy: { name: sender.name, email: sender.email },
-    lines: view.lines.map((l) => ({ supplierSku: l.supplierSku, name: l.nameDe, qty: l.qty, orderUnit: l.orderUnit, note: l.note })),
+    lines: [...view.lines]
+      .sort((a, b) => (a.department ?? '~').localeCompare(b.department ?? '~', 'de') || (a.itemGroup ?? '~').localeCompare(b.itemGroup ?? '~', 'de') || a.nameDe.localeCompare(b.nameDe, 'de'))
+      .map((l) => ({ department: l.department, group: l.itemGroup, supplierSku: l.supplierSku, name: l.nameDe, qty: l.qty, quantityUnit: l.quantityUnit, orderUnit: l.orderUnit, note: l.note })),
   };
 }
 

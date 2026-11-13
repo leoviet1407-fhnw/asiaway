@@ -1,21 +1,29 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { formatDay, formatDateTime } from '../../lib/dates';
-import { formatQty } from '../../domain/qty';
-import type { OrderDocument } from '../mail/order-document';
+import { formatDateTime } from '../../lib/dates';
+import { deliveryAddressLine, deliveryDayLabel, quantityLabel, type OrderDocument } from '../mail/order-document';
+import { LOGO_PNG_BASE64 } from './logo-data';
 
 /**
- * The A4 order sent to the supplier. Uses the PDF standard fonts (no font files
- * to ship); they cover German, and anything they cannot draw becomes "?".
- * Prices are deliberately not printed: suppliers bill from their own list.
+ * The order sheet the supplier receives, in the layout the restaurants already
+ * use with Prodega: landscape, "Bestellung für …", To/Cc, customer number and
+ * delivery address on the right, a beige date bar, then Abteilung · Gruppe ·
+ * Menge · Einheit · Art.Nr. · Art. Bezeichnung. Prices are deliberately not
+ * printed: suppliers bill from their own list.
  */
+const W = 841.89;
+const H = 595.28;
+const M = 30;
+
+const INK = rgb(0, 0, 0);
+const NAVY = rgb(0x1f / 255, 0x38 / 255, 0x64 / 255);
 const RED = rgb(0xac / 255, 0x20 / 255, 0x25 / 255);
-const NAVY = rgb(0x09 / 255, 0x14 / 255, 0x1d / 255);
-const CHARCOAL = rgb(0x3e / 255, 0x3a / 255, 0x38 / 255);
-const LINE = rgb(0.85, 0.85, 0.85);
+const BEIGE = rgb(0xdd / 255, 0xd9 / 255, 0xc4 / 255);
+const HEADER_BLUE = rgb(0xc5 / 255, 0xd9 / 255, 0xf1 / 255);
+const GREEN = rgb(0xd8 / 255, 0xe4 / 255, 0xbc / 255);
+const RULE = rgb(0.82, 0.82, 0.82);
+const GREY = rgb(0.45, 0.45, 0.45);
 
-const A4: [number, number] = [595.28, 841.89];
-const MARGIN = 50;
-
+/** The PDF standard fonts draw German; anything else (Vietnamese accents) falls back to the base letter. */
 function safe(font: PDFFont, text: string): string {
   let out = '';
   for (const ch of text.normalize('NFC')) {
@@ -23,7 +31,6 @@ function safe(font: PDFFont, text: string): string {
       font.encodeText(ch);
       out += ch;
     } catch {
-      // Strip accents we cannot draw (Vietnamese), keep the base letter.
       const base = ch.normalize('NFD').replace(/[̀-ͯ]/g, '');
       try {
         font.encodeText(base);
@@ -36,11 +43,14 @@ function safe(font: PDFFont, text: string): string {
   return out;
 }
 
-function truncate(font: PDFFont, text: string, size: number, maxWidth: number): string {
-  let value = text;
+function fit(font: PDFFont, text: string, size: number, maxWidth: number): string {
+  let value = safe(font, text);
   while (value.length > 1 && font.widthOfTextAtSize(value, size) > maxWidth) value = value.slice(0, -2) + '…';
   return value;
 }
+
+/** "Prodega" → "P R O D E G A", as on the supplier's own sheet. */
+const spaced = (name: string) => [...name.toUpperCase()].join(' ').replace(/ {2,}/g, '   ');
 
 export async function renderOrderPdf(doc: OrderDocument): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
@@ -50,140 +60,121 @@ export async function renderOrderPdf(doc: OrderDocument): Promise<Uint8Array> {
   pdf.setCreationDate(doc.createdAt);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdf.embedPng(Buffer.from(LOGO_PNG_BASE64, 'base64'));
 
-  let page: PDFPage = pdf.addPage(A4);
-  let y = A4[1] - MARGIN;
+  const cols = [
+    { key: 'dept', title: 'Abteilung', w: 92 },
+    { key: 'group', title: 'Gruppe', w: 84 },
+    { key: 'qty', title: 'Menge', w: 84 },
+    { key: 'unit', title: 'Einheit', w: 150 },
+    { key: 'sku', title: 'Art.Nr.', w: 78 },
+    { key: 'name', title: 'Art. Bezeichnung', w: W - 2 * M - (92 + 84 + 84 + 150 + 78) },
+  ] as const;
+  const x0 = M;
+  const colX: number[] = [];
+  cols.forEach((c, i) => colX.push(i === 0 ? x0 : colX[i - 1]! + cols[i - 1]!.w));
+  const tableW = W - 2 * M;
 
-  const text = (value: string, x: number, size = 10, font = regular, color = CHARCOAL) => {
+  const pages: PDFPage[] = [];
+  const draw = (page: PDFPage, value: string, x: number, y: number, size: number, font = regular, color = INK) =>
     page.drawText(safe(font, value), { x, y, size, font, color });
+  const right = (page: PDFPage, value: string, y: number, size: number, font = regular, color = INK) => {
+    const v = safe(font, value);
+    page.drawText(v, { x: W - M - font.widthOfTextAtSize(v, size), y, size, font, color });
   };
 
-  // Header band
-  page.drawRectangle({ x: 0, y: A4[1] - 8, width: A4[0], height: 8, color: RED });
-  text('AsiaWay', MARGIN, 22, bold, NAVY);
-  page.drawText(safe(bold, 'BESTELLUNG'), {
-    x: A4[0] - MARGIN - bold.widthOfTextAtSize('BESTELLUNG', 14),
-    y,
-    size: 14,
-    font: bold,
-    color: RED,
-  });
-  y -= 18;
-  const numberLabel = `Nr. ${doc.number}`;
-  page.drawText(numberLabel, { x: A4[0] - MARGIN - regular.widthOfTextAtSize(numberLabel, 10), y, size: 10, font: regular, color: CHARCOAL });
-  y -= 30;
-
-  // Two address columns
-  const colB = A4[0] / 2 + 10;
-  const top = y;
-  text('An', MARGIN, 8, bold, CHARCOAL);
-  y -= 13;
-  text(doc.supplier.name, MARGIN, 11, bold, NAVY);
-  y -= 14;
-  if (doc.supplier.customerNumber) text(`Unsere Kundennummer: ${doc.supplier.customerNumber}`, MARGIN);
-
-  y = top;
-  text('Lieferadresse', colB, 8, bold);
-  y -= 13;
-  text(`AsiaWay ${doc.location.name}`, colB, 11, bold, NAVY);
-  for (const part of doc.location.address.split(',').map((s) => s.trim())) {
-    y -= 14;
-    text(part, colB);
-  }
-  if (doc.location.deliveryNote) {
-    y -= 14;
-    text(truncate(regular, safe(regular, doc.location.deliveryNote), 9, A4[0] / 2 - MARGIN - 10), colB, 9);
-  }
-  y -= 28;
-
-  const meta: [string, string][] = [
-    ['Bestelldatum', formatDateTime(doc.createdAt)],
-    ['Gewünschte Lieferung', doc.deliveryDate ? formatDay(doc.deliveryDate) : 'nächster Liefertag'],
-    ['Bestellt von', `${doc.orderedBy.name} (${doc.orderedBy.email})`],
-  ];
-  for (const [label, value] of meta) {
-    text(label, MARGIN, 10, bold);
-    text(value, MARGIN + 140, 10);
-    y -= 15;
-  }
-  y -= 12;
-
-  // Table
-  const cols = { pos: MARGIN, sku: MARGIN + 30, name: MARGIN + 110, qty: A4[0] - MARGIN - 150, unit: A4[0] - MARGIN - 95 };
-  const header = () => {
-    page.drawRectangle({ x: MARGIN - 4, y: y - 5, width: A4[0] - 2 * MARGIN + 8, height: 18, color: NAVY });
-    const white = rgb(1, 1, 1);
-    text('Pos', cols.pos, 9, bold, white);
-    text('Art.-Nr.', cols.sku, 9, bold, white);
-    text('Artikel', cols.name, 9, bold, white);
-    text('Menge', cols.qty, 9, bold, white);
-    text('Einheit', cols.unit, 9, bold, white);
-    y -= 22;
+  const tableHeader = (page: PDFPage, y: number): number => {
+    page.drawRectangle({ x: x0, y: y - 22, width: tableW, height: 22, color: HEADER_BLUE });
+    cols.forEach((c, i) => draw(page, c.title, colX[i]! + 4, y - 15, 11, regular, c.key === 'qty' ? RED : INK));
+    return y - 22;
   };
-  header();
+
+  let page = pdf.addPage([W, H]);
+  pages.push(page);
+  let y = H - M;
+
+  // Title and header block
+  draw(page, `Bestellung für ${spaced(doc.supplier.name)}`, M, y - 18, 22);
+  const lh = 18;
+  const lw = (lh * logo.width) / logo.height;
+  page.drawImage(logo, { x: W - M - lw, y: y - 16, width: lw, height: lh });
+
+  const to = `To: ${doc.supplier.orderEmail}`;
+  const cc = doc.supplier.ccEmail ? `Cc: ${doc.supplier.ccEmail}` : null;
+  draw(page, to, M, y - 46, 9);
+  if (cc) draw(page, cc, M, y - 59, 9);
+
+  let ry = y - 40;
+  if (doc.supplier.customerNumber) {
+    right(page, `Kundennummer ${doc.supplier.customerNumber}`, ry, 10);
+    ry -= 14;
+  }
+  right(page, deliveryAddressLine(doc), ry, 9, regular, RED);
+  ry -= 12;
+  if (doc.location.phone) {
+    right(page, doc.location.phone, ry, 9);
+    ry -= 12;
+  }
+  if (doc.location.contactEmail) {
+    right(page, doc.location.contactEmail, ry, 9);
+    ry -= 12;
+  }
+  if (doc.location.deliveryNote) right(page, doc.location.deliveryNote, ry, 8, regular, GREY);
+
+  // Date bar
+  y -= 92;
+  page.drawRectangle({ x: x0, y: y - 38, width: tableW, height: 38, color: BEIGE });
+  draw(page, 'Bestelldatum', x0 + 4, y - 14, 12);
+  draw(page, formatDateTime(doc.createdAt).slice(0, 10), x0 + 4 + 250, y - 14, 12);
+  draw(page, 'Lieferdatum', x0 + 4, y - 31, 12, regular, RED);
+  draw(page, deliveryDayLabel(doc.deliveryDate), x0 + 4 + 250, y - 31, 12, regular, RED);
+  y -= 46;
+
+  y = tableHeader(page, y);
 
   doc.lines.forEach((line, i) => {
-    const rowHeight = line.note ? 28 : 18;
-    if (y - rowHeight < MARGIN + 60) {
-      page = pdf.addPage(A4);
-      y = A4[1] - MARGIN;
-      text(`Bestellung ${doc.number} (Fortsetzung)`, MARGIN, 10, bold, NAVY);
-      y -= 24;
-      header();
+    const rowH = line.note ? 28 : 18;
+    if (y - rowH < 50) {
+      page = pdf.addPage([W, H]);
+      pages.push(page);
+      draw(page, `Bestellung ${doc.number} (Fortsetzung)`, M, H - M - 10, 12, bold, RED);
+      y = tableHeader(page, H - M - 22);
     }
-    text(String(i + 1), cols.pos);
-    text(truncate(regular, safe(regular, line.supplierSku ?? '–'), 10, cols.name - cols.sku - 6), cols.sku);
-    text(truncate(regular, safe(regular, line.name), 10, cols.qty - cols.name - 8), cols.name);
-    const qty = formatQty(line.qty);
-    page.drawText(qty, { x: cols.unit - 12 - bold.widthOfTextAtSize(qty, 10), y, size: 10, font: bold, color: NAVY });
-    text(truncate(regular, safe(regular, line.orderUnit), 10, A4[0] - MARGIN - cols.unit), cols.unit);
-    if (line.note) {
-      y -= 12;
-      text(truncate(regular, safe(regular, `Hinweis: ${line.note}`), 8, cols.qty - cols.name), cols.name, 8);
-    }
-    y -= 8;
-    page.drawLine({ start: { x: MARGIN - 4, y }, end: { x: A4[0] - MARGIN + 4, y }, thickness: 0.5, color: LINE });
-    y -= 12;
+    const textY = y - 12.5;
+    const cell = (i2: number) => colX[i2]! + 4;
+    draw(page, fit(regular, (line.department ?? '').toUpperCase(), 10, cols[0].w - 8), cell(0), textY, 10, regular, NAVY);
+    draw(page, fit(regular, (line.group ?? '').toUpperCase(), 10, cols[1].w - 8), cell(1), textY, 10);
+    // Menge: red on green, as on the supplier's sheet
+    page.drawRectangle({ x: colX[2]!, y: y - rowH + 1, width: cols[2].w, height: rowH - 1, color: GREEN });
+    const qty = fit(regular, quantityLabel(line), 11, cols[2].w - 8);
+    draw(page, qty, colX[2]! + (cols[2].w - regular.widthOfTextAtSize(qty, 11)) / 2, textY, 11, regular, RED);
+    draw(page, fit(regular, line.orderUnit, 10, cols[3].w - 8), cell(3), textY, 10);
+    draw(page, fit(regular, line.supplierSku ?? '', 10, cols[4].w - 8), cell(4), textY, 10);
+    draw(page, fit(regular, line.name, 10, cols[5].w - 8), cell(5), textY, 10);
+    if (line.note) draw(page, fit(regular, `Hinweis: ${line.note}`, 8, cols[5].w - 8), cell(5), textY - 11, 8, regular, GREY);
+    y -= rowH;
+    page.drawLine({ start: { x: x0, y }, end: { x: x0 + tableW, y }, thickness: 0.5, color: RULE });
+    void i;
   });
 
-  y -= 6;
-  text(`${doc.lines.length} Positionen`, MARGIN, 9);
-  y -= 20;
+  y -= 18;
   if (doc.note) {
-    text('Bemerkung', MARGIN, 10, bold);
-    y -= 14;
-    for (const chunk of wrap(regular, safe(regular, doc.note), 10, A4[0] - 2 * MARGIN)) {
-      text(chunk, MARGIN);
-      y -= 13;
+    if (y < 80) {
+      page = pdf.addPage([W, H]);
+      pages.push(page);
+      y = H - M - 10;
     }
-    y -= 8;
+    draw(page, 'Bemerkung', M, y, 10, bold);
+    draw(page, fit(regular, doc.note, 10, tableW), M + 70, y, 10);
+    y -= 18;
   }
-  text('Bitte bestätigen Sie den Liefertermin per Antwort auf die Bestell-E-Mail. Vielen Dank!', MARGIN, 9);
+  draw(page, 'Bitte bestätigen Sie den Liefertermin per Antwort auf die Bestell-E-Mail. Vielen Dank!', M, y, 9, regular, GREY);
 
-  // Footer on every page
-  const pages = pdf.getPages();
   pages.forEach((p, i) => {
-    const footer = `AsiaWay · Bestellung ${doc.number} · Seite ${i + 1}/${pages.length}`;
-    p.drawText(footer, { x: MARGIN, y: 30, size: 8, font: regular, color: CHARCOAL });
+    draw(p, `AsiaWay · Bestellung ${doc.number} · bestellt von ${doc.orderedBy.name}`, M, 22, 8, regular, GREY);
+    const label = `Seite ${i + 1} von ${pages.length}`;
+    p.drawText(label, { x: W - M - regular.widthOfTextAtSize(label, 8), y: 22, size: 8, font: regular, color: GREY });
   });
 
   return pdf.save();
-}
-
-function wrap(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
-  const out: string[] = [];
-  for (const paragraph of text.split('\n')) {
-    let line = '';
-    for (const word of paragraph.split(/\s+/)) {
-      const next = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(next, size) > maxWidth && line) {
-        out.push(line);
-        line = word;
-      } else {
-        line = next;
-      }
-    }
-    out.push(line);
-  }
-  return out;
 }

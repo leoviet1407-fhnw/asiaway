@@ -33,6 +33,10 @@ export function ItemForm({ item }: { item: CatalogItem }) {
           </select>
         </div>
         <Field label={t('Lagereinheit')} name="stockUnit" defaultValue={item.stockUnit} />
+        <Field label={t('Abteilung')} name="department" defaultValue={item.department ?? ''} list="departments" />
+        <Field label={t('Gruppe')} name="itemGroup" defaultValue={item.itemGroup ?? ''} list="groups" />
+        <datalist id="departments">{['KÜCHE', 'PRODUCTION', 'REINIGUNG', 'BAR'].map((d) => <option key={d} value={d} />)}</datalist>
+        <datalist id="groups">{['FOOD', 'GEMÜSE', 'TK PRODUKT', 'GETRÄNKE', 'REINIGUNG'].map((d) => <option key={d} value={d} />)}</datalist>
         <div className="flex flex-wrap gap-4 sm:col-span-2">
           <Check name="isFresh" label={t('Frischware (ohne Barcode)')} defaultChecked={item.isFresh} />
           <Check name="isKeyItem" label={t('Key-Artikel (wird gezählt)')} defaultChecked={item.isKeyItem} />
@@ -58,10 +62,11 @@ export function ItemForm({ item }: { item: CatalogItem }) {
       <section className="card space-y-3">
         <h2 className="text-lg">{t('Lieferanten & Preise')}</h2>
         {item.offers.map((o) => (
-          <div key={o.supplierItemId} className="grid gap-2 sm:grid-cols-3">
+          <div key={o.supplierItemId} className="grid gap-2 sm:grid-cols-4">
             <input type="hidden" name="offerId" value={o.supplierItemId} />
             <div className="sm:col-span-3 text-sm font-semibold text-navy">{o.supplierName}</div>
             <Field label={t('Art.-Nr. Lieferant')} name="supplierSku" defaultValue={o.supplierSku ?? ''} />
+            <Field label={t('Menge in')} name="quantityUnit" defaultValue={o.quantityUnit ?? ''} />
             <Field label={t('Bestelleinheit')} name="orderUnit" defaultValue={o.orderUnit} />
             <Field label={t('Preis CHF')} name="price" defaultValue={(o.priceCents / 100).toFixed(2)} inputMode="decimal" />
           </div>
@@ -77,13 +82,13 @@ export function ItemForm({ item }: { item: CatalogItem }) {
   );
 }
 
-function Field(props: { label: string; name: string; defaultValue: string; required?: boolean; inputMode?: 'decimal' | 'numeric' }) {
+function Field(props: { label: string; name: string; defaultValue: string; required?: boolean; inputMode?: 'decimal' | 'numeric'; list?: string }) {
   return (
     <div>
       <label className="label" htmlFor={`${props.name}-${props.label}`}>
         {props.label}
       </label>
-      <input id={`${props.name}-${props.label}`} name={props.name} defaultValue={props.defaultValue} required={props.required} inputMode={props.inputMode} className="w-full" />
+      <input id={`${props.name}-${props.label}`} name={props.name} defaultValue={props.defaultValue} required={props.required} inputMode={props.inputMode} list={props.list} className="w-full" />
     </div>
   );
 }

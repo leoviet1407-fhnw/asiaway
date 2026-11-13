@@ -252,6 +252,7 @@ export async function updateItemAction(_prev: { error?: string; saved?: boolean 
         supplierItemId,
         priceCents: cents,
         orderUnit: String(form.getAll('orderUnit')[i] ?? ''),
+        quantityUnit: String(form.getAll('quantityUnit')[i] ?? '') || null,
         supplierSku: String(form.getAll('supplierSku')[i] ?? '') || null,
       };
     });
@@ -262,6 +263,8 @@ export async function updateItemAction(_prev: { error?: string; saved?: boolean 
       stockUnit: String(form.get('stockUnit') ?? ''),
       isFresh: form.get('isFresh') === 'on',
       isKeyItem: form.get('isKeyItem') === 'on',
+      department: String(form.get('department') ?? '') || null,
+      itemGroup: String(form.get('itemGroup') ?? '') || null,
       active: form.get('active') === 'on',
       barcodes,
       offers,
