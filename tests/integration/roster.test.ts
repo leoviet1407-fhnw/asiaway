@@ -31,6 +31,7 @@ import {
   saveShift,
   setAvailability,
   submissionOverview,
+  getWeekStatuses,
   submitMonth,
   getAvailabilityMonth,
 } from '@/server/services/roster-service';
@@ -241,12 +242,18 @@ describe('roster service', () => {
   });
 
   it('shows the planner who has reported for the month', async () => {
+    // The Aushilfe has to decide every day she can still change before the report can be sent.
+    await expect(submitMonth(db, staffTh, '2026-12', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    for (const d of (await getWeekStatuses(db, staffTh, staffTh.userId, '2026-12', now)).missingDays) {
+      await setAvailability(db, staffTh, { userId: staffTh.userId, date: d, kind: 'UNAVAILABLE', fromMin: null, toMin: null }, now);
+    }
     let overview = await submissionOverview(db, planner, 'winterthur', '2026-12');
     expect(overview.find((o) => o.person.userId === staffTh.userId)!.submittedAt).toBeNull();
     await submitMonth(db, staffTh, '2026-12', now);
     overview = await submissionOverview(db, planner, 'winterthur', '2026-12');
     expect(overview.find((o) => o.person.userId === staffTh.userId)!.submittedAt).not.toBeNull();
     expect(overview.find((o) => o.person.userId === staffTh.userId)!.availableDays).toBe(1);
+    expect((await getWeekStatuses(db, staffTh, staffTh.userId, '2026-12', now)).missingDays).toEqual([]);
     await expect(submissionOverview(db, staffVn, 'winterthur', '2026-12')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
@@ -270,5 +277,37 @@ describe('roster service', () => {
     const id = await createStaffUser(db, admin, input);
     expect((await listTeam(db, 'winterthur')).map((m) => m.userId)).toContain(id);
     await expect(createStaffUser(db, admin, input)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+
+  it('a contracted person cannot send the month until every day is chosen and each week reaches the contract', async () => {
+    // January 2027: weeks start 04, 11, 18, 25. staffVn is 100 % = 42 h a week.
+    const jan = '2027-01';
+    const all = (await getWeekStatuses(db, staffVn, staffVn.userId, jan, now)).missingDays;
+    expect(all.length).toBe(28); // four full weeks, nothing chosen yet
+    await expect(submitMonth(db, staffVn, jan, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', message: expect.stringContaining('28 Tage ohne Auswahl') });
+
+    // Every day "Frei": all days decided, but no hours offered → too few hours.
+    for (const d of all) await setAvailability(db, staffVn, { userId: staffVn.userId, date: d, kind: 'UNAVAILABLE', fromMin: null, toMin: null }, now);
+    await expect(submitMonth(db, staffVn, jan, now)).rejects.toMatchObject({ message: expect.stringContaining('Zu wenig Stunden') });
+
+    // Four whole days a week is 33.6 h: still not 42 h.
+    for (const monday of ['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25']) {
+      for (const offset of [0, 1, 2, 3]) {
+        const d = new Date(`${monday}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + offset);
+        await setAvailability(db, staffVn, { userId: staffVn.userId, date: d.toISOString().slice(0, 10), kind: 'AVAILABLE', fromMin: null, toMin: null }, now);
+      }
+    }
+    await expect(submitMonth(db, staffVn, jan, now)).rejects.toMatchObject({ message: expect.stringContaining('33.6 h / 42.0 h') });
+
+    // A fifth whole day each week reaches 42 h: now it can be sent.
+    for (const monday of ['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25']) {
+      const d = new Date(`${monday}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 4);
+      await setAvailability(db, staffVn, { userId: staffVn.userId, date: d.toISOString().slice(0, 10), kind: 'AVAILABLE', fromMin: null, toMin: null }, now);
+    }
+    await submitMonth(db, staffVn, jan, now);
+    const overview = await submissionOverview(db, planner, 'winterthur', jan);
+    expect(overview.find((o) => o.person.userId === staffVn.userId)!.submittedAt).not.toBeNull();
   });
 });

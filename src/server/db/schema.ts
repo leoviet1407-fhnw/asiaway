@@ -348,6 +348,14 @@ export const timeMonthApprovals = pgTable('time_month_approvals', {
   approvedAt: timestamp('approved_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+
+export const staffingNeeds = pgTable('staffing_needs', {
+  site: text('site').notNull(),
+  weekday: integer('weekday').notNull(),
+  lunchPeople: integer('lunch_people').notNull().default(0),
+  dinnerPeople: integer('dinner_people').notNull().default(0),
+});
+
 export const schema = {
   locations,
   users,
@@ -376,4 +384,5 @@ export const schema = {
   yearlyBalances,
   timeEntries,
   timeMonthApprovals,
+  staffingNeeds,
 };

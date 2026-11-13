@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ABSENCE_LABEL, dueMonth, firstOpenDate, monthDates, shiftMonth } from '@/domain/roster';
+import { dueMonth, firstOpenDate, shiftMonth } from '@/domain/roster';
 import { isOrderer } from '@/domain/roles';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -46,12 +46,6 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : dueMonth(today);
   const data = await getAvailabilityMonth(database, p, userId, month);
   const vacation = await getVacationBalance(database, p, userId, Number(month.slice(0, 4)));
-  const dates = monthDates(month);
-  const absentDates: Record<string, string> = {};
-  for (const a of data.absences) {
-    if (a.status === 'REJECTED') continue;
-    for (const d of dates) if (a.startDate <= d && d <= a.endDate) absentDates[d] = a.status === 'REQUESTED' ? `${t(ABSENCE_LABEL[a.type])} (angefragt)` : t(ABSENCE_LABEL[a.type]);
-  }
   const own = userId === p.userId;
   const href = (m: string) => `/dienstplan/verfuegbarkeit?monat=${m}${own ? '' : `&person=${userId}`}`;
   const firstOpen = firstOpenDate(today);
@@ -81,12 +75,12 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         key={`${userId}-${month}`}
         userId={userId}
         month={month}
-        dates={dates}
+        weeks={data.weeks}
         today={today}
-        onCall={profile.employmentType === 'ON_CALL'}
+        pensumPercent={profile.pensumPercent}
         isPlanner={planner}
         days={data.days}
-        absentDates={absentDates}
+        absences={data.absences.map((a) => ({ startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status }))}
         submittedAt={data.submittedAt ? data.submittedAt.toISOString() : null}
         isSelf={own}
       />

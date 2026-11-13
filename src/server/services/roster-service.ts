@@ -1,8 +1,10 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isAdmin, isOrderer, type Principal } from '../../domain/roles';
+import { weekStatus, weeksOfMonth, weeksToCheck } from '../../domain/availability';
 import {
   LEAD_DAYS,
+  firstOpenDate,
   ROSTER_SITES,
   addDays,
   checkShiftTimes,
@@ -322,17 +324,21 @@ export async function listMyShifts(db: AppDatabase, p: Principal, from: string, 
 export async function getAvailabilityMonth(db: AppDatabase, p: Principal, userId: string, month: string) {
   if (userId !== p.userId && !isPlanner(p)) throw domainError('FORBIDDEN', 'Not allowed');
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
+  // The weeks of a month are the weeks whose Monday lies in it, shown in full (Mon–Sun).
+  const weeks = weeksOfMonth(month);
   const dates = monthDates(month);
-  const days = (await db.select().from(availability).where(and(eq(availability.userId, userId), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates.at(-1)!)))).map(
+  const from = weeks[0] ?? dates[0]!;
+  const to = weeks.length ? addDays(weeks.at(-1)!, 6) : dates.at(-1)!;
+  const days = (await db.select().from(availability).where(and(eq(availability.userId, userId), gte(availability.workDate, from), lte(availability.workDate, to)))).map(
     (a): AvailabilityDay => ({ userId: a.userId, date: a.workDate, kind: a.kind as AvailabilityKind, fromMin: a.fromMin, toMin: a.toMin }),
   );
   const [submission] = await db.select().from(availabilitySubmissions).where(and(eq(availabilitySubmissions.userId, userId), eq(availabilitySubmissions.month, month))).limit(1);
   const abs = await db
     .select()
     .from(absences)
-    .where(and(eq(absences.userId, userId), lte(absences.startDate, dates.at(-1)!), gte(absences.endDate, dates[0]!)))
+    .where(and(eq(absences.userId, userId), lte(absences.startDate, to), gte(absences.endDate, from)))
     .orderBy(asc(absences.startDate));
-  return { days, submittedAt: submission?.submittedAt ?? null, absences: abs };
+  return { days, submittedAt: submission?.submittedAt ?? null, absences: abs, weeks };
 }
 
 export interface SetAvailabilityInput {
@@ -362,10 +368,51 @@ export async function setAvailability(db: AppDatabase, p: Principal, input: SetA
   await db.insert(availability).values({ userId: input.userId, workDate: input.date, ...values }).onConflictDoUpdate({ target: [availability.userId, availability.workDate], set: values });
 }
 
-/** Marks a month as reported ("Meldung abschicken"). */
+/** Everything the availability check needs for the weeks of a month. */
+export async function getWeekStatuses(db: AppDatabase, p: Principal, userId: string, month: string, now = new Date()) {
+  if (userId !== p.userId && !isPlanner(p)) throw domainError('FORBIDDEN', 'Not allowed');
+  const profile = await getProfile(db, userId);
+  const weeks = weeksOfMonth(month);
+  if (weeks.length === 0) return { weeks: [], missingDays: [], openDays: 0 };
+  const from = weeks[0]!;
+  const to = addDays(weeks.at(-1)!, 6);
+  const av = (await db.select().from(availability).where(and(eq(availability.userId, userId), gte(availability.workDate, from), lte(availability.workDate, to)))).map(
+    (a): AvailabilityDay => ({ userId: a.userId, date: a.workDate, kind: a.kind as AvailabilityKind, fromMin: a.fromMin, toMin: a.toMin }),
+  );
+  const abs = await db
+    .select()
+    .from(absences)
+    .where(and(eq(absences.userId, userId), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, to), gte(absences.endDate, from)));
+  const absList = abs.map((a) => ({ startDate: a.startDate, endDate: a.endDate, type: a.type as AbsenceType }));
+  const today = todayIso(now);
+  const statuses = weeks.map((w) => ({ ...weekStatus({ weekStart: w, pensumPercent: profile?.pensumPercent ?? null, availability: av, absences: absList }), enforced: weeksToCheck(month, firstOpenDate(today)).includes(w) }));
+  // Open days without any choice (and not on holiday): staff must decide every day
+  const dayList = weeks.flatMap((w) => weekDates(w));
+  const missingDays = dayList.filter(
+    (d) => isOpenForStaff(d, today) && !av.some((a) => a.date === d) && !absList.some((a) => (a.type === 'VACATION' || a.type === 'SICK') && a.startDate <= d && d <= a.endDate),
+  );
+  return { weeks: statuses, missingDays, openDays: dayList.filter((d) => isOpenForStaff(d, today)).length };
+}
+
+/**
+ * Marks a month as reported ("Meldung abschicken"). Staff cannot send it half-done:
+ * every day they can still change needs a choice, and each full week must reach
+ * the hours of their contract (42 h × pensum).
+ */
 export async function submitMonth(db: AppDatabase, p: Principal, month: string, now = new Date()): Promise<void> {
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
-  if (!(await getProfile(db, p.userId))) throw domainError('FORBIDDEN', 'Kein Team-Profil.');
+  const profile = await getProfile(db, p.userId);
+  if (!profile) throw domainError('FORBIDDEN', 'Kein Team-Profil.');
+  const status = await getWeekStatuses(db, p, p.userId, month, now);
+  if (status.missingDays.length > 0) {
+    const [y, m, d] = status.missingDays[0]!.split('-');
+    throw domainError('VALIDATION_FAILED', `Bitte für jeden Tag etwas wählen. Noch ${status.missingDays.length} Tage ohne Auswahl, zuerst ${d}.${m}.${y}.`);
+  }
+  const short = status.weeks.filter((w) => w.enforced && !w.ok);
+  if (short.length > 0) {
+    const list = short.map((w) => `${w.weekStart.slice(8)}.${w.weekStart.slice(5, 7)}.: ${(w.offeredMinutes / 60 + w.creditMinutes / 60).toFixed(1)} h / ${((w.requiredMinutes ?? 0) / 60).toFixed(1)} h`).join('; ');
+    throw domainError('VALIDATION_FAILED', `Zu wenig Stunden in diesen Wochen (Woche ab, gewählt / nötig): ${list}`);
+  }
   await db.insert(availabilitySubmissions).values({ userId: p.userId, month, submittedAt: now }).onConflictDoUpdate({ target: [availabilitySubmissions.userId, availabilitySubmissions.month], set: { submittedAt: now } });
   await audit(db, p.userId, 'availability.submit', 'user', p.userId, { month });
 }

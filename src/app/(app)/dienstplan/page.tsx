@@ -55,6 +55,11 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
             </Link>
           )}
           {planner && (
+            <Link href="/dienstplan/bedarf" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
+              {t('Bedarf')}
+            </Link>
+          )}
+          {planner && (
             <Link href="/dienstplan/uebersicht" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
               {t('Übersicht')}
             </Link>

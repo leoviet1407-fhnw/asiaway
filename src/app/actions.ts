@@ -24,6 +24,7 @@ import {
   saveEntry,
   saveYearlyBalance,
 } from '@/server/services/hours-service';
+import { deriveNeedsFromWeek, saveNeeds } from '@/server/services/coverage-service';
 import {
   cancelAbsence,
   copyWeek,
@@ -628,4 +629,30 @@ export async function saveBalanceAction(_prev: { error?: string; saved?: boolean
 export async function setLanguageAction(lang: 'de' | 'en'): Promise<void> {
   (await cookies()).set(LANG_COOKIE, lang === 'en' ? 'en' : 'de', { path: '/', maxAge: 365 * 24 * 3600, sameSite: 'lax' });
   revalidatePath('/', 'layout');
+}
+
+// --- Staffing need and coverage ---------------------------------------------------------------
+
+export async function saveNeedsAction(site: string, needs: { lunchPeople: number; dinnerPeople: number }[]): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await saveNeeds(await db(), p, site, needs);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function deriveNeedsAction(site: string, weekStart: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await deriveNeedsFromWeek(await db(), p, site, weekStart);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
 }
