@@ -113,7 +113,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
       <VacationPanel
         userId={userId}
         isPlanner={planner}
-        minDate={firstOpen}
+        today={today}
         items={(reports ? data.absences : yearAbsences).map((a) => ({ id: a.id, startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status, note: a.note }))}
       />
     </div>

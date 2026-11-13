@@ -23,7 +23,7 @@ const STATUS_STYLE: Record<AbsenceStatus, string> = {
 };
 
 /** Holiday requests: staff ask, the planner approves. */
-export function VacationPanel({ userId, items, minDate, isPlanner }: { userId: string; items: Item[]; minDate: string; isPlanner: boolean }) {
+export function VacationPanel({ userId, items, today, isPlanner }: { userId: string; items: Item[]; today: string; isPlanner: boolean }) {
   const t = useT();
   const router = useRouter();
   const [state, action, pending] = useActionState(requestAbsenceAction, undefined);
@@ -32,7 +32,7 @@ export function VacationPanel({ userId, items, minDate, isPlanner }: { userId: s
   return (
     <section className="space-y-3">
       <h2 className="h-site">{t('Ferien')}</h2>
-      <p className="text-sm text-charcoal-muted">{t('Ferien bitte mindestens einen Monat im Voraus anfragen. Die Leitung bestätigt sie.')}</p>
+      <p className="text-sm text-charcoal-muted">{t('Ferien jederzeit anfragen, auch kurzfristig – zum Beispiel weniger als eine Woche im Voraus. Die Leitung bestätigt sie so schnell wie möglich.')}</p>
       <form action={action} className="card grid gap-3 sm:grid-cols-4">
         <input type="hidden" name="userId" value={userId} />
         {isPlanner ? (
@@ -49,11 +49,11 @@ export function VacationPanel({ userId, items, minDate, isPlanner }: { userId: s
         )}
         <div>
           <label className="label" htmlFor="startDate">{t('Von')}</label>
-          <input id="startDate" name="startDate" type="date" min={isPlanner ? undefined : minDate} required className="w-full" />
+          <input id="startDate" name="startDate" type="date" min={isPlanner ? undefined : today} required className="w-full" />
         </div>
         <div>
           <label className="label" htmlFor="endDate">{t('Bis')}</label>
-          <input id="endDate" name="endDate" type="date" min={isPlanner ? undefined : minDate} className="w-full" />
+          <input id="endDate" name="endDate" type="date" min={isPlanner ? undefined : today} className="w-full" />
         </div>
         <div className="flex items-end">
           <button className="btn-primary w-full" disabled={pending}>{isPlanner ? t('Eintragen') : t('Anfragen')}</button>

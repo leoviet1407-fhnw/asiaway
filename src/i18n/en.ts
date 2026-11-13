@@ -423,7 +423,7 @@ export const EN: Record<string, string> = {
   ', angefragt': ', requested',
   von: 'of',
   'für': 'for',
-  'Ferien bitte mindestens einen Monat im Voraus anfragen. Die Leitung bestätigt sie.': 'Please request holidays at least one month ahead. The management confirms them.',
+  'Ferien jederzeit anfragen, auch kurzfristig – zum Beispiel weniger als eine Woche im Voraus. Die Leitung bestätigt sie so schnell wie möglich.': 'Request holidays any time, even at short notice – for example less than a week ahead. The management confirms them as quickly as possible.',
   Von: 'From',
   Bis: 'To',
   Art: 'Type',
