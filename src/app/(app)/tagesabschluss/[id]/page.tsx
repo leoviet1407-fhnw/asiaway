@@ -12,10 +12,15 @@ import { listRestaurants } from '@/server/services/catalog-service';
 import { getClosing, listClosingPhotos } from '@/server/services/closing-service';
 import { ClosingForm } from '../ClosingForm';
 import { ClosingActions } from './ClosingActions';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Tagesabschluss' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Tagesabschluss') };
+}
 
 export default async function ClosingPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ gespeichert?: string }> }) {
+  const t = await getT();
   const { id } = await params;
   const { gespeichert } = await searchParams;
   const p = await requirePrincipal();
@@ -36,33 +41,33 @@ export default async function ClosingPage({ params, searchParams }: { params: Pr
   return (
     <div className="mx-auto max-w-xl space-y-4 pb-8">
       <div>
-        <Link href="/tagesabschluss" className="text-sm text-charcoal-muted hover:text-navy">← Abschlüsse</Link>
+        <Link href="/tagesabschluss" className="text-sm text-charcoal-muted hover:text-navy">{t('← Abschlüsse')}</Link>
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl">{formatDay(closing.businessDate)}</h1>
-          <span className={`chip ${approved ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>{CLOSING_STATUS_LABEL[closing.status]}</span>
+          <h1 className="text-2xl">{formatDay(closing.businessDate, t.lang)}</h1>
+          <span className={`chip ${approved ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>{t(CLOSING_STATUS_LABEL[closing.status])}</span>
         </div>
         <p className="text-charcoal-muted">{closing.locationName} · {closing.station}</p>
         <p className="text-xs text-charcoal-muted">
-          Abgeschlossen von {closing.closedByName ?? '–'} ({formatDateTime(closing.createdAt)})
-          {approved && ` · Freigegeben von ${closing.approvedByName ?? '–'} (${formatDateTime(closing.approvedAt)})`}
+          {t('Abgeschlossen von')} {closing.closedByName ?? '–'} ({formatDateTime(closing.createdAt)})
+          {approved && ` · ${t('Freigegeben von')} ${closing.approvedByName ?? '–'} (${formatDateTime(closing.approvedAt)})`}
         </p>
       </div>
 
-      {gespeichert && <p className="rounded-btn bg-ok-50 p-3 font-semibold text-ok-500">Gespeichert.</p>}
+      {gespeichert && <p className="rounded-btn bg-ok-50 p-3 font-semibold text-ok-500">{t('Gespeichert.')}</p>}
 
       {approved ? (
         <section className="card space-y-2">
-          <Row label="Cashbestand (Kassa)" value={chf(closing.cashCountedCents)} />
-          <Row label="− Anfangsbestand" value={chf(closing.startFloatCents)} />
-          <Row label="= Barumsatz" value={chf(closing.result.cashSalesCents)} strong />
-          <Row label="+ EFT" value={chf(closing.eftCents)} />
-          <Row label="+ Mobile Payment" value={chf(closing.mobileCents)} />
-          <Row label="TOTAL (IST)" value={chf(closing.result.totalActualCents)} strong />
-          <Row label="Kassen-Brutto (SOLL)" value={chf(closing.posGrossCents)} />
-          <Row label={`Differenz – ${DIFFERENCE_LABEL[tone]}`} value={chf(closing.result.differenceCents)} strong />
-          <Row label="BANK EINZAHLEN" value={chf(closing.result.bankDepositCents)} strong />
-          {closing.note && <p className="border-t border-surface-line pt-2 text-sm">Notiz: {closing.note}</p>}
-          <p className="text-xs text-charcoal-muted">Gesperrt. Zum Ändern muss ein Besteller oder Admin den Abschluss wieder öffnen.</p>
+          <Row label={t('Cashbestand (Kassa)')} value={chf(closing.cashCountedCents)} />
+          <Row label={t('− Anfangsbestand')} value={chf(closing.startFloatCents)} />
+          <Row label={t('= Barumsatz')} value={chf(closing.result.cashSalesCents)} strong />
+          <Row label={t('+ EFT')} value={chf(closing.eftCents)} />
+          <Row label={t('+ Mobile Payment')} value={chf(closing.mobileCents)} />
+          <Row label={t('TOTAL (IST)')} value={chf(closing.result.totalActualCents)} strong />
+          <Row label={t('Kassen-Brutto (SOLL)')} value={chf(closing.posGrossCents)} />
+          <Row label={`${t('Differenz')} – ${t(DIFFERENCE_LABEL[tone])}`} value={chf(closing.result.differenceCents)} strong />
+          <Row label={t('BANK EINZAHLEN')} value={chf(closing.result.bankDepositCents)} strong />
+          {closing.note && <p className="border-t border-surface-line pt-2 text-sm">{t('Notiz:')} {closing.note}</p>}
+          <p className="text-xs text-charcoal-muted">{t('Gesperrt. Zum Ändern muss ein Besteller oder Admin den Abschluss wieder öffnen.')}</p>
         </section>
       ) : (
         <ClosingForm
@@ -95,11 +100,12 @@ export default async function ClosingPage({ params, searchParams }: { params: Pr
   );
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+async function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  const t = await getT();
   return (
     <div className={`flex justify-between gap-3 ${strong ? 'border-t border-surface-line pt-2 font-bold text-navy' : ''}`}>
       <span>{label}</span>
-      <span>CHF {value}</span>
+      <span>{t('CHF')} {value}</span>
     </div>
   );
 }

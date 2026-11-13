@@ -1,5 +1,5 @@
 /** German text for the stable error codes. */
-const MESSAGES: Record<string, string> = {
+export const MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'Bitte zuerst anmelden.',
   FORBIDDEN: 'Dafür fehlt die Berechtigung.',
   RATE_LIMITED: 'Zu viele Fehlversuche. Bitte in 15 Minuten nochmals versuchen.',

@@ -6,6 +6,7 @@ import { belowMinimum } from '@/domain/order';
 import { formatChf, formatQty, parseQty, roundQty } from '@/domain/qty';
 import { Icon } from '@/components/Icon';
 import { copyLastOrderAction, setQtyAction, updateOrderDetailsAction } from '../../../actions';
+import { useT } from '@/i18n/client';
 
 export interface EditorItem {
   id: string;
@@ -24,6 +25,7 @@ export interface EditorItem {
 const AREA_ORDER = ['COLD', 'FREEZER', 'DRY', 'BAR'];
 
 export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliveryDate: string; note: string; minOrderCents: number; onlyOrderedInitially?: boolean }) {
+  const t = useT();
   const router = useRouter();
   const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(props.items.map((i) => [i.id, i.qty])));
   const [query, setQuery] = useState('');
@@ -97,7 +99,7 @@ export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliv
       <section className="card grid gap-3 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="deliveryDate">
-            Gewünschte Lieferung
+            {t('Gewünschte Lieferung')}
           </label>
           <input
             id="deliveryDate"
@@ -112,9 +114,9 @@ export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliv
         </div>
         <div>
           <label className="label" htmlFor="note">
-            Bemerkung an Lieferant
+            {t('Bemerkung an Lieferant')}
           </label>
-          <input id="note" className="w-full" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} onBlur={() => void saveDetails(deliveryDate, note)} placeholder="optional" />
+          <input id="note" className="w-full" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} onBlur={() => void saveDetails(deliveryDate, note)} placeholder={t('optional')} />
         </div>
         <button
           type="button"
@@ -124,20 +126,20 @@ export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliv
             startCopy(async () => {
               const result = await copyLastOrderAction(props.orderId);
               if (!result.ok) setError(result.error);
-              else if (!result.value) setError('Keine frühere Bestellung bei diesem Lieferanten gefunden.');
+              else if (!result.value) setError(t('Keine frühere Bestellung bei diesem Lieferanten gefunden.'));
               router.refresh();
             })
           }
         >
-          ↺ Mengen der letzten Bestellung übernehmen
+          {t('↺ Mengen der letzten Bestellung übernehmen')}
         </button>
       </section>
 
       <div className="sticky top-[52px] z-20 -mx-4 space-y-2 bg-surface-sunken/95 px-4 py-2 backdrop-blur">
-        <input type="search" placeholder="Artikel suchen …" className="w-full" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input type="search" placeholder={t('Artikel suchen …')} className="w-full" value={query} onChange={(e) => setQuery(e.target.value)} />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="min-h-0 accent-brand-600" checked={onlyOrdered} onChange={(e) => setOnlyOrdered(e.target.checked)} />
-          Nur bestellte Artikel zeigen
+          {t('Nur bestellte Artikel zeigen')}
         </label>
       </div>
 
@@ -151,17 +153,17 @@ export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliv
           </ul>
         </section>
       ))}
-      {groups.length === 0 && <p className="card text-charcoal-muted">Keine Artikel gefunden.</p>}
+      {groups.length === 0 && <p className="card text-charcoal-muted">{t('Keine Artikel gefunden.')}</p>}
 
       {error && <p className="rounded-btn bg-danger-50 p-3 text-danger-500">{error}</p>}
 
       <div className="fixed inset-x-0 bottom-16 z-20 border-t border-surface-line bg-white/95 px-4 py-2 backdrop-blur md:bottom-0">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="text-sm">
-            <span className="font-semibold text-navy">{count} Positionen</span> · {formatChf(total)}
-            {belowMinimum(total, props.minOrderCents) && <span className="ml-2 text-warn-500">unter Mindestbestellung {formatChf(props.minOrderCents)}</span>}
+            <span className="font-semibold text-navy">{count} {t('Positionen')}</span> · {formatChf(total)}
+            {belowMinimum(total, props.minOrderCents) && <span className="ml-2 text-warn-500">{t('unter Mindestbestellung')} {formatChf(props.minOrderCents)}</span>}
           </div>
-          <span className="text-xs text-charcoal-muted">{saving > 0 ? 'Speichert …' : 'Gespeichert'}</span>
+          <span className="text-xs text-charcoal-muted">{saving > 0 ? t('Speichert …') : t('Gespeichert')}</span>
         </div>
       </div>
     </div>
@@ -169,6 +171,7 @@ export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliv
 }
 
 function ItemRow({ item, qty, onChange }: { item: EditorItem; qty: number; onChange: (v: number) => void }) {
+  const t = useT();
   const [text, setText] = useState<string | null>(null);
   const step = item.orderUnit === 'kg' ? 0.5 : 1;
   return (
@@ -176,8 +179,8 @@ function ItemRow({ item, qty, onChange }: { item: EditorItem; qty: number; onCha
       <div className="min-w-0 flex-1">
         <div className="font-medium leading-snug text-navy">
           {item.nameDe}
-          {item.isKeyItem && <span className="chip ml-1 bg-navy-50 text-[10px] text-navy">Key</span>}
-          {item.isFresh && <span className="chip ml-1 bg-ok-50 text-[10px] text-ok-500">frisch</span>}
+          {item.isKeyItem && <span className="chip ml-1 bg-navy-50 text-[10px] text-navy">{t('Key')}</span>}
+          {item.isFresh && <span className="chip ml-1 bg-ok-50 text-[10px] text-ok-500">{t('frisch')}</span>}
         </div>
         {item.nameVi && <div className="text-xs text-charcoal-muted">{item.nameVi}</div>}
         <div className="text-xs text-charcoal-muted">
@@ -185,12 +188,12 @@ function ItemRow({ item, qty, onChange }: { item: EditorItem; qty: number; onCha
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <button type="button" aria-label="weniger" className="btn-secondary min-w-tap px-0" onClick={() => onChange(qty - step)} disabled={qty <= 0}>
+        <button type="button" aria-label={t('weniger')} className="btn-secondary min-w-tap px-0" onClick={() => onChange(qty - step)} disabled={qty <= 0}>
           <Icon name="minus" />
         </button>
         <input
           inputMode="decimal"
-          aria-label={`Menge ${item.nameDe}`}
+          aria-label={`${t('Menge')} ${item.nameDe}`}
           className="w-16 px-1 text-center font-semibold"
           value={text ?? (qty > 0 ? formatQty(qty) : '')}
           placeholder="0"
@@ -205,7 +208,7 @@ function ItemRow({ item, qty, onChange }: { item: EditorItem; qty: number; onCha
             setText(null);
           }}
         />
-        <button type="button" aria-label="mehr" className="btn-primary min-w-tap px-0" onClick={() => onChange(qty + step)}>
+        <button type="button" aria-label={t('mehr')} className="btn-primary min-w-tap px-0" onClick={() => onChange(qty + step)}>
           <Icon name="plus" />
         </button>
       </div>

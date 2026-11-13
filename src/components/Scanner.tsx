@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
+import { useT } from '@/i18n/client';
 
 /**
  * Phone-camera barcode scanner.
@@ -27,6 +28,7 @@ const WANTED = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'];
 type Engine = 'native' | 'zxing';
 
 export function Scanner({ onCode }: { onCode: (code: string) => void }) {
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const onCodeRef = useRef(onCode);
@@ -59,7 +61,7 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
     if (!video) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setState('error');
-      setMessage('Dieser Browser kann nicht auf die Kamera zugreifen. Bitte Barcode unten eintippen.');
+      setMessage(t('Dieser Browser kann nicht auf die Kamera zugreifen. Bitte Barcode unten eintippen.'));
       return;
     }
     let stream: MediaStream;
@@ -72,8 +74,8 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
       setState('error');
       setMessage(
         (error as DOMException)?.name === 'NotAllowedError'
-          ? 'Kamera-Zugriff verweigert. In den Browser-Einstellungen erlauben oder Barcode eintippen.'
-          : 'Kamera konnte nicht gestartet werden. Barcode bitte eintippen.',
+          ? t('Kamera-Zugriff verweigert. In den Browser-Einstellungen erlauben oder Barcode eintippen.')
+          : t('Kamera konnte nicht gestartet werden. Barcode bitte eintippen.'),
       );
       return;
     }
@@ -146,7 +148,7 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
         console.error('[scanner] zxing failed', error);
         stopStream();
         setState('error');
-        setMessage('Scanner konnte nicht geladen werden. Barcode bitte eintippen.');
+        setMessage(t('Scanner konnte nicht geladen werden. Barcode bitte eintippen.'));
         return;
       }
     }
@@ -166,7 +168,7 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-white">
             <button type="button" className="btn-primary px-6 text-base" onClick={() => void start()} disabled={state === 'starting'}>
               <Icon name="camera" />
-              {state === 'starting' ? 'Kamera startet …' : 'Kamera starten'}
+              {state === 'starting' ? t('Kamera startet …') : t('Kamera starten')}
             </button>
             {message && <p className="max-w-xs text-sm text-white/80">{message}</p>}
           </div>
@@ -174,9 +176,9 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
       </div>
       {state === 'running' && (
         <div className="flex items-center justify-between px-3 py-1.5 text-xs text-white/70">
-          <span>{engine === 'native' ? 'Scanner aktiv' : 'Scanner aktiv (ZXing)'} – Barcode in den Rahmen halten</span>
+          <span>{engine === 'native' ? t('Scanner aktiv') : t('Scanner aktiv (ZXing)')} {t('– Barcode in den Rahmen halten')}</span>
           <button type="button" className="font-semibold text-white" onClick={stop}>
-            Kamera aus
+            {t('Kamera aus')}
           </button>
         </div>
       )}

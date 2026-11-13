@@ -376,8 +376,9 @@ export function shiftMonth(month: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 7);
 }
 
-export function weekdayShort(iso: string): string {
-  return ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
+export function weekdayShort(iso: string, lang: 'de' | 'en' = 'de'): string {
+  const names = lang === 'en' ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  return names[new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
 }
 
 export type AbsenceStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED';

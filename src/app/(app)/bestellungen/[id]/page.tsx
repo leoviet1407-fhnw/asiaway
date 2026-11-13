@@ -15,10 +15,15 @@ import { OrderStatusChip } from '@/components/StatusChip';
 import { startReceiptAction } from '../../../actions';
 import { OrderActions } from './OrderActions';
 import { OrderEditor } from './OrderEditor';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Bestellung' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Bestellung') };
+}
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getT();
   const { id } = await params;
   const p = await requirePrincipal();
   const database = await db();
@@ -40,7 +45,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     <div className="space-y-4 pb-28">
       <div>
         <Link href="/bestellungen" className="text-sm text-charcoal-muted hover:text-navy">
-          ← Bestellungen
+          {t('← Bestellungen')}
         </Link>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl">{supplier.name}</h1>
@@ -48,16 +53,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
         <p className="text-charcoal-muted">
           {order.number} · {location.name}
-          {supplier.deliveryDays && ` · Liefertage ${supplier.deliveryDays}`}
+          {supplier.deliveryDays && ` · ${t('Liefertage')} ${supplier.deliveryDays}`}
         </p>
         {supplier.cutoffNote && <p className="text-sm text-charcoal-muted">{supplier.cutoffNote}</p>}
       </div>
 
       <dl className="card grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-        <Meta label="Erstellt" value={`${view.createdBy?.name ?? '–'}, ${formatDateTime(order.createdAt)}`} />
-        <Meta label="Eingereicht" value={view.submittedBy ? `${view.submittedBy.name}, ${formatDateTime(order.submittedAt)}` : '–'} />
-        <Meta label="Gesendet" value={view.sentBy ? `${view.sentBy.name}, ${formatDateTime(order.sentAt)}` : '–'} />
-        <Meta label="An" value={order.sentTo ?? supplier.orderEmail} />
+        <Meta label={t('Erstellt')} value={`${view.createdBy?.name ?? '–'}, ${formatDateTime(order.createdAt)}`} />
+        <Meta label={t('Eingereicht')} value={view.submittedBy ? `${view.submittedBy.name}, ${formatDateTime(order.submittedAt)}` : '–'} />
+        <Meta label={t('Gesendet')} value={view.sentBy ? `${view.sentBy.name}, ${formatDateTime(order.sentAt)}` : '–'} />
+        <Meta label={t('An')} value={order.sentTo ?? supplier.orderEmail} />
       </dl>
 
       {editable ? (
@@ -75,7 +80,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               nameDe: i.nameDe,
               nameVi: i.nameVi,
               sku: offer.supplierSku ?? i.sku,
-              area: STORAGE_AREA_LABEL[i.storageArea],
+              area: t(STORAGE_AREA_LABEL[i.storageArea]),
               areaKey: i.storageArea,
               orderUnit: offer.orderUnit,
               priceCents: line?.unitPriceCents ?? offer.priceCents,
@@ -91,25 +96,25 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
       {preview && (
         <section className="card space-y-2 border-brand-600">
-          <h2 className="text-lg">E-Mail an den Lieferanten</h2>
-          <p className="text-xs text-charcoal-muted">Vorschau des gespeicherten Stands – nach Änderungen Seite neu laden. Gesendet wird immer der aktuelle Stand.</p>
+          <h2 className="text-lg">{t('E-Mail an den Lieferanten')}</h2>
+          <p className="text-xs text-charcoal-muted">{t('Vorschau des gespeicherten Stands – nach Änderungen Seite neu laden. Gesendet wird immer der aktuelle Stand.')}</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
-            <dt className="font-semibold">An</dt>
+            <dt className="font-semibold">{t('An')}</dt>
             <dd className="break-all">{preview.to}</dd>
             {preview.cc && (
               <>
-                <dt className="font-semibold">CC</dt>
+                <dt className="font-semibold">{t('CC')}</dt>
                 <dd className="break-all">{preview.cc}</dd>
               </>
             )}
-            <dt className="font-semibold">Antwort an</dt>
+            <dt className="font-semibold">{t('Antwort an')}</dt>
             <dd className="break-all">{preview.replyTo}</dd>
-            <dt className="font-semibold">Betreff</dt>
+            <dt className="font-semibold">{t('Betreff')}</dt>
             <dd>{preview.subject}</dd>
           </dl>
           <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-btn bg-surface-sunken p-3 font-sans text-sm">{preview.text}</pre>
           <a href={withBase(`/bestellungen/${order.id}/pdf`)} target="_blank" className="btn-secondary" rel="noreferrer">
-            PDF ansehen
+            {t('PDF ansehen')}
           </a>
         </section>
       )}
@@ -117,24 +122,24 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {order.sentAt && (
         <section className="card flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm">
-            Gesendet an <strong>{order.sentTo}</strong> am {formatDateTime(order.sentAt)}.
+            {t('Gesendet an')} <strong>{order.sentTo}</strong> {t('am')} {formatDateTime(order.sentAt)}.
           </div>
           <a href={withBase(`/bestellungen/${order.id}/pdf`)} target="_blank" className="btn-secondary" rel="noreferrer">
-            Gesendetes PDF
+            {t('Gesendetes PDF')}
           </a>
         </section>
       )}
 
       {receipts.length > 0 && (
         <section className="card">
-          <h2 className="mb-2 text-lg">Lieferungen</h2>
+          <h2 className="mb-2 text-lg">{t('Lieferungen')}</h2>
           <ul className="space-y-1 text-sm">
             {receipts.map((r, i) => (
               <li key={r.id}>
                 <Link className="text-brand-600 underline" href={r.status === 'OPEN' ? `/wareneingang/${r.id}` : `/wareneingang/${r.id}/abweichungen`}>
-                  Lieferung {receipts.length - i}
+                  {t('Lieferung')} {receipts.length - i}
                 </Link>{' '}
-                – {r.status === 'OPEN' ? 'in Arbeit' : `abgeschlossen ${formatDateTime(r.completedAt)}`}
+                – {r.status === 'OPEN' ? t('in Arbeit') : `${t('abgeschlossen')} ${formatDateTime(r.completedAt)}`}
               </li>
             ))}
           </ul>
@@ -144,7 +149,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       <OrderActions
         orderId={order.id}
         canSubmit={canSubmitOrder(p, order)}
-        submitLabel={isOrderer(p) ? 'Weiter zu Prüfen & Senden' : 'Zur Prüfung einreichen'}
+        submitLabel={isOrderer(p) ? t('Weiter zu Prüfen & Senden') : t('Zur Prüfung einreichen')}
         canSend={canSendOrder(p, order)}
         canReturn={isOrderer(p) && order.status === 'SUBMITTED'}
         canCancel={canCancelOrder(p, order)}
@@ -155,7 +160,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {canReceiveOrder(p, order) && (
         <form action={startReceiptAction} className="fixed inset-x-0 bottom-16 z-20 px-4 md:static md:px-0">
           <input type="hidden" name="orderId" value={order.id} />
-          <button className="btn-primary w-full shadow-lg md:w-auto">{openReceipt ? 'Wareneingang fortsetzen' : 'Wareneingang starten'}</button>
+          <button className="btn-primary w-full shadow-lg md:w-auto">{openReceipt ? t('Wareneingang fortsetzen') : t('Wareneingang starten')}</button>
         </form>
       )}
     </div>
@@ -171,7 +176,7 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReadOnlyLines({
+async function ReadOnlyLines({
   lines,
   totalCents,
   minOrderCents,
@@ -184,15 +189,16 @@ function ReadOnlyLines({
   deliveryDate: string | null;
   note: string | null;
 }) {
+  const t = await getT();
   return (
     <section className="card space-y-3">
       <div className="flex flex-wrap gap-x-6 text-sm">
         <div>
-          <span className="font-semibold">Lieferung:</span> {formatDay(deliveryDate)}
+          <span className="font-semibold">{t('Lieferung:')}</span> {formatDay(deliveryDate, t.lang)}
         </div>
         {note && (
           <div>
-            <span className="font-semibold">Bemerkung:</span> {note}
+            <span className="font-semibold">{t('Bemerkung:')}</span> {note}
           </div>
         )}
       </div>
@@ -202,7 +208,7 @@ function ReadOnlyLines({
             <div className="min-w-0">
               <div className="font-medium text-navy">{l.nameDe}</div>
               <div className="text-xs text-charcoal-muted">
-                {STORAGE_AREA_LABEL[l.storageArea as StorageArea]} · {l.supplierSku ?? l.sku}
+                {t(STORAGE_AREA_LABEL[l.storageArea as StorageArea])} · {l.supplierSku ?? l.sku}
               </div>
             </div>
             <div className="whitespace-nowrap text-right">
@@ -215,11 +221,11 @@ function ReadOnlyLines({
         ))}
       </ul>
       <div className="flex justify-between border-t border-surface-line pt-2 font-semibold text-navy">
-        <span>{lines.length} Positionen</span>
+        <span>{lines.length} {t('Positionen')}</span>
         <span>{formatChf(totalCents)}</span>
       </div>
       {belowMinimum(totalCents, minOrderCents) && (
-        <p className="rounded-btn bg-warn-50 p-2 text-sm text-warn-500">Unter dem Mindestbestellwert von {formatChf(minOrderCents)}.</p>
+        <p className="rounded-btn bg-warn-50 p-2 text-sm text-warn-500">{t('Unter dem Mindestbestellwert von')} {formatChf(minOrderCents)}.</p>
       )}
     </section>
   );

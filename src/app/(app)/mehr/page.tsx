@@ -4,21 +4,27 @@ import { Icon, type IconName } from '@/components/Icon';
 import { requirePrincipal } from '@/server/auth/current';
 import { logoutAction } from '../../actions';
 import { PasswordForm } from './PasswordForm';
+import { LanguageSwitch } from '@/i18n/LanguageSwitch';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Mehr' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Mehr') };
+}
 
 export default async function MorePage() {
+  const t = await getT();
   const p = await requirePrincipal();
   const items: { href: string; label: string; text: string; icon: IconName }[] = [
-    { href: '/artikel', label: 'Artikel', text: 'Artikelliste, Barcodes, Preise', icon: 'box' },
-    ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: 'Lieferanten', text: 'Kontakte, Liefertage, Mindestbestellung', icon: 'truck' as const }] : []),
-    { href: '/dienstplan/stunden', label: 'Meine Stunden', text: 'Arbeitszeit, Überstunden, Ferien-Rest', icon: 'calendar' },
-    { href: '/dienstplan/verfuegbarkeit', label: 'Verfügbarkeit & Ferien', text: 'Einen Monat im Voraus melden', icon: 'calendar' },
-    ...(isOrderer(p) ? [{ href: '/dienstplan/team', label: 'Team & Meldungen', text: 'Wer hat gemeldet, Ferienanfragen, Mitarbeiter', icon: 'calendar' as const }] : []),
+    { href: '/artikel', label: t('Artikel'), text: t('Artikelliste, Barcodes, Preise'), icon: 'box' },
+    ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: t('Lieferanten'), text: t('Kontakte, Liefertage, Mindestbestellung'), icon: 'truck' as const }] : []),
+    { href: '/dienstplan/stunden', label: t('Meine Stunden'), text: t('Arbeitszeit, Überstunden, Ferien-Rest'), icon: 'calendar' },
+    { href: '/dienstplan/verfuegbarkeit', label: t('Verfügbarkeit & Ferien'), text: t('Einen Monat im Voraus melden'), icon: 'calendar' },
+    ...(isOrderer(p) ? [{ href: '/dienstplan/team', label: t('Team & Meldungen'), text: t('Wer hat gemeldet, Ferienanfragen, Mitarbeiter'), icon: 'calendar' as const }] : []),
   ];
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl">Mehr</h1>
+      <h1 className="text-2xl">{t('Mehr')}</h1>
       <ul className="space-y-2">
         {items.map((i) => (
           <li key={i.href}>
@@ -32,9 +38,13 @@ export default async function MorePage() {
           </li>
         ))}
       </ul>
+      <div className="card flex items-center justify-between gap-3">
+        <span className="font-semibold text-navy">Deutsch / English</span>
+        <LanguageSwitch />
+      </div>
       <PasswordForm />
       <form action={logoutAction}>
-        <button className="btn-secondary w-full">Abmelden ({p.name})</button>
+        <button className="btn-secondary w-full">{t('Abmelden (')}{p.name})</button>
       </form>
     </div>
   );

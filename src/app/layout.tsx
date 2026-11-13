@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Sans } from 'next/font/google';
 import { ServiceWorker } from '@/components/ServiceWorker';
+import { LangProvider } from '@/i18n/client';
+import { getLang } from '@/i18n/server';
 import { withBase } from '@/lib/base-path';
 import './globals.css';
 
@@ -27,12 +29,15 @@ export const viewport: Viewport = {
   themeColor: '#09141d',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const lang = await getLang();
   return (
-    <html lang="de" className={plex.variable}>
+    <html lang={lang} className={plex.variable}>
       <body className="min-h-screen">
-        {children}
-        <ServiceWorker />
+        <LangProvider lang={lang}>
+          {children}
+          <ServiceWorker />
+        </LangProvider>
       </body>
     </html>
   );

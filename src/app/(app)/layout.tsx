@@ -5,34 +5,37 @@ import { db } from '@/server/db';
 import { listLocations } from '@/server/services/catalog-service';
 import { logoutAction } from '../actions';
 import { Logo } from '@/components/Logo';
+import { LanguageSwitch } from '@/i18n/LanguageSwitch';
 import { NavLinks } from '@/components/NavLinks';
+import { getT } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const t = await getT();
   const p = await requirePrincipal();
   const locations = await listLocations(await db());
   const scope = p.grants
-    .map((g) => `${roleLabel(g.role)}${g.locationId ? ` · ${locations.find((l) => l.id === g.locationId)?.shortName ?? g.locationId}` : ''}`)
+    .map((g) => `${t(roleLabel(g.role))}${g.locationId ? ` · ${locations.find((l) => l.id === g.locationId)?.shortName ?? g.locationId}` : ''}`)
     .join(', ');
   const links = [
-    { href: '/', label: 'Start', icon: 'home' as const },
-    { href: '/bestellungen', label: 'Bestellen', icon: 'cart' as const },
-    { href: '/wareneingang', label: 'Eingang', icon: 'scan' as const },
-    { href: '/tagesabschluss', label: 'Abschluss', icon: 'cash' as const },
-    { href: '/dienstplan', label: 'Dienstplan', icon: 'calendar' as const },
+    { href: '/', label: t('Start'), icon: 'home' as const },
+    { href: '/bestellungen', label: t('Bestellen'), icon: 'cart' as const },
+    { href: '/wareneingang', label: t('Eingang'), icon: 'scan' as const },
+    { href: '/tagesabschluss', label: t('Abschluss'), icon: 'cash' as const },
+    { href: '/dienstplan', label: t('Dienstplan'), icon: 'calendar' as const },
   ];
   const more = [
-    { href: '/artikel', label: 'Artikel', icon: 'box' as const },
-    ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: 'Lieferanten', icon: 'truck' as const }] : []),
+    { href: '/artikel', label: t('Artikel'), icon: 'box' as const },
+    ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: t('Lieferanten'), icon: 'truck' as const }] : []),
   ];
   return (
     <div className="min-h-screen pb-20 md:pb-0">
       <header className="sticky top-0 z-30 bg-navy text-white">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2">
-          <Link href="/" className="flex items-center gap-2" aria-label="AsiaWay Staff – Start">
+          <Link href="/" className="flex items-center gap-2" aria-label={t('AsiaWay Staff – Start')}>
             <Logo variant="white" className="h-6" />
-            <span className="text-sm text-white/70">Staff</span>
+            <span className="text-sm text-white/70">{t('Staff')}</span>
           </Link>
           <nav className="ml-6 hidden md:block">
             <NavLinks links={[...links, ...more]} variant="top" />
@@ -42,9 +45,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="text-sm font-semibold">{p.name}</div>
               <div className="text-xs text-white/60">{scope}</div>
             </div>
+            <LanguageSwitch dark />
             <form action={logoutAction}>
-              <button className="btn min-h-0 px-3 py-1.5 text-sm text-white hover:bg-white/10" title="Abmelden">
-                Abmelden
+              <button className="btn min-h-0 px-3 py-1.5 text-sm text-white hover:bg-white/10" title={t('Abmelden')}>
+                {t('Abmelden')}
               </button>
             </form>
           </div>
@@ -52,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <main className="mx-auto max-w-5xl px-4 py-4">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-surface-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        <NavLinks links={[...links, { href: '/mehr', label: 'Mehr', icon: 'more' as const }]} variant="bottom" />
+        <NavLinks links={[...links, { href: '/mehr', label: t('Mehr'), icon: 'more' as const }]} variant="bottom" />
       </nav>
     </div>
   );

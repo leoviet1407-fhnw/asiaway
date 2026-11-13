@@ -8,6 +8,8 @@ import { DomainError } from '@/domain/errors';
 import { parseChfToCents, parseQty } from '@/domain/qty';
 import { parseTime } from '@/domain/roster';
 import { messageFor } from '@/lib/messages';
+import { getT } from '@/i18n/server';
+import { LANG_COOKIE } from '@/i18n/translate';
 import { requirePrincipal } from '@/server/auth/current';
 import { SESSION_COOKIE, SESSION_DAYS, changePassword, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
@@ -62,10 +64,11 @@ import {
 
 export type ActionResult<T = undefined> = { ok: true; value?: T } | { ok: false; error: string };
 
-function fail(error: unknown): { ok: false; error: string } {
-  if (error instanceof DomainError) return { ok: false, error: messageFor(error.code, error.message) };
+async function fail(error: unknown): Promise<{ ok: false; error: string }> {
+  const t = await getT();
+  if (error instanceof DomainError) return { ok: false, error: t(messageFor(error.code, error.message)) };
   console.error('[action] unexpected error', error);
-  return { ok: false, error: messageFor('INTERNAL_ERROR') };
+  return { ok: false, error: t(messageFor('INTERNAL_ERROR')) };
 }
 
 /** Redirects are thrown by Next; they must pass through untouched. */
@@ -88,8 +91,8 @@ export async function loginAction(_prev: { error?: string } | undefined, form: F
       maxAge: SESSION_DAYS * 24 * 3600,
     });
   } catch (error) {
-    if (error instanceof DomainError && error.code === 'UNAUTHENTICATED') return { error: 'E-Mail oder Passwort ist falsch.' };
-    return { error: fail(error).error };
+    if (error instanceof DomainError && error.code === 'UNAUTHENTICATED') return { error: (await getT())('E-Mail oder Passwort ist falsch.') };
+    return { error: (await fail(error)).error };
   }
   redirect('/');
 }
@@ -110,7 +113,7 @@ export async function openDraftAction(_prev: { error?: string } | undefined, for
     ({ id } = await openDraft(await db(), p, String(form.get('locationId')), String(form.get('supplierId'))));
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
   redirect(`/bestellungen/${id}`);
 }
@@ -122,7 +125,7 @@ export async function setQtyAction(orderId: string, itemId: string, qty: number)
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -133,7 +136,7 @@ export async function setLineNoteAction(orderId: string, itemId: string, qty: nu
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -144,7 +147,7 @@ export async function updateOrderDetailsAction(orderId: string, deliveryDate: st
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -156,7 +159,7 @@ export async function copyLastOrderAction(orderId: string): Promise<ActionResult
     return { ok: true, value: n };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -174,7 +177,7 @@ export async function orderStepAction(orderId: string, step: OrderStep): Promise
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -193,7 +196,7 @@ export async function syncReceiptAction(receiptId: string, lines: SyncLine[]): P
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -201,13 +204,13 @@ export async function uploadPhotoAction(form: FormData): Promise<ActionResult<st
   try {
     const p = await requirePrincipal();
     const file = form.get('photo');
-    if (!(file instanceof File)) return { ok: false, error: 'Kein Foto erhalten.' };
+    if (!(file instanceof File)) return { ok: false, error: (await getT())('Kein Foto erhalten.') };
     const kind = form.get('kind') === 'DAMAGE' ? 'DAMAGE' : 'DELIVERY_NOTE';
     const id = await addReceiptPhoto(await db(), p, String(form.get('receiptId')), kind, file.type, Buffer.from(await file.arrayBuffer()));
     return { ok: true, value: id };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -221,7 +224,7 @@ export async function completeReceiptAction(_prev: { error?: string } | undefine
     });
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
   revalidatePath('/', 'layout');
   redirect(`/wareneingang/${receiptId}/abweichungen?fertig=1`);
@@ -267,7 +270,7 @@ export async function updateItemAction(_prev: { error?: string; saved?: boolean 
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
 }
 
@@ -275,7 +278,7 @@ export async function updateSupplierAction(_prev: { error?: string; saved?: bool
   try {
     const p = await requirePrincipal();
     const minOrder = parseChfToCents(String(form.get('minOrder') ?? '0') || '0');
-    if (minOrder === null) return { error: 'Mindestbestellwert ist ungültig.' };
+    if (minOrder === null) return { error: (await getT())('Mindestbestellwert ist ungültig.') };
     const channel = String(form.get('orderChannel'));
     await updateSupplier(await db(), p, String(form.get('id')), {
       name: String(form.get('name') ?? ''),
@@ -294,7 +297,7 @@ export async function updateSupplierAction(_prev: { error?: string; saved?: bool
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
 }
 
@@ -324,7 +327,7 @@ export async function saveClosingAction(_prev: { error?: string } | undefined, f
     });
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
   revalidatePath('/tagesabschluss', 'layout');
   redirect(`/tagesabschluss/${id}?gespeichert=1`);
@@ -339,7 +342,7 @@ export async function closingStepAction(closingId: string, step: 'approve' | 're
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -347,12 +350,12 @@ export async function uploadClosingPhotoAction(form: FormData): Promise<ActionRe
   try {
     const p = await requirePrincipal();
     const file = form.get('photo');
-    if (!(file instanceof File)) return { ok: false, error: 'Kein Foto erhalten.' };
+    if (!(file instanceof File)) return { ok: false, error: (await getT())('Kein Foto erhalten.') };
     const id = await addClosingPhoto(await db(), p, String(form.get('closingId')), file.type, Buffer.from(await file.arrayBuffer()));
     return { ok: true, value: id };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -373,7 +376,7 @@ export async function saveShiftAction(input: {
     const p = await requirePrincipal();
     const startMin = parseTime(input.start);
     const endMin = parseTime(input.end);
-    if (startMin === null || endMin === null) return { ok: false, error: 'Zeit ist ungültig (z. B. 10:30).' };
+    if (startMin === null || endMin === null) return { ok: false, error: (await getT())('Zeit ist ungültig (z. B. 10:30).') };
     const id = await saveShift(await db(), p, {
       id: input.id,
       site: input.site,
@@ -388,7 +391,7 @@ export async function saveShiftAction(input: {
     return { ok: true, value: id };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -399,7 +402,7 @@ export async function deleteShiftAction(shiftId: string): Promise<ActionResult> 
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -415,7 +418,7 @@ export async function weekStepAction(site: string, weekStart: string, step: 'pub
     return { ok: true, value };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -424,12 +427,12 @@ export async function setAvailabilityAction(input: { userId: string; date: strin
     const p = await requirePrincipal();
     const from = input.from ? parseTime(input.from) : null;
     const to = input.to ? parseTime(input.to) : null;
-    if ((input.from && from === null) || (input.to && to === null)) return { ok: false, error: 'Zeit ist ungültig (z. B. 17:00).' };
+    if ((input.from && from === null) || (input.to && to === null)) return { ok: false, error: (await getT())('Zeit ist ungültig (z. B. 17:00).') };
     await setAvailability(await db(), p, { userId: input.userId, date: input.date, kind: input.kind, fromMin: from, toMin: to });
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -441,7 +444,7 @@ export async function submitMonthAction(month: string): Promise<ActionResult> {
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -460,7 +463,7 @@ export async function requestAbsenceAction(_prev: { error?: string; saved?: bool
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
 }
 
@@ -474,7 +477,7 @@ export async function absenceStepAction(absenceId: string, step: 'approve' | 're
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -498,7 +501,7 @@ export async function saveProfileAction(_prev: { error?: string; saved?: boolean
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
 }
 
@@ -512,7 +515,7 @@ export async function createStaffAction(_prev: { error?: string; password?: stri
     return { password, email };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
 }
 
@@ -520,12 +523,13 @@ export async function changePasswordAction(_prev: { error?: string; saved?: bool
   try {
     const p = await requirePrincipal();
     const next = String(form.get('next') ?? '');
-    if (next !== String(form.get('repeat') ?? '')) return { error: 'Die beiden neuen Passwörter sind nicht gleich.' };
+    if (next !== String(form.get('repeat') ?? '')) return { error: (await getT())('Die beiden neuen Passwörter sind nicht gleich.') };
     await changePassword(await db(), p.userId, String(form.get('current') ?? ''), next, (await cookies()).get(SESSION_COOKIE)?.value);
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    if (error instanceof DomainError && error.code === 'UNAUTHENTICATED') return { error: (await getT())('Das aktuelle Passwort ist falsch.') };
+    return { error: (await fail(error)).error };
   }
 }
 
@@ -547,7 +551,7 @@ export async function confirmShiftAction(shiftId: string): Promise<ActionResult>
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -555,12 +559,12 @@ export async function correctShiftAction(shiftId: string, input: TimesInput): Pr
   try {
     const p = await requirePrincipal();
     const t = times(input);
-    if (typeof t === 'string') return { ok: false, error: t };
+    if (typeof t === 'string') return { ok: false, error: (await getT())(t) };
     await correctShift(await db(), p, shiftId, t);
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -568,12 +572,12 @@ export async function saveEntryAction(input: TimesInput & { userId: string; date
   try {
     const p = await requirePrincipal();
     const t = times(input);
-    if (typeof t === 'string') return { ok: false, error: t };
+    if (typeof t === 'string') return { ok: false, error: (await getT())(t) };
     await saveEntry(await db(), p, { id: input.id, userId: input.userId, date: input.date, ...t });
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -584,7 +588,7 @@ export async function deleteEntryAction(entryId: string): Promise<ActionResult> 
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -597,7 +601,7 @@ export async function monthStepAction(userId: string, month: string, step: 'appr
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return fail(error);
+    return await fail(error);
   }
 }
 
@@ -614,6 +618,11 @@ export async function saveBalanceAction(_prev: { error?: string; saved?: boolean
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { error: fail(error).error };
+    return { error: (await fail(error)).error };
   }
+}
+
+export async function setLanguageAction(lang: 'de' | 'en'): Promise<void> {
+  (await cookies()).set(LANG_COOKIE, lang === 'en' ? 'en' : 'de', { path: '/', maxAge: 365 * 24 * 3600, sameSite: 'lax' });
+  revalidatePath('/', 'layout');
 }

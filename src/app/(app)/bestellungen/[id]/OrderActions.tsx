@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import type { OrderStatus } from '@/domain/order';
 import { orderStepAction } from '../../../actions';
+import { useT } from '@/i18n/client';
 
 export function OrderActions(props: {
   orderId: string;
@@ -15,6 +16,7 @@ export function OrderActions(props: {
   canCancel: boolean;
   sendTo: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -48,24 +50,24 @@ export function OrderActions(props: {
           <button
             className="btn-primary flex-1 sm:flex-none"
             disabled={pending}
-            onClick={() => run('send', `Bestellung jetzt per E-Mail an ${props.sendTo} senden?`, 'Bestellung gesendet.')}
+            onClick={() => run('send', t('Bestellung jetzt per E-Mail an {to} senden?', { to: props.sendTo }), t('Bestellung gesendet.'))}
           >
-            {pending ? 'Senden …' : 'An Lieferant senden'}
+            {pending ? t('Senden …') : t('An Lieferant senden')}
           </button>
         )}
         {props.canSubmit && (
-          <button className="btn-primary flex-1 sm:flex-none" disabled={pending} onClick={() => run('submit', undefined, 'Zur Prüfung eingereicht.')}>
+          <button className="btn-primary flex-1 sm:flex-none" disabled={pending} onClick={() => run('submit', undefined, t('Zur Prüfung eingereicht.'))}>
             {props.submitLabel}
           </button>
         )}
         {props.canReturn && (
-          <button className="btn-secondary" disabled={pending} onClick={() => run('return', 'Zurück an Entwurf? Die Mitarbeiter können dann wieder ändern.')}>
-            Zurück an Entwurf
+          <button className="btn-secondary" disabled={pending} onClick={() => run('return', t('Zurück an Entwurf? Die Mitarbeiter können dann wieder ändern.'))}>
+            {t('Zurück an Entwurf')}
           </button>
         )}
         {props.canCancel && (
-          <button className="btn-danger" disabled={pending} onClick={() => run('cancel', 'Bestellung wirklich stornieren?')}>
-            Stornieren
+          <button className="btn-danger" disabled={pending} onClick={() => run('cancel', t('Bestellung wirklich stornieren?'))}>
+            {t('Stornieren')}
           </button>
         )}
       </div>

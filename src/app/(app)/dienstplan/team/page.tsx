@@ -2,20 +2,24 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, shiftMonth } from '@/domain/roster';
 import { isAdmin, isOrderer } from '@/domain/roles';
-import { formatDateTime, formatDay, todayIso } from '@/lib/dates';
+import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listPendingAbsences, listTeam, submissionOverview } from '@/server/services/roster-service';
 import { AbsenceDecision, BalanceForm, NewMemberForm, ProfileForm } from './TeamForms';
 import { formatOvertime, vacationNeedsAttention } from '@/domain/hours';
 import { getYearlyBalance, teamBalances } from '@/server/services/hours-service';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Team & Meldungen' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Team & Meldungen') };
+}
 
-const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-const monthName = (m: string) => `${MONTHS[Number(m.slice(5)) - 1]} ${m.slice(0, 4)}`;
+const monthName = (m: string, lang: 'de' | 'en') => monthLabel(m, lang);
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ site?: string; monat?: string }> }) {
+  const t = await getT();
   const p = await requirePrincipal();
   if (!isOrderer(p)) redirect('/dienstplan');
   const params = await searchParams;
@@ -37,8 +41,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-6 pb-8">
       <div>
-        <Link href="/dienstplan" className="text-sm text-charcoal-muted hover:text-navy">← Dienstplan</Link>
-        <h1 className="mt-1 text-2xl">Team & Meldungen</h1>
+        <Link href="/dienstplan" className="text-sm text-charcoal-muted hover:text-navy">{t('← Dienstplan')}</Link>
+        <h1 className="mt-1 text-2xl">{t('Team & Meldungen')}</h1>
       </div>
       <div className="flex gap-2">
         {ROSTER_SITES.map((s) => (
@@ -47,18 +51,18 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       </div>
 
       <section className="space-y-3">
-        <h2 className="h-site">Meldungen für {monthName(month)}</h2>
+        <h2 className="h-site">{t('Meldungen für')} {monthName(month, t.lang)}</h2>
         <div className="flex items-center justify-between gap-2">
-          <Link href={href(shiftMonth(month, -1))} className="btn-secondary px-3" aria-label="Vormonat">←</Link>
-          <span className="text-center text-sm text-charcoal-muted">Mitarbeiter können Tage ab {formatDay(firstOpenDate(today))} ändern</span>
-          <Link href={href(shiftMonth(month, 1))} className="btn-secondary px-3" aria-label="Folgemonat">→</Link>
+          <Link href={href(shiftMonth(month, -1))} className="btn-secondary px-3" aria-label={t('Vormonat')}>←</Link>
+          <span className="text-center text-sm text-charcoal-muted">{t('Mitarbeiter können Tage ab')} {formatDay(firstOpenDate(today), t.lang)} {t('ändern')}</span>
+          <Link href={href(shiftMonth(month, 1))} className="btn-secondary px-3" aria-label={t('Folgemonat')}>→</Link>
         </div>
         {overview.length === 0 ? (
-          <p className="card text-charcoal-muted">Noch niemand im Team. Unten Mitarbeiter hinzufügen.</p>
+          <p className="card text-charcoal-muted">{t('Noch niemand im Team. Unten Mitarbeiter hinzufügen.')}</p>
         ) : (
           <>
             <p className={`rounded-btn p-3 text-sm font-semibold ${missing === 0 ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>
-              {missing === 0 ? 'Alle haben gemeldet.' : `${missing} von ${overview.length} haben noch nicht gemeldet.`}
+              {missing === 0 ? t('Alle haben gemeldet.') : t('{missing} von {total} haben noch nicht gemeldet.', { missing, total: overview.length })}
             </p>
             <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
               {overview.map((o) => (
@@ -66,13 +70,13 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                   <div>
                     <div className="font-semibold text-navy">{o.person.name}</div>
                     <div className="text-xs text-charcoal-muted">
-                      {o.person.pensumPercent ? `${o.person.pensumPercent} %` : EMPLOYMENT_LABEL[o.person.employmentType]} · {o.availableDays} verfügbar · {o.unavailableDays} nicht verfügbar
-                      {o.absences.length > 0 && ` · ${o.absences.map((a) => `${ABSENCE_LABEL[a.type]} ${formatDay(a.startDate).slice(4, 10)}${a.startDate !== a.endDate ? '–' + formatDay(a.endDate).slice(4, 10) : ''}`).join(', ')}`}
+                      {o.person.pensumPercent ? `${o.person.pensumPercent} %` : t(EMPLOYMENT_LABEL[o.person.employmentType])} · {o.availableDays} {t('verfügbar ·')} {o.unavailableDays} {t('nicht verfügbar')}
+                      {o.absences.length > 0 && ` · ${o.absences.map((a) => `${t(ABSENCE_LABEL[a.type])} ${formatDay(a.startDate, t.lang).slice(4, 10)}${a.startDate !== a.endDate ? '–' + formatDay(a.endDate, t.lang).slice(4, 10) : ''}`).join(', ')}`}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {o.submittedAt ? <span className="chip bg-ok-50 text-ok-500">✓ {formatDateTime(o.submittedAt).slice(0, 10)}</span> : <span className="chip bg-warn-50 text-warn-500">fehlt</span>}
-                    <Link href={`/dienstplan/verfuegbarkeit?monat=${month}&person=${o.person.userId}`} className="btn-ghost min-h-0 px-2 py-1 text-sm">öffnen</Link>
+                    {o.submittedAt ? <span className="chip bg-ok-50 text-ok-500">✓ {formatDateTime(o.submittedAt).slice(0, 10)}</span> : <span className="chip bg-warn-50 text-warn-500">{t('fehlt')}</span>}
+                    <Link href={`/dienstplan/verfuegbarkeit?monat=${month}&person=${o.person.userId}`} className="btn-ghost min-h-0 px-2 py-1 text-sm">{t('öffnen')}</Link>
                   </div>
                 </li>
               ))}
@@ -82,16 +86,16 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       </section>
 
       <section className="space-y-3">
-        <h2 className="h-site">Ferienanfragen <span className="chip ml-1 bg-navy-50 text-navy">{pending.length}</span></h2>
+        <h2 className="h-site">{t('Ferienanfragen')} <span className="chip ml-1 bg-navy-50 text-navy">{pending.length}</span></h2>
         {pending.length === 0 ? (
-          <p className="card text-sm text-charcoal-muted">Keine offenen Anfragen.</p>
+          <p className="card text-sm text-charcoal-muted">{t('Keine offenen Anfragen.')}</p>
         ) : (
           <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
             {pending.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                 <div>
                   <div className="font-semibold text-navy">{a.name}</div>
-                  <div className="text-sm">{formatDay(a.startDate)}{a.endDate !== a.startDate && ` – ${formatDay(a.endDate)}`} · {ABSENCE_LABEL[a.type]}</div>
+                  <div className="text-sm">{formatDay(a.startDate, t.lang)}{a.endDate !== a.startDate && ` – ${formatDay(a.endDate, t.lang)}`} · {t(ABSENCE_LABEL[a.type])}</div>
                 </div>
                 <AbsenceDecision id={a.id} />
               </li>
@@ -101,28 +105,28 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       </section>
 
       <section className="space-y-3">
-        <h2 className="h-site">Ferien & Überstunden</h2>
+        <h2 className="h-site">{t('Ferien & Überstunden')}</h2>
         <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
           {balances.map(({ person, vacation, hours }) => (
             <li key={person.userId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
               <div>
                 <div className="font-semibold text-navy">{person.name}</div>
                 <div className="text-xs text-charcoal-muted">
-                  Ferien: {vacation.taken} genommen · {vacation.requested} angefragt · <span className={vacation.remaining < 0 || vacationNeedsAttention(vacation, today) ? 'font-bold text-brand-600' : ''}>Rest {vacation.remaining}</span> von {vacation.entitlement + vacation.carry}
-                  {vacationNeedsAttention(vacation, today) && ' – noch viel offen'}
+                  {t('Ferien:')} {vacation.taken} {t('genommen ·')} {vacation.requested} {t('angefragt ·')} <span className={vacation.remaining < 0 || vacationNeedsAttention(vacation, today) ? 'font-bold text-brand-600' : ''}>{t('Rest')} {vacation.remaining}</span> {t('von')} {vacation.entitlement + vacation.carry}
+                  {vacationNeedsAttention(vacation, today) && ` – ${t('noch viel offen')}`}
                 </div>
                 <div className="text-xs text-charcoal-muted">
-                  {hours.totals.overtimeMinutes === null ? `Stunden diesen Monat: ${Math.round(hours.totals.workedMinutes / 60)} h` : `Überstunden Monat: ${formatOvertime(hours.totals.overtimeMinutes)} · Saldo ${formatOvertime(hours.yearBalanceMinutes ?? 0)}`}
+                  {hours.totals.overtimeMinutes === null ? `${t('Stunden diesen Monat')}: ${Math.round(hours.totals.workedMinutes / 60)} h` : `${t('Überstunden Monat')}: ${formatOvertime(hours.totals.overtimeMinutes)} · ${t('Saldo')} ${formatOvertime(hours.yearBalanceMinutes ?? 0)}`}
                 </div>
               </div>
-              <Link href={`/dienstplan/stunden?person=${person.userId}`} className="btn-secondary min-h-0 px-3 py-1.5 text-sm">Stunden prüfen</Link>
+              <Link href={`/dienstplan/stunden?person=${person.userId}`} className="btn-secondary min-h-0 px-3 py-1.5 text-sm">{t('Stunden prüfen')}</Link>
             </li>
           ))}
         </ul>
       </section>
 
       <section className="space-y-3">
-        <h2 className="h-site">Team {site.name}</h2>
+        <h2 className="h-site">{t('Team')} {site.name}</h2>
         <ul className="space-y-3">
           {team.map((m, i) => (
             <li key={m.userId} className="card space-y-3">
@@ -131,7 +135,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             </li>
           ))}
         </ul>
-        {isAdmin(p) ? <NewMemberForm site={site.id} /> : <p className="text-sm text-charcoal-muted">Neue Mitarbeiter legt ein Admin an.</p>}
+        {isAdmin(p) ? <NewMemberForm site={site.id} /> : <p className="text-sm text-charcoal-muted">{t('Neue Mitarbeiter legt ein Admin an.')}</p>}
       </section>
     </div>
   );

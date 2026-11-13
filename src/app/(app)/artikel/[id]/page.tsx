@@ -5,10 +5,15 @@ import { requireAdmin } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getItem } from '@/server/services/catalog-service';
 import { ItemForm } from './ItemForm';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Artikel bearbeiten' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Artikel bearbeiten') };
+}
 
 export default async function ItemEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getT();
   await requireAdmin();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
@@ -17,7 +22,7 @@ export default async function ItemEditPage({ params }: { params: Promise<{ id: s
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Link href="/artikel" className="text-sm text-charcoal-muted hover:text-navy">
-          ← Artikel
+          {t('← Artikel')}
         </Link>
         <h1 className="text-2xl">{item.nameDe}</h1>
         <ItemForm item={item} />

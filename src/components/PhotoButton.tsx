@@ -5,7 +5,10 @@ import { uploadPhotoAction } from '@/app/actions';
 import { shrinkImage as shrink } from '@/lib/shrink-image';
 import { Icon } from './Icon';
 
+import { useT } from '@/i18n/client';
+
 export function PhotoButton({ receiptId, kind, label, onUploaded }: { receiptId: string; kind: 'DELIVERY_NOTE' | 'DAMAGE'; label: string; onUploaded: (id: string) => void }) {
+  const t = useT();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export function PhotoButton({ receiptId, kind, label, onUploaded }: { receiptId:
       if (result.ok && result.value) onUploaded(result.value);
       else if (!result.ok) setError(result.error);
     } catch {
-      setError('Upload fehlgeschlagen – Verbindung prüfen und nochmals versuchen.');
+      setError(t('Upload fehlgeschlagen – Verbindung prüfen und nochmals versuchen.'));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -45,7 +48,7 @@ export function PhotoButton({ receiptId, kind, label, onUploaded }: { receiptId:
       />
       <button type="button" className="btn-secondary w-full text-sm" disabled={busy} onClick={() => input.current?.click()}>
         <Icon name="camera" />
-        {busy ? 'Lädt hoch …' : label}
+        {busy ? t('Lädt hoch …') : label}
       </button>
       {error && <p className="mt-1 text-xs text-danger-500">{error}</p>}
     </div>

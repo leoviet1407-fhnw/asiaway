@@ -7,10 +7,15 @@ import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getProfile, getWeekView, listMyShifts, sitesFor } from '@/server/services/roster-service';
 import { WeekPlanner } from './WeekPlanner';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Dienstplan' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Dienstplan') };
+}
 
 export default async function RosterPage({ searchParams }: { searchParams: Promise<{ site?: string; woche?: string }> }) {
+  const t = await getT();
   const p = await requirePrincipal();
   const params = await searchParams;
   const database = await db();
@@ -21,8 +26,8 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
   if (sites.length === 0) {
     return (
       <div className="mx-auto max-w-md space-y-3">
-        <h1 className="text-2xl">Dienstplan</h1>
-        <p className="card">Sie sind noch keinem Team zugeordnet. Bitte bei der Leitung melden.</p>
+        <h1 className="text-2xl">{t('Dienstplan')}</h1>
+        <p className="card">{t('Sie sind noch keinem Team zugeordnet. Bitte bei der Leitung melden.')}</p>
       </div>
     );
   }
@@ -37,21 +42,21 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl">Dienstplan</h1>
+        <h1 className="text-2xl">{t('Dienstplan')}</h1>
         <div className="flex flex-wrap gap-2">
           {profile && (
             <Link href="/dienstplan/verfuegbarkeit" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
-              Verfügbarkeit & Ferien
+              {t('Verfügbarkeit & Ferien')}
             </Link>
           )}
           {profile && (
             <Link href="/dienstplan/stunden" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
-              Meine Stunden
+              {t('Meine Stunden')}
             </Link>
           )}
           {planner && (
             <Link href="/dienstplan/team" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
-              Team & Meldungen
+              {t('Team & Meldungen')}
             </Link>
           )}
         </div>
@@ -59,11 +64,11 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
 
       {mine.length > 0 && (
         <section className="card">
-          <h2 className="mb-2 text-lg">Meine nächsten Schichten</h2>
+          <h2 className="mb-2 text-lg">{t('Meine nächsten Schichten')}</h2>
           <ul className="divide-y divide-surface-line">
             {mine.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 py-1.5">
-                <span className="font-medium text-navy">{formatDay(s.date)}</span>
+                <span className="font-medium text-navy">{formatDay(s.date, t.lang)}</span>
                 <span className="rounded px-2 py-0.5 text-sm font-semibold" style={{ background: station(s.station)?.color ?? '#e3e1df', color: station(s.station)?.textColor ?? '#09141d' }}>
                   {formatTime(s.startMin)}–{formatTime(s.endMin)} · {s.roleLabel ?? s.station}
                 </span>
@@ -84,16 +89,16 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <Link href={href(addDays(week, -7))} className="btn-secondary px-3" aria-label="Vorwoche">←</Link>
+        <Link href={href(addDays(week, -7))} className="btn-secondary px-3" aria-label={t('Vorwoche')}>←</Link>
         <div className="text-center">
-          <div className="font-semibold text-navy">Woche ab {formatDay(week)}</div>
+          <div className="font-semibold text-navy">{t('Woche ab')} {formatDay(week, t.lang)}</div>
           <div className="text-xs text-charcoal-muted">{site.name}</div>
         </div>
-        <Link href={href(addDays(week, 7))} className="btn-secondary px-3" aria-label="Folgewoche">→</Link>
+        <Link href={href(addDays(week, 7))} className="btn-secondary px-3" aria-label={t('Folgewoche')}>→</Link>
       </div>
 
       {view.hidden ? (
-        <p className="card text-charcoal-muted">Diese Woche ist noch nicht veröffentlicht.</p>
+        <p className="card text-charcoal-muted">{t('Diese Woche ist noch nicht veröffentlicht.')}</p>
       ) : (
         <>
           <WeekPlanner
@@ -108,7 +113,7 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
             editable={planner}
           />
           <a href={withBase(`/dienstplan/pdf?site=${site.id}&woche=${week}`)} target="_blank" rel="noreferrer" className="btn-secondary">
-            Plan als PDF (2 Seiten)
+            {t('Plan als PDF (2 Seiten)')}
           </a>
         </>
       )}

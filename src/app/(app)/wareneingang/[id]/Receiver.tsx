@@ -9,6 +9,7 @@ import { PhotoButton } from '@/components/PhotoButton';
 import { Scanner } from '@/components/Scanner';
 import { LineStatusChip } from '@/components/StatusChip';
 import { syncReceiptAction } from '../../../actions';
+import { useT } from '@/i18n/client';
 
 export interface ReceiverLine {
   itemId: string;
@@ -65,6 +66,7 @@ function beep(ok: boolean) {
 }
 
 export function Receiver(props: Props) {
+  const t = useT();
   const router = useRouter();
   const storageKey = `aw-receipt-${props.receiptId}`;
   const [entries, setEntries] = useState<Record<string, Entry>>(() => Object.fromEntries(props.current.map((e) => [keyOf(e), e])));
@@ -158,7 +160,7 @@ export function Receiver(props: Props) {
       if (result.kind === 'invalid') {
         if (!fromCamera) {
           beep(false);
-          setFeedback({ tone: 'error', text: `Ungültiger Barcode ${result.code} (Prüfziffer)`, key: null, at });
+          setFeedback({ tone: 'error', text: t('Ungültiger Barcode {code} (Prüfziffer)', { code: result.code }), key: null, at });
         }
         return;
       }
@@ -171,7 +173,7 @@ export function Receiver(props: Props) {
         });
         version.current += 1;
         setDirty(true);
-        setFeedback({ tone: 'error', text: `Unbekannter Barcode ${result.code}`, key, at });
+        setFeedback({ tone: 'error', text: t('Unbekannter Barcode {code}', { code: result.code }), key, at });
         return;
       }
       const line = byItem.get(result.itemId);
@@ -181,17 +183,17 @@ export function Receiver(props: Props) {
       });
       version.current += 1;
       setDirty(true);
-      const name = line?.nameDe ?? props.itemNames[result.itemId]?.nameDe ?? 'Artikel';
+      const name = line?.nameDe ?? props.itemNames[result.itemId]?.nameDe ?? t('Artikel');
       if (!result.onOrder) {
         beep(false);
-        setFeedback({ tone: 'warn', text: `Nicht bestellt: ${name}`, key: result.itemId, at });
+        setFeedback({ tone: 'warn', text: t('Nicht bestellt: {name}', { name }), key: result.itemId, at });
       } else {
         beep(true);
         const current = roundQty((entries[result.itemId]?.qty ?? 0) + result.add);
         const over = line && current > line.expectedNow + 0.0005;
         setFeedback({
           tone: over ? 'warn' : 'ok',
-          text: `${name} +${formatQty(result.add)} → ${formatQty(current)} / ${formatQty(line?.expectedNow ?? 0)}${over ? ' (zu viel)' : ''}`,
+          text: `${name} +${formatQty(result.add)} → ${formatQty(current)} / ${formatQty(line?.expectedNow ?? 0)}${over ? ` (${t('zu viel')})` : ''}`,
           key: result.itemId,
           at,
         });
@@ -241,8 +243,8 @@ export function Receiver(props: Props) {
           setManual('');
         }}
       >
-        <input inputMode="numeric" placeholder="Barcode eintippen oder Hand-Scanner" className="min-w-0 flex-1" value={manual} onChange={(e) => setManual(e.target.value)} aria-label="Barcode manuell" />
-        <button className="btn-secondary">OK</button>
+        <input inputMode="numeric" placeholder={t('Barcode eintippen oder Hand-Scanner')} className="min-w-0 flex-1" value={manual} onChange={(e) => setManual(e.target.value)} aria-label={t('Barcode manuell')} />
+        <button className="btn-secondary">{t('OK')}</button>
       </form>
 
       {feedback && (
@@ -256,13 +258,13 @@ export function Receiver(props: Props) {
       )}
 
       {syncState === 'offline' && (
-        <div className="rounded-btn bg-warn-50 p-3 text-sm text-warn-500">Offline – alles bleibt auf dem Telefon gespeichert und wird gesendet, sobald Verbindung da ist.</div>
+        <div className="rounded-btn bg-warn-50 p-3 text-sm text-warn-500">{t('Offline – alles bleibt auf dem Telefon gespeichert und wird gesendet, sobald Verbindung da ist.')}</div>
       )}
       {syncState === 'error' && syncError && <div className="rounded-btn bg-danger-50 p-3 text-sm text-danger-500">{syncError}</div>}
 
       <div className="flex gap-2">
-        <PhotoButton receiptId={props.receiptId} kind="DELIVERY_NOTE" label={`Lieferschein${photos.DELIVERY_NOTE ? ` (${photos.DELIVERY_NOTE})` : ''}`} onUploaded={() => setPhotos((p) => ({ ...p, DELIVERY_NOTE: p.DELIVERY_NOTE + 1 }))} />
-        <PhotoButton receiptId={props.receiptId} kind="DAMAGE" label={`Schaden${photos.DAMAGE ? ` (${photos.DAMAGE})` : ''}`} onUploaded={() => setPhotos((p) => ({ ...p, DAMAGE: p.DAMAGE + 1 }))} />
+        <PhotoButton receiptId={props.receiptId} kind="DELIVERY_NOTE" label={`${t('Lieferschein')}${photos.DELIVERY_NOTE ? ` (${photos.DELIVERY_NOTE})` : ''}`} onUploaded={() => setPhotos((p) => ({ ...p, DELIVERY_NOTE: p.DELIVERY_NOTE + 1 }))} />
+        <PhotoButton receiptId={props.receiptId} kind="DAMAGE" label={`${t('Schaden')}${photos.DAMAGE ? ` (${photos.DAMAGE})` : ''}`} onUploaded={() => setPhotos((p) => ({ ...p, DAMAGE: p.DAMAGE + 1 }))} />
       </div>
 
       {areas.map((area) => (
@@ -284,9 +286,9 @@ export function Receiver(props: Props) {
                         <div className="font-medium leading-snug text-navy">{line.nameDe}</div>
                         <div className="text-xs text-charcoal-muted">
                           {line.orderUnit}
-                          {line.isFresh ? ' · frisch – antippen' : line.hasBarcode ? '' : ' · ohne Barcode – antippen'}
-                          {line.before > 0 && ` · früher geliefert ${formatQty(line.before)}`}
-                          {entry?.damaged && <span className="ml-1 font-semibold text-brand-600">· beschädigt</span>}
+                          {line.isFresh ? ` · ${t('frisch – antippen')}` : line.hasBarcode ? '' : ` · ${t('ohne Barcode – antippen')}`}
+                          {line.before > 0 && ` · ${t('früher geliefert')} ${formatQty(line.before)}`}
+                          {entry?.damaged && <span className="ml-1 font-semibold text-brand-600">{t('· beschädigt')}</span>}
                         </div>
                       </div>
                       <div className="text-right">
@@ -312,13 +314,13 @@ export function Receiver(props: Props) {
 
       {extras.length > 0 && (
         <section>
-          <h2 className="mb-1 mt-2 text-sm font-semibold uppercase tracking-wide text-brand-600">Nicht bestellt / unbekannt</h2>
+          <h2 className="mb-1 mt-2 text-sm font-semibold uppercase tracking-wide text-brand-600">{t('Nicht bestellt / unbekannt')}</h2>
           <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-brand-600/40 bg-white">
             {extras.map(([key, e]) => (
               <li key={key} className="flex items-center gap-3 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium text-navy">{e.itemId ? props.itemNames[e.itemId]?.nameDe ?? 'Artikel' : 'Unbekannter Barcode'}</div>
-                  <div className="text-xs text-charcoal-muted">{e.itemId ? 'nicht auf dieser Bestellung' : e.scannedCode}</div>
+                  <div className="font-medium text-navy">{e.itemId ? props.itemNames[e.itemId]?.nameDe ?? t('Artikel') : t('Unbekannter Barcode')}</div>
+                  <div className="text-xs text-charcoal-muted">{e.itemId ? t('nicht auf dieser Bestellung') : e.scannedCode}</div>
                 </div>
                 <Stepper value={e.qty} onChange={(v) => update(key, { itemId: e.itemId, scannedCode: e.scannedCode }, { qty: v })} />
               </li>
@@ -331,14 +333,14 @@ export function Receiver(props: Props) {
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <div className="flex-1 text-sm">
             <div className="font-semibold text-navy">
-              {doneCount} / {props.lines.length} vollständig
+              {doneCount} / {props.lines.length} {t('vollständig')}
             </div>
             <div className="text-xs text-charcoal-muted">
-              {syncState === 'saving' ? 'Speichert …' : syncState === 'offline' ? 'Offline – lokal gespeichert' : dirty ? 'Ungespeichert' : 'Gespeichert'}
+              {syncState === 'saving' ? t('Speichert …') : syncState === 'offline' ? t('Offline – lokal gespeichert') : dirty ? t('Ungespeichert') : t('Gespeichert')}
             </div>
           </div>
           <button type="button" className="btn-primary" onClick={() => void finish()}>
-            Prüfen & abschliessen
+            {t('Prüfen & abschliessen')}
           </button>
         </div>
       </div>
@@ -347,16 +349,18 @@ export function Receiver(props: Props) {
 }
 
 function StatusDot({ status }: { status: LineStatus | null }) {
-  if (status === null) return <span className="h-3 w-3 shrink-0 rounded-full border-2 border-charcoal-muted/40" aria-label="offen" />;
+  const t = useT();
+  if (status === null) return <span className="h-3 w-3 shrink-0 rounded-full border-2 border-charcoal-muted/40" aria-label={t('offen')} />;
   const color: Record<LineStatus, string> = { OK: 'bg-ok-500', SHORT: 'bg-brand-500', MISSING: 'bg-brand-600', EXTRA: 'bg-warn-500', WRONG: 'bg-navy' };
   return <span className={`h-3 w-3 shrink-0 rounded-full ${color[status]}`} aria-label={status} />;
 }
 
 function Stepper({ value, onChange, step = 1 }: { value: number; onChange: (v: number) => void; step?: number }) {
+  const t = useT();
   const [text, setText] = useState<string | null>(null);
   return (
     <div className="flex items-center gap-1">
-      <button type="button" aria-label="weniger" className="btn-secondary min-w-tap px-0" onClick={() => onChange(value - step)} disabled={value <= 0}>
+      <button type="button" aria-label={t('weniger')} className="btn-secondary min-w-tap px-0" onClick={() => onChange(value - step)} disabled={value <= 0}>
         <Icon name="minus" />
       </button>
       <input
@@ -372,9 +376,9 @@ function Stepper({ value, onChange, step = 1 }: { value: number; onChange: (v: n
           }
           setText(null);
         }}
-        aria-label="Menge"
+        aria-label={t('Menge')}
       />
-      <button type="button" aria-label="mehr" className="btn-primary min-w-tap px-0" onClick={() => onChange(value + step)}>
+      <button type="button" aria-label={t('mehr')} className="btn-primary min-w-tap px-0" onClick={() => onChange(value + step)}>
         <Icon name="plus" />
       </button>
     </div>
@@ -382,28 +386,29 @@ function Stepper({ value, onChange, step = 1 }: { value: number; onChange: (v: n
 }
 
 function LinePanel({ line, entry, onSet }: { line: ReceiverLine; entry: Entry | undefined; onSet: (patch: Partial<Entry>) => void }) {
+  const t = useT();
   const qty = entry?.qty ?? 0;
   const step = line.orderUnit === 'kg' ? 0.1 : 1;
   return (
     <div className="space-y-3 border-t border-surface-line bg-surface-sunken px-3 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className="btn-primary flex-1" onClick={() => onSet({ qty: line.expectedNow })}>
-          <Icon name="check" /> Wie bestellt ({formatQty(line.expectedNow)})
+          <Icon name="check" /> {t('Wie bestellt (')}{formatQty(line.expectedNow)})
         </button>
         <button type="button" className="btn-secondary" onClick={() => onSet({ qty: 0 })}>
-          Nicht geliefert
+          {t('Nicht geliefert')}
         </button>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-navy">{line.orderUnit === 'kg' ? 'Gewicht (kg)' : `Menge (${line.orderUnit})`}</span>
+        <span className="text-sm font-semibold text-navy">{line.orderUnit === 'kg' ? t('Gewicht (kg)') : `${t('Menge')} (${line.orderUnit})`}</span>
         <Stepper value={qty} step={step} onChange={(v) => onSet({ qty: v })} />
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" className="min-h-0 accent-brand-600" checked={entry?.damaged ?? false} onChange={(e) => onSet({ damaged: e.target.checked })} />
-        Beschädigt / Qualität mangelhaft
+        {t('Beschädigt / Qualität mangelhaft')}
       </label>
       {(entry?.damaged || entry?.note) && (
-        <input className="w-full" placeholder="Notiz (z. B. 2 Dosen verbeult)" defaultValue={entry?.note ?? ''} maxLength={500} onBlur={(e) => onSet({ note: e.target.value || null })} />
+        <input className="w-full" placeholder={t('Notiz (z. B. 2 Dosen verbeult)')} defaultValue={entry?.note ?? ''} maxLength={500} onBlur={(e) => onSet({ note: e.target.value || null })} />
       )}
     </div>
   );

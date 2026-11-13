@@ -8,8 +8,12 @@ import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listRestaurants } from '@/server/services/catalog-service';
 import { listClosings, sumClosings } from '@/server/services/closing-service';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Tagesabschluss' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Tagesabschluss') };
+}
 
 const TONE_STYLE: Record<DifferenceTone, string> = { ok: 'bg-ok-50 text-ok-500', tips: 'bg-info-50 text-info-500', short: 'bg-brand-600 text-white' };
 
@@ -20,6 +24,7 @@ function shiftMonth(month: string, delta: number): string {
 }
 
 export default async function ClosingsPage({ searchParams }: { searchParams: Promise<{ monat?: string; ort?: string }> }) {
+  const t = await getT();
   const p = await requirePrincipal();
   const params = await searchParams;
   const database = await db();
@@ -34,19 +39,19 @@ export default async function ClosingsPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl">Tagesabschluss</h1>
-        <Link href="/tagesabschluss/neu" className="btn-primary">+ Neu</Link>
+        <h1 className="text-2xl">{t('Tagesabschluss')}</h1>
+        <Link href="/tagesabschluss/neu" className="btn-primary">{t('+ Neu')}</Link>
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <Link href={href(shiftMonth(month, -1), locationId)} className="btn-secondary px-3" aria-label="Vormonat">←</Link>
+        <Link href={href(shiftMonth(month, -1), locationId)} className="btn-secondary px-3" aria-label={t('Vormonat')}>←</Link>
         <div className="font-semibold capitalize text-navy">{monthLabel}</div>
-        <Link href={href(shiftMonth(month, 1), locationId)} className="btn-secondary px-3" aria-label="Folgemonat">→</Link>
+        <Link href={href(shiftMonth(month, 1), locationId)} className="btn-secondary px-3" aria-label={t('Folgemonat')}>→</Link>
       </div>
 
       {locs.length > 1 && (
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
-          <Link href={href(month)} className={`chip whitespace-nowrap px-3 py-1 ${!locationId ? 'bg-brand-600 text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}>Alle Standorte</Link>
+          <Link href={href(month)} className={`chip whitespace-nowrap px-3 py-1 ${!locationId ? 'bg-brand-600 text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}>{t('Alle Standorte')}</Link>
           {locs.map((l) => (
             <Link key={l.id} href={href(month, l.id)} className={`chip whitespace-nowrap px-3 py-1 ${locationId === l.id ? 'bg-brand-600 text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}>{l.name}</Link>
           ))}
@@ -55,15 +60,15 @@ export default async function ClosingsPage({ searchParams }: { searchParams: Pro
 
       {list.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Kassen-Brutto" value={formatChf(sum.posGrossCents)} />
-          <Stat label="Bank einzahlen" value={formatChf(sum.bankDepositCents)} />
-          <Stat label="Trinkgeld" value={formatChf(sum.tipsCents)} />
-          <Stat label="Fehlbeträge" value={formatChf(sum.shortfallCents)} danger={sum.shortfallCents > 0} />
+          <Stat label={t('Kassen-Brutto')} value={formatChf(sum.posGrossCents)} />
+          <Stat label={t('Bank einzahlen')} value={formatChf(sum.bankDepositCents)} />
+          <Stat label={t('Trinkgeld')} value={formatChf(sum.tipsCents)} />
+          <Stat label={t('Fehlbeträge')} value={formatChf(sum.shortfallCents)} danger={sum.shortfallCents > 0} />
         </div>
       )}
 
       {list.length === 0 ? (
-        <p className="card text-charcoal-muted">Keine Abschlüsse in diesem Monat.</p>
+        <p className="card text-charcoal-muted">{t('Keine Abschlüsse in diesem Monat.')}</p>
       ) : (
         <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
           {list.map((c) => {
@@ -72,13 +77,13 @@ export default async function ClosingsPage({ searchParams }: { searchParams: Pro
               <li key={c.id}>
                 <Link href={`/tagesabschluss/${c.id}`} className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-4 py-3 hover:bg-surface-sunken">
                   <div className="min-w-0">
-                    <div className="font-semibold text-navy">{formatDay(c.businessDate)}</div>
+                    <div className="font-semibold text-navy">{formatDay(c.businessDate, t.lang)}</div>
                     <div className="text-sm text-charcoal-muted">{c.locationName} · {c.station}</div>
-                    <div className="text-sm text-charcoal-muted">Brutto {formatChf(c.posGrossCents)} · Bank {formatChf(c.result.bankDepositCents)}</div>
+                    <div className="text-sm text-charcoal-muted">{t('Brutto')} {formatChf(c.posGrossCents)} {t('· Bank')} {formatChf(c.result.bankDepositCents)}</div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`chip ${TONE_STYLE[tone]}`}>{tone === 'ok' ? DIFFERENCE_LABEL.ok : `${tone === 'short' ? '−' : '+'}${formatChf(Math.abs(c.result.differenceCents)).replace('CHF ', '')}`}</span>
-                    <span className="text-xs text-charcoal-muted">{c.status === 'APPROVED' ? '✓ freigegeben' : 'offen zur Freigabe'}</span>
+                    <span className={`chip ${TONE_STYLE[tone]}`}>{tone === 'ok' ? t(DIFFERENCE_LABEL.ok) : `${tone === 'short' ? '−' : '+'}${formatChf(Math.abs(c.result.differenceCents)).replace('CHF ', '')}`}</span>
+                    <span className="text-xs text-charcoal-muted">{c.status === 'APPROVED' ? `✓ ${t('freigegeben')}` : t('offen zur Freigabe')}</span>
                   </div>
                 </Link>
               </li>
@@ -89,7 +94,7 @@ export default async function ClosingsPage({ searchParams }: { searchParams: Pro
 
       {isOrderer(p) && (
         <a href={withBase(`/tagesabschluss/export?monat=${month}${locationId ? `&ort=${locationId}` : ''}`)} className="btn-secondary">
-          Monat als CSV exportieren
+          {t('Monat als CSV exportieren')}
         </a>
       )}
     </div>

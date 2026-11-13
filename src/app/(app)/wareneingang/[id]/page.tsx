@@ -6,10 +6,15 @@ import { db } from '@/server/db';
 import { STORAGE_AREA_LABEL, type StorageArea } from '@/server/services/catalog-service';
 import { getReceiptView } from '@/server/services/receiving-service';
 import { Receiver } from './Receiver';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Wareneingang' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Wareneingang') };
+}
 
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getT();
   const { id } = await params;
   const p = await requirePrincipal();
   let view: Awaited<ReturnType<typeof getReceiptView>>;
@@ -25,12 +30,12 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     <Receiver
       receiptId={id}
       title={view.order.supplierName}
-      subtitle={`${view.order.locationName} · ${view.order.number} · Lieferung ${formatDay(view.order.deliveryDate)}`}
+      subtitle={`${view.order.locationName} · ${view.order.number} · ${t('Lieferung')} ${formatDay(view.order.deliveryDate, t.lang)}`}
       lines={view.lines.map((l) => ({
         itemId: l.itemId,
         nameDe: l.nameDe,
         nameVi: l.nameVi,
-        area: STORAGE_AREA_LABEL[l.storageArea as StorageArea],
+        area: t(STORAGE_AREA_LABEL[l.storageArea as StorageArea]),
         isFresh: l.isFresh,
         orderUnit: l.orderUnit,
         ordered: l.ordered,

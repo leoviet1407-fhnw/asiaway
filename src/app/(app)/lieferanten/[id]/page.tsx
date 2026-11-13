@@ -5,10 +5,15 @@ import { requireAdmin } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getSupplier } from '@/server/services/catalog-service';
 import { SupplierForm } from './SupplierForm';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Lieferant bearbeiten' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Lieferant bearbeiten') };
+}
 
 export default async function SupplierEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getT();
   await requireAdmin();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
@@ -17,7 +22,7 @@ export default async function SupplierEditPage({ params }: { params: Promise<{ i
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Link href="/lieferanten" className="text-sm text-charcoal-muted hover:text-navy">
-          ← Lieferanten
+          {t('← Lieferanten')}
         </Link>
         <h1 className="text-2xl">{s.name}</h1>
         <SupplierForm

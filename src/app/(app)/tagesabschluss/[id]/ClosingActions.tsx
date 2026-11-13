@@ -5,9 +5,11 @@ import { useRef, useState, useTransition } from 'react';
 import { Icon } from '@/components/Icon';
 import { shrinkImage } from '@/lib/shrink-image';
 import { closingStepAction, uploadClosingPhotoAction } from '../../../actions';
+import { useT } from '@/i18n/client';
 
 /** Photos of the paper form and of the POS report, and the orderer's approval. */
 export function ClosingActions({ closingId, approved, canApprove, photos, photoBase }: { closingId: string; approved: boolean; canApprove: boolean; photos: string[]; photoBase: string }) {
+  const t = useT();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -26,7 +28,7 @@ export function ClosingActions({ closingId, approved, canApprove, photos, photoB
       if (!result.ok) setError(result.error);
       else router.refresh();
     } catch {
-      setError('Upload fehlgeschlagen – Verbindung prüfen und nochmals versuchen.');
+      setError(t('Upload fehlgeschlagen – Verbindung prüfen und nochmals versuchen.'));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -45,14 +47,14 @@ export function ClosingActions({ closingId, approved, canApprove, photos, photoB
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg">Fotos</h2>
-      <p className="text-sm text-charcoal-muted">Foto vom ausgefüllten Formular und vom Kassenbericht (z. B. Tagesabschluss-Beleg des POS).</p>
+      <h2 className="text-lg">{t('Fotos')}</h2>
+      <p className="text-sm text-charcoal-muted">{t('Foto vom ausgefüllten Formular und vom Kassenbericht (z. B. Tagesabschluss-Beleg des POS).')}</p>
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {photos.map((id) => (
             <a key={id} href={`${photoBase}/${id}`} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-btn border border-surface-line bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`${photoBase}/${id}`} alt="Abschluss-Foto" className="aspect-square w-full object-cover" />
+              <img src={`${photoBase}/${id}`} alt={t('Abschluss-Foto')} className="aspect-square w-full object-cover" />
             </a>
           ))}
         </div>
@@ -62,7 +64,7 @@ export function ClosingActions({ closingId, approved, canApprove, photos, photoB
           <input ref={input} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => input.current?.click()}>
             <Icon name="camera" />
-            {busy ? 'Lädt hoch …' : 'Foto hinzufügen'}
+            {busy ? t('Lädt hoch …') : t('Foto hinzufügen')}
           </button>
         </>
       )}
@@ -70,12 +72,12 @@ export function ClosingActions({ closingId, approved, canApprove, photos, photoB
       {canApprove && (
         <div className="border-t border-surface-line pt-3">
           {approved ? (
-            <button className="btn-secondary" disabled={pending} onClick={() => step('reopen', 'Abschluss wieder öffnen? Die Mitarbeiter können ihn dann ändern.')}>
-              Wieder öffnen
+            <button className="btn-secondary" disabled={pending} onClick={() => step('reopen', t('Abschluss wieder öffnen? Die Mitarbeiter können ihn dann ändern.'))}>
+              {t('Wieder öffnen')}
             </button>
           ) : (
-            <button className="btn-primary" disabled={pending} onClick={() => step('approve', 'Abschluss freigeben und sperren?')}>
-              {pending ? '…' : 'Freigeben'}
+            <button className="btn-primary" disabled={pending} onClick={() => step('approve', t('Abschluss freigeben und sperren?'))}>
+              {pending ? '…' : t('Freigeben')}
             </button>
           )}
         </div>

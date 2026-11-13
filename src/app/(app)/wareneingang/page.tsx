@@ -4,19 +4,24 @@ import { db } from '@/server/db';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
 import { startReceiptAction } from '../../actions';
+import { getT } from '@/i18n/server';
 
-export const metadata = { title: 'Wareneingang' };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t('Wareneingang') };
+}
 
 export default async function ReceivingListPage() {
+  const t = await getT();
   const p = await requirePrincipal();
   const orders = await listReceivable(await db(), p);
   const today = todayIso();
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl">Wareneingang</h1>
-      <p className="text-charcoal-muted">Lieferung antippen, dann Ware scannen oder abhaken.</p>
+      <h1 className="text-2xl">{t('Wareneingang')}</h1>
+      <p className="text-charcoal-muted">{t('Lieferung antippen, dann Ware scannen oder abhaken.')}</p>
       {orders.length === 0 ? (
-        <p className="card text-charcoal-muted">Keine gesendeten Bestellungen offen.</p>
+        <p className="card text-charcoal-muted">{t('Keine gesendeten Bestellungen offen.')}</p>
       ) : (
         <ul className="space-y-2">
           {orders.map((o) => (
@@ -30,13 +35,13 @@ export default async function ReceivingListPage() {
                       {o.locationName} · {o.number}
                     </div>
                     <div className={`text-sm ${o.deliveryDate && o.deliveryDate <= today ? 'font-semibold text-brand-600' : 'text-charcoal-muted'}`}>
-                      Lieferung {formatDay(o.deliveryDate)}
-                      {o.deliveryDate === today && ' (heute)'}
+                      {t('Lieferung')} {formatDay(o.deliveryDate, t.lang)}
+                      {o.deliveryDate === today && ` (${t('heute')})`}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <OrderStatusChip status={o.status} />
-                    <span className="text-sm font-semibold text-brand-600">{o.openReceiptId ? 'Fortsetzen →' : 'Starten →'}</span>
+                    <span className="text-sm font-semibold text-brand-600">{o.openReceiptId ? t('Fortsetzen →') : t('Starten →')}</span>
                   </div>
                 </button>
               </form>

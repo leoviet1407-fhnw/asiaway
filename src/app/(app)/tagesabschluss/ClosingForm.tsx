@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from 'react';
 import { DIFFERENCE_LABEL, closingWarnings, computeClosing, differenceTone } from '@/domain/closing';
 import { formatChf, parseChfToCents } from '@/domain/qty';
 import { saveClosingAction } from '../../actions';
+import { useT } from '@/i18n/client';
 
 interface Values {
   id?: string;
@@ -30,6 +31,7 @@ const toCents = (v: string) => parseChfToCents(v || '0') ?? 0;
 
 /** The paper form, with every sum calculated as you type. */
 export function ClosingForm({ values, locations, locked, maxDate }: Props) {
+  const t = useT();
   const [state, action, pending] = useActionState(saveClosingAction, undefined);
   const [v, setV] = useState(values);
   const set = (key: keyof Values) => (e: { target: { value: string } }) => setV((cur) => ({ ...cur, [key]: e.target.value }));
@@ -55,7 +57,7 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
       {values.id && <input type="hidden" name="id" value={values.id} />}
       <section className="card grid gap-3 sm:grid-cols-3">
         <div>
-          <label className="label" htmlFor="locationId">Standort</label>
+          <label className="label" htmlFor="locationId">{t('Standort')}</label>
           {locked ? (
             <>
               <input type="hidden" name="locationId" value={v.locationId} />
@@ -76,11 +78,11 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
           )}
         </div>
         <div>
-          <label className="label" htmlFor="businessDate">Datum</label>
+          <label className="label" htmlFor="businessDate">{t('Datum')}</label>
           <input id="businessDate" name="businessDate" type="date" className="w-full" value={v.businessDate} max={maxDate} onChange={set('businessDate')} readOnly={locked} required />
         </div>
         <div>
-          <label className="label" htmlFor="station">Station</label>
+          <label className="label" htmlFor="station">{t('Station')}</label>
           {locked ? (
             <>
               <input type="hidden" name="station" value={v.station} />
@@ -97,21 +99,21 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
       </section>
 
       <section className="card space-y-3">
-        <Money label="Cashbestand (Kassa)" name="cashCounted" value={v.cashCounted} onChange={set('cashCounted')} hint="Bargeld in der Kasse, gezählt" required autoFocus={!locked} />
-        <Money label="− Anfangsbestand (Stock)" name="startFloat" value={v.startFloat} onChange={set('startFloat')} />
-        <Calc label="= Barumsatz (Cash vom Tag)" value={formatChf(result.cashSalesCents)} />
-        <Money label="+ EFT" name="eft" value={v.eft} onChange={set('eft')} hint="Total Kartenterminal" required />
-        <Money label="+ Mobile Payment" name="mobile" value={v.mobile} onChange={set('mobile')} hint="z. B. TWINT, leer lassen wenn keine" />
-        <Calc label="TOTAL (IST)" value={formatChf(result.totalActualCents)} strong />
+        <Money label={t('Cashbestand (Kassa)')} name="cashCounted" value={v.cashCounted} onChange={set('cashCounted')} hint={t('Bargeld in der Kasse, gezählt')} required autoFocus={!locked} />
+        <Money label={t('− Anfangsbestand (Stock)')} name="startFloat" value={v.startFloat} onChange={set('startFloat')} />
+        <Calc label={t('= Barumsatz (Cash vom Tag)')} value={formatChf(result.cashSalesCents)} />
+        <Money label={t('+ EFT')} name="eft" value={v.eft} onChange={set('eft')} hint={t('Total Kartenterminal')} required />
+        <Money label={t('+ Mobile Payment')} name="mobile" value={v.mobile} onChange={set('mobile')} hint={t('z. B. TWINT, leer lassen wenn keine')} />
+        <Calc label={t('TOTAL (IST)')} value={formatChf(result.totalActualCents)} strong />
       </section>
 
       <section className="card space-y-3">
-        <Money label="Kassen-Brutto laut POS (SOLL)" name="posGross" value={v.posGross} onChange={set('posGross')} hint="Bruttoumsatz aus dem Kassensystem" required />
+        <Money label={t('Kassen-Brutto laut POS (SOLL)')} name="posGross" value={v.posGross} onChange={set('posGross')} hint={t('Bruttoumsatz aus dem Kassensystem')} required />
         <div className="flex items-baseline justify-between gap-3 border-t border-surface-line pt-3">
-          <span className="font-semibold text-navy">Differenz / Trinkgeld</span>
+          <span className="font-semibold text-navy">{t('Differenz / Trinkgeld')}</span>
           <span className={`text-right text-xl font-bold ${toneClass}`}>
             {formatChf(result.differenceCents)}
-            <span className="block text-xs font-semibold">{DIFFERENCE_LABEL[tone]}</span>
+            <span className="block text-xs font-semibold">{t(DIFFERENCE_LABEL[tone])}</span>
           </span>
         </div>
       </section>
@@ -119,8 +121,8 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
       <section className="card">
         <div className="flex items-baseline justify-between gap-3">
           <div>
-            <div className="font-semibold text-navy">BANK EINZAHLEN</div>
-            <div className="text-xs text-charcoal-muted">Kassen-Brutto − EFT − Mobile</div>
+            <div className="font-semibold text-navy">{t('BANK EINZAHLEN')}</div>
+            <div className="text-xs text-charcoal-muted">{t('Kassen-Brutto − EFT − Mobile')}</div>
           </div>
           <div className="text-2xl font-bold text-navy">{formatChf(result.bankDepositCents)}</div>
         </div>
@@ -129,25 +131,26 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
       {warnings.length > 0 && (
         <ul className="space-y-1 rounded-btn bg-warn-50 p-3 text-sm text-warn-500">
           {warnings.map((w) => (
-            <li key={w}>⚠ {w}</li>
+            <li key={w}>⚠ {t(w)}</li>
           ))}
         </ul>
       )}
 
       <div>
-        <label className="label" htmlFor="note">Notiz</label>
-        <input id="note" name="note" className="w-full" maxLength={1000} value={v.note} onChange={set('note')} placeholder="optional, z. B. Differenz erklärt durch …" />
+        <label className="label" htmlFor="note">{t('Notiz')}</label>
+        <input id="note" name="note" className="w-full" maxLength={1000} value={v.note} onChange={set('note')} placeholder={t('optional, z. B. Differenz erklärt durch …')} />
       </div>
 
       {state?.error && <p role="alert" className="rounded-btn bg-danger-50 p-3 text-danger-500">{state.error}</p>}
       <button className="btn-primary w-full sm:w-auto" disabled={pending}>
-        {pending ? 'Speichert …' : values.id ? 'Änderungen speichern' : 'Abschluss speichern'}
+        {pending ? t('Speichert …') : values.id ? t('Änderungen speichern') : t('Abschluss speichern')}
       </button>
     </form>
   );
 }
 
 function Money(props: { label: string; name: string; value: string; onChange: (e: { target: { value: string } }) => void; hint?: string; required?: boolean; autoFocus?: boolean }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-[1fr_auto] items-center gap-x-3">
       <label htmlFor={props.name} className="min-w-0">
@@ -155,7 +158,7 @@ function Money(props: { label: string; name: string; value: string; onChange: (e
         {props.hint && <span className="block text-xs text-charcoal-muted">{props.hint}</span>}
       </label>
       <div className="flex items-center gap-1">
-        <span className="text-sm text-charcoal-muted">CHF</span>
+        <span className="text-sm text-charcoal-muted">{t('CHF')}</span>
         <input
           id={props.name}
           name={props.name}

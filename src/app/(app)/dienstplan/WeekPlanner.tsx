@@ -19,6 +19,7 @@ import {
   type Violation,
 } from '@/domain/roster';
 import { deleteShiftAction, saveShiftAction, weekStepAction } from '../../actions';
+import { useT } from '@/i18n/client';
 
 interface Props {
   site: string;
@@ -47,6 +48,7 @@ const dm = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.`;
 
 /** The week: a row per person, a column per day. The planner clicks a cell to add or change a shift. */
 export function WeekPlanner(props: Props) {
+  const t = useT();
   const router = useRouter();
   const stations = stationsOf(props.site);
   const dates = weekDates(props.weekStart);
@@ -67,7 +69,7 @@ export function WeekPlanner(props: Props) {
     start(async () => {
       setError(null);
       const result = await fn();
-      if (!result.ok) setError(result.error ?? 'Fehler');
+      if (!result.ok) setError(result.error ?? t('Fehler'));
       else {
         done?.();
         router.refresh();
@@ -117,17 +119,17 @@ export function WeekPlanner(props: Props) {
     <div className="space-y-4">
       {props.editable && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`chip ${props.status === 'PUBLISHED' ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>{props.status === 'PUBLISHED' ? 'Veröffentlicht' : 'Entwurf – Mitarbeiter sehen noch nichts'}</span>
-          <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending || props.shifts.length > 0} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'copy'), () => setNotice('Letzte Woche übernommen.'))}>
-            Letzte Woche kopieren
+          <span className={`chip ${props.status === 'PUBLISHED' ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>{props.status === 'PUBLISHED' ? t('Veröffentlicht') : t('Entwurf – Mitarbeiter sehen noch nichts')}</span>
+          <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending || props.shifts.length > 0} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'copy'), () => setNotice(t('Letzte Woche übernommen.')))}>
+            {t('Letzte Woche kopieren')}
           </button>
           {props.status === 'PUBLISHED' ? (
             <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'unpublish'))}>
-              Zurück zum Entwurf
+              {t('Zurück zum Entwurf')}
             </button>
           ) : (
-            <button className="btn-primary min-h-0 px-4 py-1.5" disabled={pending} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'publish'), () => setNotice('Veröffentlicht.'))}>
-              Veröffentlichen
+            <button className="btn-primary min-h-0 px-4 py-1.5" disabled={pending} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'publish'), () => setNotice(t('Veröffentlicht.')))}>
+              {t('Veröffentlichen')}
             </button>
           )}
         </div>
@@ -139,13 +141,13 @@ export function WeekPlanner(props: Props) {
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 w-28 bg-surface-sunken p-1 text-left text-xs">Mitarbeiter</th>
+              <th className="sticky left-0 z-10 w-28 bg-surface-sunken p-1 text-left text-xs">{t('Mitarbeiter')}</th>
               {dates.map((d) => (
                 <th key={d} className="p-1 text-center text-xs font-semibold text-navy">
-                  {weekdayShort(d)} {dm(d)}
+                  {weekdayShort(d, t.lang)} {dm(d)}
                 </th>
               ))}
-              <th className="p-1 text-right text-xs">Stunden</th>
+              <th className="p-1 text-right text-xs">{t('Stunden')}</th>
             </tr>
           </thead>
           <tbody>
@@ -157,7 +159,7 @@ export function WeekPlanner(props: Props) {
                 <tr key={person.userId}>
                   <td className="sticky left-0 z-10 border-t border-surface-line bg-surface-sunken p-1 align-top">
                     <div className="font-semibold text-navy">{person.name}</div>
-                    <div className="text-[11px] text-charcoal-muted">{person.pensumPercent ? `${person.pensumPercent} %` : EMPLOYMENT_LABEL[person.employmentType]}</div>
+                    <div className="text-[11px] text-charcoal-muted">{person.pensumPercent ? `${person.pensumPercent} %` : t(EMPLOYMENT_LABEL[person.employmentType])}</div>
                   </td>
                   {dates.map((d) => {
                     const absence = absenceOn(person.userId, d);
@@ -170,11 +172,11 @@ export function WeekPlanner(props: Props) {
                         className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? 'cursor-pointer hover:bg-brand-50/40' : ''} ${absence ? 'bg-surface-line/70' : ''}`}
                       >
                         <div className="min-h-[34px] space-y-0.5">
-                          {absence && <div className="rounded bg-navy/80 px-1 text-[10px] font-semibold text-white">{absence.type === 'VACATION' ? 'Ferien' : absence.type === 'SICK' ? 'Krank' : 'Abwesend'}</div>}
+                          {absence && <div className="rounded bg-navy/80 px-1 text-[10px] font-semibold text-white">{absence.type === 'VACATION' ? t('Ferien') : absence.type === 'SICK' ? t('Krank') : t('Abwesend')}</div>}
                           {list.map(chip)}
-                          {props.editable && !absence && list.length === 0 && av?.kind === 'UNAVAILABLE' && <div className="text-[10px] text-brand-600">nicht verfügbar</div>}
+                          {props.editable && !absence && list.length === 0 && av?.kind === 'UNAVAILABLE' && <div className="text-[10px] text-brand-600">{t('nicht verfügbar')}</div>}
                           {props.editable && !absence && list.length === 0 && av?.kind === 'AVAILABLE' && (
-                            <div className="text-[10px] text-ok-500">{av.fromMin !== null ? `${formatTime(av.fromMin)}–${formatTime(av.toMin!)}` : 'verfügbar'}</div>
+                            <div className="text-[10px] text-ok-500">{av.fromMin !== null ? `${formatTime(av.fromMin)}–${formatTime(av.toMin!)}` : t('verfügbar')}</div>
                           )}
                         </div>
                       </td>
@@ -182,7 +184,7 @@ export function WeekPlanner(props: Props) {
                   })}
                   <td className={`border-l border-t border-surface-line p-1 text-right align-top text-xs ${off ? 'font-bold text-brand-600' : ''}`}>
                     {formatHours(minutes)}
-                    {target && <div className="font-normal text-charcoal-muted">Ziel {formatHours(target.minMin)}–{formatHours(target.maxMin)}</div>}
+                    {target && <div className="font-normal text-charcoal-muted">{t('Ziel')} {formatHours(target.minMin)}–{formatHours(target.maxMin)}</div>}
                   </td>
                 </tr>
               );
@@ -190,8 +192,8 @@ export function WeekPlanner(props: Props) {
             {(open.length > 0 || props.editable) && (
               <tr>
                 <td className="sticky left-0 z-10 border-t border-surface-line bg-surface-sunken p-1 align-top text-brand-600">
-                  <div className="font-semibold">Offen</div>
-                  <div className="text-[11px]">ohne Person</div>
+                  <div className="font-semibold">{t('Offen')}</div>
+                  <div className="text-[11px]">{t('ohne Person')}</div>
                 </td>
                 {dates.map((d) => (
                   <td key={d} onClick={() => props.editable && setEditing(blank(null, d))} className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? 'cursor-pointer hover:bg-brand-50/40' : ''}`}>
@@ -207,22 +209,22 @@ export function WeekPlanner(props: Props) {
 
       {editing && props.editable && (
         <section className="card space-y-3 border-brand-600">
-          <h2 className="text-lg">{editing.id ? 'Schicht ändern' : 'Neue Schicht'}</h2>
+          <h2 className="text-lg">{editing.id ? t('Schicht ändern') : t('Neue Schicht')}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="person">Mitarbeiter</label>
+              <label className="label" htmlFor="person">{t('Mitarbeiter')}</label>
               <select id="person" className="w-full" value={editing.userId ?? ''} onChange={(e) => setEditing({ ...editing, userId: e.target.value || null })}>
-                <option value="">– offen (noch niemand) –</option>
+                <option value="">{t('– offen (noch niemand) –')}</option>
                 {props.people.map((p) => (
                   <option key={p.userId} value={p.userId}>{p.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="label" htmlFor="date">Tag</label>
+              <label className="label" htmlFor="date">{t('Tag')}</label>
               <select id="date" className="w-full" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })}>
                 {dates.map((d) => (
-                  <option key={d} value={d}>{weekdayShort(d)} {dm(d)}</option>
+                  <option key={d} value={d}>{weekdayShort(d, t.lang)} {dm(d)}</option>
                 ))}
               </select>
             </div>
@@ -230,27 +232,27 @@ export function WeekPlanner(props: Props) {
           <div className="flex flex-wrap gap-2">
             {SHIFT_PRESETS.map((pr) => (
               <button key={pr.label} type="button" className="btn-secondary min-h-0 px-3 py-1.5 text-sm" onClick={() => setEditing({ ...editing, start: pr.start, end: pr.end })}>
-                {pr.label} {pr.start}–{pr.end}
+                {t(pr.label)} {pr.start}–{pr.end}
               </button>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label" htmlFor="start">Beginn</label>
+              <label className="label" htmlFor="start">{t('Beginn')}</label>
               <input id="start" inputMode="numeric" className="w-full" value={editing.start} onChange={(e) => setEditing({ ...editing, start: e.target.value })} />
             </div>
             <div>
-              <label className="label" htmlFor="end">Ende</label>
+              <label className="label" htmlFor="end">{t('Ende')}</label>
               <input id="end" inputMode="numeric" className="w-full" value={editing.end} onChange={(e) => setEditing({ ...editing, end: e.target.value })} />
             </div>
             <div>
-              <label className="label" htmlFor="brk">Pause (Min.)</label>
+              <label className="label" htmlFor="brk">{t('Pause (Min.)')}</label>
               <input id="brk" inputMode="numeric" className="w-full" value={editing.breakMin} onChange={(e) => setEditing({ ...editing, breakMin: e.target.value })} />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="station">Station</label>
+              <label className="label" htmlFor="station">{t('Station')}</label>
               <select id="station" className="w-full" value={editing.station} onChange={(e) => setEditing({ ...editing, station: e.target.value })}>
                 {stations.map((s) => (
                   <option key={s.name} value={s.name}>{s.name}</option>
@@ -258,16 +260,16 @@ export function WeekPlanner(props: Props) {
               </select>
             </div>
             <div>
-              <label className="label" htmlFor="role">Aufgabe</label>
-              <input id="role" className="w-full" value={editing.roleLabel} maxLength={80} placeholder="z. B. Abendschicht · Drinks" onChange={(e) => setEditing({ ...editing, roleLabel: e.target.value })} />
+              <label className="label" htmlFor="role">{t('Aufgabe')}</label>
+              <input id="role" className="w-full" value={editing.roleLabel} maxLength={80} placeholder={t('z. B. Abendschicht · Drinks')} onChange={(e) => setEditing({ ...editing, roleLabel: e.target.value })} />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className="btn-primary" disabled={pending} onClick={save}>Speichern</button>
-            <button className="btn-secondary" onClick={() => setEditing(null)}>Abbrechen</button>
+            <button className="btn-primary" disabled={pending} onClick={save}>{t('Speichern')}</button>
+            <button className="btn-secondary" onClick={() => setEditing(null)}>{t('Abbrechen')}</button>
             {editing.id && (
               <button className="btn-danger ml-auto" disabled={pending} onClick={() => run(() => deleteShiftAction(editing.id!), () => setEditing(null))}>
-                Löschen
+                {t('Löschen')}
               </button>
             )}
           </div>
@@ -278,20 +280,20 @@ export function WeekPlanner(props: Props) {
         <section className="space-y-2">
           {errors.length > 0 && (
             <div className="rounded-btn bg-danger-50 p-3">
-              <h3 className="mb-1 text-sm text-danger-500">Fehler – so kann der Plan nicht veröffentlicht werden</h3>
+              <h3 className="mb-1 text-sm text-danger-500">{t('Fehler – so kann der Plan nicht veröffentlicht werden')}</h3>
               <ul className="space-y-0.5 text-sm text-danger-500">
                 {errors.map((v, i) => (
-                  <li key={i}>• {v.message}</li>
+                  <li key={i}>• {t(v.message)}</li>
                 ))}
               </ul>
             </div>
           )}
           {warnings.length > 0 && (
             <div className="rounded-btn bg-warn-50 p-3">
-              <h3 className="mb-1 text-sm text-warn-500">Hinweise</h3>
+              <h3 className="mb-1 text-sm text-warn-500">{t('Hinweise')}</h3>
               <ul className="space-y-0.5 text-sm text-warn-500">
                 {warnings.map((v, i) => (
-                  <li key={i}>• {v.message}</li>
+                  <li key={i}>• {t(v.message)}</li>
                 ))}
               </ul>
             </div>
