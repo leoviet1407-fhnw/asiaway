@@ -71,7 +71,10 @@ export function suggestShifts(input: {
   offers: readonly AvailabilityDay[];
   /** People away on a date. */
   away: (userId: string, date: string) => boolean;
+  /** Shifts people already have elsewhere (the other site): nobody is planned twice at the same time. */
+  busy?: readonly { userId: string | null; date: string; startMin: number; endMin: number }[];
 }): { shifts: SuggestedShift[]; gaps: SuggestGap[] } {
+  const clash = (userId: string, date: string, start: number, end: number) => (input.busy ?? []).some((b) => b.userId === userId && b.date === date && b.startMin < end && b.endMin > start);
   const minutes = new Map(input.people.map((p) => [p.userId, p.plannedMinutes]));
   const shifts: SuggestedShift[] = [];
   const gaps: SuggestGap[] = [];
@@ -92,7 +95,7 @@ export function suggestShifts(input: {
             .map((p) => {
               if (chosen.has(p.userId) || input.away(p.userId, date)) return null;
               const span = shiftSpan(p, input.offers.find((o) => o.userId === p.userId && o.date === date), service);
-              if (!span) return null;
+              if (!span || clash(p.userId, date, span.start, span.end)) return null;
               const t = target(p);
               const left = t === null ? -1 : t - (minutes.get(p.userId) ?? 0);
               if (pass === 'contract' && (t === null || left < span.end - span.start - 30)) return null;
@@ -145,6 +148,7 @@ export function findGaps(input: {
   offers: readonly AvailabilityDay[];
   away: (userId: string, date: string) => boolean;
   planned: readonly { userId: string | null; date: string; startMin: number; endMin: number; breakMin?: number }[];
+  busy?: readonly { userId: string | null; date: string; startMin: number; endMin: number }[];
 }): GapInfo[] {
   const out: GapInfo[] = [];
   weekDates(input.weekStart).forEach((date, i) => {
@@ -160,7 +164,7 @@ export function findGaps(input: {
       for (const p of input.people) {
         if (covering.has(p.userId) || input.away(p.userId, date)) continue;
         const span = shiftSpan(p, input.offers.find((o) => o.userId === p.userId && o.date === date), service);
-        if (!span) continue;
+        if (!span || (input.busy ?? []).some((b) => b.userId === p.userId && b.date === date && b.startMin < span.end && b.endMin > span.start)) continue;
         // not on top of one of their own shifts that day
         if (day.some((s) => s.userId === p.userId && s.startMin < span.end && s.endMin > span.start)) continue;
         const t = target(p);

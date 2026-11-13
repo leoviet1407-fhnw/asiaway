@@ -41,7 +41,13 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
   }
   // Some people work here only on certain weekdays (e.g. Belle at Oerlikon only on Saturdays)
   const days = await getSiteDays(db, ids);
-  for (let i = offers.length - 1; i >= 0; i--) if (!worksAtSiteOn(days.get(offers[i]!.userId)?.get(siteId), offers[i]!.date)) offers.splice(i, 1);
+  // A person who is fixed to another site on a weekday (e.g. Belle at Oerlikon on Saturdays) is kept free for it
+  const reservedElsewhere = (userId: string, date: string) =>
+    [...(days.get(userId) ?? [])].some(([site, allowed]) => site !== siteId && allowed.length > 0 && worksAtSiteOn(allowed, date));
+  for (let i = offers.length - 1; i >= 0; i--) {
+    const o = offers[i]!;
+    if (!worksAtSiteOn(days.get(o.userId)?.get(siteId), o.date) || reservedElsewhere(o.userId, o.date)) offers.splice(i, 1);
+  }
   const away = ids.length ? await db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, dates[6]!), gte(absences.endDate, dates[0]!))) : [];
   const other = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), ne(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
   const planned = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
@@ -54,7 +60,8 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
     usualFromMin: m.usualFromMin,
     usualToMin: m.usualToMin,
   }));
-  return { team, needs, offers, people, planned, isAway: (userId: string, date: string) => away.some((a) => a.userId === userId && a.startDate <= date && date <= a.endDate) };
+  const busy = other.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin }));
+  return { team, needs, offers, people, busy, planned, isAway: (userId: string, date: string) => away.some((a) => a.userId === userId && a.startDate <= date && date <= a.endDate) };
 }
 
 /** A person's usual station if the site has it, else the site's first station. */
@@ -72,7 +79,7 @@ async function compute(db: AppDatabase, p: Principal, siteId: string, weekStart:
   if (ctx.planned.length) throw domainError('VALIDATION_FAILED', 'Der Vorschlag geht nur für eine leere Woche.');
   if (ctx.needs.every((n) => n.lunchPeople === 0 && n.dinnerPeople === 0)) throw domainError('VALIDATION_FAILED', 'Der Bedarf ist noch nicht festgelegt (Mehr > Bedarf & Abdeckung).');
   if (ctx.team.length === 0) throw domainError('VALIDATION_FAILED', 'Noch niemand im Team.');
-  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway }) };
+  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway, busy: ctx.busy }) };
 }
 
 /** The same suggestion without saving anything: what "Plan vorschlagen" would do. */
@@ -158,6 +165,7 @@ export async function listGaps(db: AppDatabase, p: Principal, siteId: string, we
     needs: ctx.needs,
     offers: ctx.offers,
     away: ctx.isAway,
+    busy: ctx.busy,
     planned: ctx.planned.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin })),
   });
 }
