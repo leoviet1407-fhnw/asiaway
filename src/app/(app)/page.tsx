@@ -48,7 +48,7 @@ export default async function HomePage() {
     ]);
     const shortWeeks = status.weeks.filter((w) => w.enforced && !w.ok).length;
     // People with a Pensum report no times, only holiday; casual staff report the times they can work
-    if (mustReportTimes(profile.employmentType as EmploymentType)) availability = { done: reportMonth.submittedAt !== null && status.missingDays.length === 0 && shortWeeks === 0, missingDays: status.missingDays.length, shortWeeks };
+    if (mustReportTimes(profile.employmentType as EmploymentType)) availability = { done: reportMonth.submittedAt !== null, missingDays: 0, shortWeeks: 0 };
     if (!mustReportTimes(profile.employmentType as EmploymentType)) vacation = await getVacationBalance(database, p, p.userId, Number(today.slice(0, 4)));
     unconfirmed = hours.planned.filter((s) => s.date <= today && s.entryId === null).length;
   }

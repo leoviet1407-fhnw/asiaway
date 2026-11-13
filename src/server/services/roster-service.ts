@@ -3,13 +3,10 @@ import { domainError } from '../../domain/errors';
 import { isAdmin, isPlanner, type Principal } from '../../domain/roles';
 import { weekStatus, weeksOfMonth, weeksToCheck } from '../../domain/availability';
 import {
-  LEAD_DAYS,
-  firstOpenDate,
   ROSTER_SITES,
   addDays,
   checkShiftTimes,
   hasBlockingViolation,
-  isOpenForStaff,
   mondayOf,
   monthDates,
   stationsOf,
@@ -394,12 +391,12 @@ export interface SetAvailabilityInput {
   toMin: number | null;
 }
 
-/** Staff change only days that are at least LEAD_DAYS away; the planner any day. */
+/** Staff can enter or change any day that has not passed; the planner any day. */
 export async function setAvailability(db: AppDatabase, p: Principal, input: SetAvailabilityInput, now = new Date()): Promise<void> {
   const planner = isPlanner(p);
   if (input.userId !== p.userId && !planner) throw domainError('FORBIDDEN', 'Not allowed');
   if (!isoDate(input.date)) throw domainError('VALIDATION_FAILED', 'Datum ist ungültig.');
-  if (!planner && !isOpenForStaff(input.date, todayIso(now))) throw domainError('TOO_LATE', 'Too late', { leadDays: LEAD_DAYS });
+  if (!planner && input.date < todayIso(now)) throw domainError('VALIDATION_FAILED', 'Dieser Tag ist schon vorbei.');
   if (input.kind === null) {
     await db.delete(availability).where(and(eq(availability.userId, input.userId), eq(availability.workDate, input.date)));
     return;
@@ -429,13 +426,13 @@ export async function getWeekStatuses(db: AppDatabase, p: Principal, userId: str
     .where(and(eq(absences.userId, userId), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, to), gte(absences.endDate, from)));
   const absList = abs.map((a) => ({ startDate: a.startDate, endDate: a.endDate, type: a.type as AbsenceType }));
   const today = todayIso(now);
-  const statuses = weeks.map((w) => ({ ...weekStatus({ weekStart: w, pensumPercent: profile?.pensumPercent ?? null, availability: av, absences: absList }), enforced: weeksToCheck(month, firstOpenDate(today)).includes(w) }));
+  const statuses = weeks.map((w) => ({ ...weekStatus({ weekStart: w, pensumPercent: profile?.pensumPercent ?? null, availability: av, absences: absList }), enforced: weeksToCheck(month, mondayOf(today)).includes(w) }));
   // Open days without any choice (and not on holiday): staff must decide every day
   const dayList = weeks.flatMap((w) => weekDates(w));
   const missingDays = dayList.filter(
-    (d) => isOpenForStaff(d, today) && !av.some((a) => a.date === d) && !absList.some((a) => (a.type === 'VACATION' || a.type === 'SICK') && a.startDate <= d && d <= a.endDate),
+    (d) => d >= today && !av.some((a) => a.date === d) && !absList.some((a) => (a.type === 'VACATION' || a.type === 'SICK') && a.startDate <= d && d <= a.endDate),
   );
-  return { weeks: statuses, missingDays, openDays: dayList.filter((d) => isOpenForStaff(d, today)).length };
+  return { weeks: statuses, missingDays, openDays: dayList.filter((d) => d >= today).length };
 }
 
 /**
@@ -448,7 +445,8 @@ export async function submitMonth(db: AppDatabase, p: Principal, month: string, 
   const profile = await getProfile(db, p.userId);
   if (!profile) throw domainError('FORBIDDEN', 'Kein Team-Profil.');
   const status = await getWeekStatuses(db, p, p.userId, month, now);
-  if (status.missingDays.length > 0) {
+  // Casual staff just enter the times they can work: days without an entry count as not available
+  if (profile.pensumPercent !== null && status.missingDays.length > 0) {
     const [y, m, d] = status.missingDays[0]!.split('-');
     throw domainError('VALIDATION_FAILED', `Bitte für jeden Tag etwas wählen. Noch ${status.missingDays.length} Tage ohne Auswahl, zuerst ${d}.${m}.${y}.`);
   }

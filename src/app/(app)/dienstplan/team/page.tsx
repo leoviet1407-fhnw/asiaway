@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, mustReportTimes, shiftMonth, stationsOf } from '@/domain/roster';
+import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, mustReportTimes, shiftMonth, stationsOf } from '@/domain/roster';
 import { isAdmin, isPlanner } from '@/domain/roles';
 import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -56,7 +56,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <h2 className="h-site">{t('Meldungen für')} {monthName(month, t.lang)}</h2>
         <div className="flex items-center justify-between gap-2">
           <Link href={href(shiftMonth(month, -1))} className="btn-secondary px-3" aria-label={t('Vormonat')}>←</Link>
-          <span className="text-center text-sm text-charcoal-muted">{t('Mitarbeiter können Tage ab')} {formatDay(firstOpenDate(today), t.lang)} {t('ändern')}</span>
+          <span className="text-center text-sm text-charcoal-muted">{t('Mitarbeiter können jederzeit eintragen und ändern.')}</span>
           <Link href={href(shiftMonth(month, 1))} className="btn-secondary px-3" aria-label={t('Folgemonat')}>→</Link>
         </div>
         {reporting.length === 0 ? (

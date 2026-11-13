@@ -227,10 +227,14 @@ describe('roster service', () => {
     await expect(copyWeek(db, planner, 'winterthur', '2026-11-30')).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 
-  it('lets staff report availability only a month ahead, and the planner any day', async () => {
+  it('lets staff report availability for any day that has not passed, and the planner any day', async () => {
+    const pastDay = { userId: staffTh.userId, date: '2026-11-12', kind: 'AVAILABLE' as const, fromMin: null, toMin: null };
+    await expect(setAvailability(db, staffTh, pastDay, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await setAvailability(db, planner, pastDay, now);
+    // a day next week needs no month of notice any more
     const closeDay = { userId: staffTh.userId, date: '2026-11-20', kind: 'AVAILABLE' as const, fromMin: null, toMin: null };
-    await expect(setAvailability(db, staffTh, closeDay, now)).rejects.toMatchObject({ code: 'TOO_LATE' });
-    await setAvailability(db, planner, closeDay, now);
+    await setAvailability(db, staffTh, closeDay, now);
+    await setAvailability(db, staffTh, { ...closeDay, kind: null }, now);
     const farDay = { userId: staffTh.userId, date: '2026-12-12', kind: 'AVAILABLE' as const, fromMin: t('17:00'), toMin: t('22:00') };
     await setAvailability(db, staffTh, farDay, now);
     await setAvailability(db, staffTh, { ...farDay, date: '2026-12-13', kind: 'UNAVAILABLE', fromMin: null, toMin: null }, now);
@@ -243,18 +247,13 @@ describe('roster service', () => {
   });
 
   it('shows the planner who has reported for the month', async () => {
-    // The Aushilfe has to decide every day she can still change before the report can be sent.
-    await expect(submitMonth(db, staffTh, '2026-12', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    for (const d of (await getWeekStatuses(db, staffTh, staffTh.userId, '2026-12', now)).missingDays) {
-      await setAvailability(db, staffTh, { userId: staffTh.userId, date: d, kind: 'UNAVAILABLE', fromMin: null, toMin: null }, now);
-    }
+    // The Aushilfe only enters the days she can work; days without an entry count as free
     let overview = await submissionOverview(db, planner, 'winterthur', '2026-12');
     expect(overview.find((o) => o.person.userId === staffTh.userId)!.submittedAt).toBeNull();
     await submitMonth(db, staffTh, '2026-12', now);
     overview = await submissionOverview(db, planner, 'winterthur', '2026-12');
     expect(overview.find((o) => o.person.userId === staffTh.userId)!.submittedAt).not.toBeNull();
     expect(overview.find((o) => o.person.userId === staffTh.userId)!.availableDays).toBe(1);
-    expect((await getWeekStatuses(db, staffTh, staffTh.userId, '2026-12', now)).missingDays).toEqual([]);
     await expect(submissionOverview(db, staffVn, 'winterthur', '2026-12')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 

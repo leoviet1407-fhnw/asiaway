@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { dueMonth, firstOpenDate, formatTime, mustReportTimes, shiftMonth } from '@/domain/roster';
+import { dueMonth, formatTime, mustReportTimes, shiftMonth } from '@/domain/roster';
 import { isPlanner } from '@/domain/roles';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -52,7 +52,6 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const vacation = await getVacationBalance(database, p, userId, Number(month.slice(0, 4)));
   const own = userId === p.userId;
   const href = (m: string) => `/dienstplan/verfuegbarkeit?monat=${m}${own ? '' : `&person=${userId}`}`;
-  const firstOpen = firstOpenDate(today);
   // People with a Pensum only enter holiday; casual staff also enter the times they can work
   const reports = mustReportTimes(profile.employmentType as import('@/domain/roster').EmploymentType);
   const yearAbsences = reports ? [] : await listAbsencesOfYear(database, p, userId, Number(month.slice(0, 4)));
@@ -75,9 +74,9 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
       {reports && (
       <>
       <div className="rounded-btn bg-navy p-4 text-white">
-        <div className="font-semibold">{t('Bitte einen Monat im Voraus melden.')}</div>
+        <div className="font-semibold">{t('Melden Sie, wann Sie arbeiten können.')}</div>
         <p className="text-sm text-white/80">
-          {t('Änderungen sind ab {date} möglich. Für den {month} ist jetzt die Meldung fällig.', { date: formatDay(firstOpen, t.lang), month: monthName(dueMonth(today), t.lang) })}
+          {t('Sie können jederzeit eintragen und ändern. Als Nächstes: {month}.', { month: monthName(dueMonth(today), t.lang) })}
         </p>
       </div>
 

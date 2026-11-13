@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { DINNER_WINDOW, LUNCH_WINDOW, STANDARD_DAY_MINUTES, weekStatus } from '@/domain/availability';
-import { formatTime, isOpenForStaff, weekDates, weekdayShort, type AbsenceType, type AvailabilityDay } from '@/domain/roster';
+import { formatTime, weekDates, weekdayShort, type AbsenceType, type AvailabilityDay } from '@/domain/roster';
 import { useT } from '@/i18n/client';
 import { WEEKLY_HOURS_AT_100 } from '@/domain/hours';
 import { setAvailabilityAction, submitMonthAction } from '../../../actions';
@@ -75,13 +75,16 @@ export function AvailabilityEditor(props: Props) {
   const real = props.absences.filter((a) => a.status !== 'REJECTED');
   const away = (date: string) => real.find((a) => a.startDate <= date && date <= a.endDate);
   const countsAsAway = (date: string) => real.some((a) => (a.type === 'VACATION' || a.type === 'SICK') && a.startDate <= date && date <= a.endDate);
-  const locked = (date: string) => !props.isPlanner && !isOpenForStaff(date, props.today);
-  const enforced = (monday: string) => props.isPlanner || isOpenForStaff(monday, props.today);
+  // Only days that have passed are closed (for the planner nothing is). Weeks that have started are checked.
+  const locked = (date: string) => !props.isPlanner && date < props.today;
+  const enforced = (monday: string) => props.isPlanner || weekDates(monday)[6]! >= props.today;
+  // People with a Pensum must choose every day; casual staff only enter what they can do, the rest counts as free
+  const mustChooseAll = props.pensumPercent !== null;
 
   const asDay = (date: string, c: Cell): AvailabilityDay => ({ userId: props.userId, date, kind: c.kind, fromMin: c.from ? parseHm(c.from) : null, toMin: c.to ? parseHm(c.to) : null });
   const statusOf = (monday: string) =>
     weekStatus({ weekStart: monday, pensumPercent: props.pensumPercent, availability: Object.entries(cells).map(([date, c]) => asDay(date, c)), absences: real });
-  const noChoiceIn = (monday: string) => weekDates(monday).filter((d) => !locked(d) && !cells[d] && !countsAsAway(d)).length;
+  const noChoiceIn = (monday: string) => (mustChooseAll ? weekDates(monday).filter((d) => !locked(d) && !cells[d] && !countsAsAway(d)).length : 0);
 
   const statuses = useMemo(() => props.weeks.map((w) => ({ monday: w, ...statusOf(w), noChoice: noChoiceIn(w) })), [cells, props.weeks]); // eslint-disable-line react-hooks/exhaustive-deps
   const allGood = statuses.every((s) => s.noChoice === 0 && (!enforced(s.monday) || s.ok));
@@ -136,7 +139,7 @@ export function AvailabilityEditor(props: Props) {
           {t('Wählen Sie für jeden Tag, wann Sie arbeiten können. Pro Woche brauchen Sie mindestens {hours} h (Pensum {pct} %).', { hours: hours(weeklyNeed(props.pensumPercent)), pct: props.pensumPercent })}
         </p>
       ) : (
-        <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Wählen Sie für jeden Tag, ob Sie arbeiten können. Sie werden nur an Tagen eingeteilt, die Sie wählen.')}</p>
+        <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Tragen Sie ein, wann Sie arbeiten können – Woche für Woche, zum Beispiel die 1. und 2. Woche im Dezember – und schicken Sie es ab. Tage ohne Eintrag gelten als nicht verfügbar.')}</p>
       )}
 
       <div className="flex items-center justify-between gap-2">
@@ -178,7 +181,7 @@ export function AvailabilityEditor(props: Props) {
           const ch = choiceOf(cell);
           const absence = away(date);
           const isLocked = locked(date);
-          const needsChoice = ch === null && !isLocked && !countsAsAway(date);
+          const needsChoice = mustChooseAll && ch === null && !isLocked && !countsAsAway(date);
           return (
             <li key={date} className={`card space-y-2 p-3 ${needsChoice ? 'border-warn-500' : ''} ${isLocked ? 'bg-surface-sunken' : ''}`}>
               <div className="flex items-baseline justify-between gap-2">
@@ -191,11 +194,13 @@ export function AvailabilityEditor(props: Props) {
                     {absence.status === 'REQUESTED' ? ` (${t('angefragt')})` : ''}
                   </span>
                 ) : isLocked ? (
-                  <span className="text-xs text-charcoal-muted">{t('gesperrt (weniger als 4 Wochen)')}</span>
+                  <span className="text-xs text-charcoal-muted">{t('vorbei')}</span>
                 ) : needsChoice ? (
                   <span className="text-xs font-semibold text-warn-500">{t('bitte wählen')}</span>
+                ) : cell ? (
+                  <span className="text-xs font-semibold text-ok-500">✓ {label(cell)}</span>
                 ) : (
-                  <span className="text-xs font-semibold text-ok-500">✓ {label(cell!)}</span>
+                  <span className="text-xs text-charcoal-muted">{t('nicht gemeldet = frei')}</span>
                 )}
               </div>
               {!countsAsAway(date) && !isLocked && (
@@ -293,6 +298,7 @@ export function AvailabilityEditor(props: Props) {
         {props.isSelf ? (
           <>
             {!allGood && <p className="rounded-btn bg-warn-50 p-3 text-sm text-warn-500">{t('Noch nicht fertig: Jeder Tag braucht eine Auswahl, und jede Woche muss zu Ihrem Pensum passen.')}</p>}
+            {allGood && !mustChooseAll && !saved && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Tage ohne Eintrag gelten als nicht verfügbar. Sie können jederzeit nochmals ändern.')}</p>}
             {saved && allGood && <p className="rounded-btn bg-ok-50 p-3 text-sm font-semibold text-ok-500">{t('Meldung abgeschickt ✓')}</p>}
             <button
               className="btn-primary w-full"

@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { addDays, isOpenForStaff, mustReportTimes, weekDates, type AvailabilityKind } from '../../domain/roster';
+import { addDays, mustReportTimes, weekDates, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
@@ -71,7 +71,7 @@ export async function applyPattern(db: AppDatabase, p: Principal, userId: string
   const planner = isPlanner(p);
   const rows = weeks
     .flatMap((w) => weekDates(w).map((date, i) => ({ date, pat: pattern.find((x) => x.weekday === i + 1) })))
-    .filter((x) => x.pat && !have.has(x.date) && (planner || isOpenForStaff(x.date, today)) && !away.some((a) => (a.type === 'VACATION' || a.type === 'SICK') && a.startDate <= x.date && x.date <= a.endDate))
+    .filter((x) => x.pat && !have.has(x.date) && (planner || x.date >= today) && !away.some((a) => (a.type === 'VACATION' || a.type === 'SICK') && a.startDate <= x.date && x.date <= a.endDate))
     .map((x) => ({ userId, workDate: x.date, kind: x.pat!.kind!, fromMin: x.pat!.fromMin, toMin: x.pat!.toMin, updatedBy: p.userId, updatedAt: now }));
   if (rows.length) await db.insert(availability).values(rows).onConflictDoNothing();
   await audit(db, p.userId, 'pattern.apply', 'user', userId, { month, days: rows.length });

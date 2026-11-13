@@ -705,6 +705,16 @@ export const EN: Record<string, string> = {
   'Ferien eintragen': 'Enter holiday',
   'Nur Aushilfen melden ihre Zeiten. Im Team gibt es noch keine.': 'Only casual staff report their times. There are none in the team yet.',
 
+  // --- No lead time for availability ---
+  'vorbei': 'over',
+  'nicht gemeldet = frei': 'not reported = free',
+  'Tage ohne Eintrag gelten als nicht verfügbar. Sie können jederzeit nochmals ändern.': 'Days without an entry count as not available. You can change it again at any time.',
+  'Tragen Sie ein, wann Sie arbeiten können – Woche für Woche, zum Beispiel die 1. und 2. Woche im Dezember – und schicken Sie es ab. Tage ohne Eintrag gelten als nicht verfügbar.': 'Enter when you can work – week by week, for example the 1st and 2nd week of December – and submit it. Days without an entry count as not available.',
+  'Sie können jederzeit eintragen und ändern. Als Nächstes: {month}.': 'You can enter and change things at any time. Next up: {month}.',
+  'Melden Sie, wann Sie arbeiten können.': 'Report when you can work.',
+  'Mitarbeiter können jederzeit eintragen und ändern.': 'Staff can enter and change things at any time.',
+  'Dieser Tag ist schon vorbei.': 'This day is already over.',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',
