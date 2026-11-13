@@ -8,7 +8,7 @@ import { useT } from '@/i18n/client';
 
 const TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'];
 
-export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; employmentType: EmploymentType; pensumPercent: number | null; active: boolean } }) {
+export function ProfileForm({ member }: { member: { userId: string; name: string; email: string; site: string; extraSites: string[]; employmentType: EmploymentType; pensumPercent: number | null; active: boolean } }) {
   const t = useT();
   const [state, action, pending] = useActionState(saveProfileAction, undefined);
   const [type, setType] = useState<EmploymentType>(member.employmentType);
@@ -33,6 +33,11 @@ export function ProfileForm({ member }: { member: { userId: string; name: string
       <label className="flex items-center gap-1 text-sm">
         <input type="checkbox" name="active" defaultChecked={member.active} className="min-h-0 accent-brand-600" /> {t('aktiv')}
       </label>
+      {ROSTER_SITES.filter((s) => s.id !== member.site).map((s) => (
+        <label key={s.id} className="col-span-full flex items-center gap-1 text-sm">
+          <input type="checkbox" name="extraSite" value={s.id} defaultChecked={member.extraSites.includes(s.id)} className="min-h-0 accent-brand-600" /> {t('Arbeitet auch in {site}', { site: s.name })}
+        </label>
+      ))}
       <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending}>{state?.saved ? t('Gespeichert ✓') : t('Speichern')}</button>
       {state?.error && <p className="col-span-full text-sm text-danger-500">{state.error}</p>}
     </form>
@@ -64,6 +69,11 @@ export function NewMemberForm({ site }: { site: string }) {
           ))}
         </select>
       </div>
+      {ROSTER_SITES.filter((s) => s.id !== site).map((s) => (
+        <label key={s.id} className="flex items-center gap-1 text-sm sm:col-span-2">
+          <input type="checkbox" name="extraSite" value={s.id} className="min-h-0 accent-brand-600" /> {t('Arbeitet auch in {site}', { site: s.name })}
+        </label>
+      ))}
       {(type === 'FULL_TIME' || type === 'PART_TIME') && (
         <div>
           <label className="label" htmlFor="nm-pensum">{t('Pensum (%)')}</label>

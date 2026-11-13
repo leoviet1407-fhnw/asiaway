@@ -44,6 +44,10 @@ import {
 /** Planners (Besteller/Leitung and admins) make the plan, for every site. */
 export const isPlanner = isOrderer;
 
+/** Whether a profile belongs to the roster of a site (main site or one of the extra sites). */
+export const worksAt = (profile: { site: string; extraSites?: readonly string[] | null } | null | undefined, siteId: string) =>
+  !!profile && (profile.site === siteId || (profile.extraSites ?? []).includes(siteId));
+
 export async function getProfile(db: AppDatabase, userId: string) {
   const [row] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId)).limit(1);
   return row ?? null;
@@ -53,7 +57,7 @@ export async function getProfile(db: AppDatabase, userId: string) {
 export async function sitesFor(db: AppDatabase, p: Principal) {
   if (isPlanner(p)) return [...ROSTER_SITES];
   const profile = await getProfile(db, p.userId);
-  return ROSTER_SITES.filter((s) => s.id === profile?.site);
+  return ROSTER_SITES.filter((s) => worksAt(profile, s.id));
 }
 
 function requirePlanner(p: Principal) {
@@ -64,7 +68,7 @@ async function requireSite(db: AppDatabase, p: Principal, siteId: string) {
   if (!ROSTER_SITES.some((s) => s.id === siteId)) throw domainError('NOT_FOUND', 'Unknown site');
   if (isPlanner(p)) return;
   const profile = await getProfile(db, p.userId);
-  if (profile?.site !== siteId) throw domainError('FORBIDDEN', 'Not your site');
+  if (!worksAt(profile, siteId)) throw domainError('FORBIDDEN', 'Not your site');
 }
 
 const isoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -73,6 +77,7 @@ const isoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 export interface TeamMember extends RosterPerson {
   email: string;
   site: string;
+  extraSites: string[];
   active: boolean;
 }
 
@@ -81,15 +86,16 @@ export async function listTeam(db: AppDatabase, siteId: string, { includeInactiv
     .select({ p: staffProfiles, u: users })
     .from(staffProfiles)
     .innerJoin(users, eq(users.id, staffProfiles.userId))
-    .where(eq(staffProfiles.site, siteId))
     .orderBy(asc(staffProfiles.sort), asc(users.name));
   return rows
+    .filter((r) => worksAt(r.p, siteId))
     .filter((r) => includeInactive || (r.p.active && r.u.active))
     .map((r) => ({
       userId: r.u.id,
       name: r.u.name,
       email: r.u.email,
       site: r.p.site,
+      extraSites: r.p.extraSites,
       active: r.p.active && r.u.active,
       employmentType: r.p.employmentType as EmploymentType,
       pensumPercent: r.p.pensumPercent,
@@ -98,6 +104,8 @@ export async function listTeam(db: AppDatabase, siteId: string, { includeInactiv
 
 export interface ProfileInput {
   site: string;
+  /** Further sites this person is planned at. */
+  extraSites?: string[];
   employmentType: EmploymentType;
   pensumPercent: number | null;
   active: boolean;
@@ -105,6 +113,7 @@ export interface ProfileInput {
 
 function checkProfile(input: ProfileInput) {
   if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
+  if ((input.extraSites ?? []).some((x) => x === input.site || !ROSTER_SITES.some((s) => s.id === x))) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
   const needsPensum = input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME';
   if (needsPensum && !(input.pensumPercent && input.pensumPercent >= 1 && input.pensumPercent <= 100)) {
     throw domainError('VALIDATION_FAILED', 'Das Pensum muss zwischen 1 und 100 % liegen.');
@@ -116,6 +125,7 @@ export async function saveProfile(db: AppDatabase, p: Principal, userId: string,
   checkProfile(input);
   const values = {
     site: input.site,
+    extraSites: [...new Set(input.extraSites ?? [])],
     employmentType: input.employmentType,
     pensumPercent: input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME' ? input.pensumPercent : null,
     active: input.active,
@@ -123,6 +133,11 @@ export async function saveProfile(db: AppDatabase, p: Principal, userId: string,
   const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw domainError('NOT_FOUND', 'User not found');
   await db.insert(staffProfiles).values({ userId, ...values }).onConflictDoUpdate({ target: staffProfiles.userId, set: values });
+  // Staff may enter goods-in and closings for every restaurant of their sites
+  const wanted = [input.site, ...values.extraSites].flatMap((id) => ROSTER_SITES.find((s) => s.id === id)?.locationIds ?? []);
+  const have = (await db.select().from(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, 'STAFF')))).map((r) => r.locationId);
+  const missing = wanted.filter((id) => !have.includes(id));
+  if (missing.length) await db.insert(userRoles).values(missing.map((id) => ({ userId, role: 'STAFF' as const, locationId: id })));
   await audit(db, p.userId, 'team.profile', 'user', userId, values);
 }
 
@@ -144,10 +159,10 @@ export async function createStaffUser(
   const userId = await db.transaction(async (tx) => {
     const [u] = await tx.insert(users).values({ email, name: input.name.trim(), passwordHash: hash }).returning({ id: users.id });
     // Staff may enter goods-in and closings for the restaurants of their site.
-    const ids = ROSTER_SITES.find((s) => s.id === input.site)!.locationIds;
+    const ids = [input.site, ...(input.extraSites ?? [])].flatMap((id) => ROSTER_SITES.find((s) => s.id === id)!.locationIds);
     await tx.insert(userRoles).values(ids.map((id) => ({ userId: u!.id, role: 'STAFF' as const, locationId: id })));
     const needsPensum = input.employmentType === 'FULL_TIME' || input.employmentType === 'PART_TIME';
-    await tx.insert(staffProfiles).values({ userId: u!.id, site: input.site, employmentType: input.employmentType, pensumPercent: needsPensum ? input.pensumPercent : null, active: input.active });
+    await tx.insert(staffProfiles).values({ userId: u!.id, site: input.site, extraSites: [...new Set(input.extraSites ?? [])], employmentType: input.employmentType, pensumPercent: needsPensum ? input.pensumPercent : null, active: input.active });
     return u!.id;
   }).catch((error: unknown) => {
     const e = error as { code?: string; cause?: { code?: string } };
@@ -217,7 +232,9 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
       ? await db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates[6]!)))
       : [];
     avail = av.map((a) => ({ userId: a.userId, date: a.workDate, kind: a.kind as AvailabilityKind, fromMin: a.fromMin, toMin: a.toMin }));
-    violations = validateRoster({ weekStart, people, shifts: weekShifts, availability: avail, absences: abs });
+    // Shifts of the same people at the other site count for rest time and weekly hours
+    const everywhere = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!))) : [];
+    violations = validateRoster({ weekStart, people, shifts: everywhere.map(toShift), availability: avail, absences: abs });
   }
   return { site: siteId, weekStart, status, publishedAt: week?.publishedAt ?? null, people, shifts: weekShifts, availability: avail, absences: abs, violations, hidden: false };
 }
@@ -243,7 +260,7 @@ export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftI
   if (!stationsOf(input.site).some((s) => s.name === input.station)) throw domainError('VALIDATION_FAILED', 'Station ist ungültig.');
   if (input.userId) {
     const profile = await getProfile(db, input.userId);
-    if (!profile || profile.site !== input.site || !profile.active) throw domainError('VALIDATION_FAILED', 'Diese Person gehört nicht zum Team dieses Standorts.');
+    if (!profile || !worksAt(profile, input.site) || !profile.active) throw domainError('VALIDATION_FAILED', 'Diese Person gehört nicht zum Team dieses Standorts.');
   }
   const values = {
     site: input.site,

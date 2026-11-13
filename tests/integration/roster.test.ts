@@ -310,4 +310,18 @@ describe('roster service', () => {
     const overview = await submissionOverview(db, planner, 'winterthur', jan);
     expect(overview.find((o) => o.person.userId === staffVn.userId)!.submittedAt).not.toBeNull();
   });
+  it('a manager can be planned at both sites', async () => {
+    const id = await createStaffUser(db, admin, { name: 'Zwei Standorte', email: 'beide@asiaway.test', password: 'testpasswort1', site: 'oerlikon', extraSites: ['winterthur'], employmentType: 'PART_TIME', pensumPercent: 80, active: true });
+    expect((await listTeam(db, 'oerlikon')).some((m) => m.userId === id)).toBe(true);
+    expect((await listTeam(db, 'winterthur')).some((m) => m.userId === id)).toBe(true);
+    const mon = '2027-03-01';
+    // The same person on two sites on one day: Oerlikon lunch, Winterthur dinner works
+    await saveShift(db, planner, { site: 'oerlikon', date: mon, userId: id, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'Service', roleLabel: null });
+    await saveShift(db, planner, { site: 'winterthur', date: mon, userId: id, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null });
+    // A one-site person may not be put on the other site
+    await expect(saveShift(db, planner, { site: 'winterthur', date: mon, userId: (await listTeam(db, 'oerlikon')).find((m) => m.userId !== id)!.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null })).rejects.toThrow();
+    // The saved profile gives the login access to both sites' restaurants
+    const me = await loadPrincipalForUser(db, id);
+    expect(me!.grants.map((g) => g.locationId).sort()).toEqual(['oerlikon', 'winti-th', 'winti-vn']);
+  });
 });

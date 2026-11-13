@@ -17,6 +17,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
   dataType: () => 'bytea',
@@ -261,6 +262,8 @@ export const staffProfiles = pgTable('staff_profiles', {
   site: text('site').notNull(),
   employmentType: employmentType('employment_type').notNull(),
   pensumPercent: integer('pensum_percent'),
+  /** Other roster sites this person is planned at (e.g. the Leitung works at both). */
+  extraSites: text('extra_sites').array().notNull().default(sql`'{}'::text[]`),
   active: boolean('active').notNull().default(true),
   sort: integer('sort').notNull().default(0),
 });

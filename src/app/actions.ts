@@ -491,6 +491,7 @@ function profileFrom(form: FormData) {
   const pensum = Number(String(form.get('pensum') ?? '').replace('%', '').trim());
   return {
     site: String(form.get('site') ?? ''),
+    extraSites: form.getAll('extraSite').map(String).filter(Boolean),
     employmentType,
     pensumPercent: Number.isFinite(pensum) && pensum > 0 ? pensum : null,
     active: form.get('active') === 'on',

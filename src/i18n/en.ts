@@ -464,6 +464,7 @@ export const EN: Record<string, string> = {
   'Übertrag Ferien': 'Holidays carried over',
   'Überstunden Vorjahr (h)': 'Overtime last year (h)',
   'Mitarbeiter hinzufügen': 'Add employee',
+  'Arbeitet auch in {site}': 'Also works at {site}',
   'E-Mail (Login)': 'Email (login)',
   Anlegen: 'Create',
   'Angelegt. Login jetzt weitergeben – das Passwort wird nur einmal angezeigt:': 'Created. Pass the login on now – the password is shown only once:',

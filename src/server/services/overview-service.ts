@@ -69,7 +69,7 @@ export async function getOverview(
     .from(staffProfiles)
     .innerJoin(users, eq(users.id, staffProfiles.userId))
     .orderBy(asc(staffProfiles.site), asc(staffProfiles.sort), asc(users.name));
-  const filtered = profiles.filter((r) => !siteId || r.p.site === siteId);
+  const filtered = profiles.filter((r) => !siteId || r.p.site === siteId || r.p.extraSites.includes(siteId));
   const ids = filtered.map((r) => r.u.id);
 
   const roleRows = ids.length ? await db.select().from(userRoles).where(inArray(userRoles.userId, ids)) : [];
