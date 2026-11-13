@@ -86,7 +86,7 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     const rows = await db.select().from(shifts);
     expect(rows.filter((s) => s.workDate >= weekStart && s.workDate <= '2027-01-17').length).toBe(r.created);
     expect(r.gaps.length).toBe(0);
-    await expect(suggestWeek(db, planner, 'winterthur', weekStart, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' }); // not an empty week any more
+    expect((await suggestWeek(db, planner, 'winterthur', weekStart, now)).created).toBe(0); // nothing is missing any more: running it again changes nothing
     await expect(suggestWeek(db, a, 'winterthur', '2027-01-18', now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     void t;
   });
@@ -165,5 +165,21 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     // all seven days = no restriction
     await saveSiteDays(db, planner, a.userId, { winterthur: [1, 2, 3, 4, 5, 6, 7] });
     expect((await getSiteDays(db, [a.userId])).get(a.userId)?.get('winterthur')).toBeUndefined();
+  });
+
+  it('suggesting a week that is partly planned keeps what is there and fills only the rest', async () => {
+    const week = '2027-08-02';
+    await saveSiteDays(db, planner, a.userId, { winterthur: [1, 2, 3, 4, 5, 6, 7] });
+    await saveSiteDays(db, planner, b.userId, { winterthur: [1, 2, 3, 4, 5, 6, 7] });
+    await saveNeeds(db, planner, 'winterthur', Array.from({ length: 7 }, (_, i) => (i < 5 ? { lunchPeople: 1, dinnerPeople: 1 } : { lunchPeople: 0, dinnerPeople: 0 })));
+    // the Leitung already put b on Monday for the whole day by hand
+    await saveShift(db, planner, { site: 'winterthur', date: '2027-08-02', userId: b.userId, startMin: t('10:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
+    const r = await suggestWeek(db, planner, 'winterthur', week, now);
+    const rows = (await db.select().from(shifts)).filter((x) => x.workDate >= week && x.workDate <= '2027-08-08');
+    // Monday lunch and dinner are already covered by that shift: nobody else is added on Monday
+    expect(rows.filter((x) => x.workDate === '2027-08-02')).toHaveLength(1);
+    expect(r.created).toBe(rows.length - 1); // everything else was filled (Tuesday to Friday)
+    expect(r.gaps).toEqual([]);
+    expect((await suggestWeek(db, planner, 'winterthur', week, now)).created).toBe(0);
   });
 });

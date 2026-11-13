@@ -73,9 +73,11 @@ export function suggestShifts(input: {
   away: (userId: string, date: string) => boolean;
   /** Shifts people already have elsewhere (the other site): nobody is planned twice at the same time. */
   busy?: readonly { userId: string | null; date: string; startMin: number; endMin: number }[];
+  /** What is already planned at this site this week: it counts towards the need and is kept as it is. */
+  existing?: readonly { userId: string | null; date: string; startMin: number; endMin: number; breakMin?: number }[];
 }): { shifts: SuggestedShift[]; gaps: SuggestGap[] } {
-  const clash = (userId: string, date: string, start: number, end: number) => (input.busy ?? []).some((b) => b.userId === userId && b.date === date && b.startMin < end && b.endMin > start);
-  const minutes = new Map(input.people.map((p) => [p.userId, p.plannedMinutes]));
+  const clash = (userId: string, date: string, start: number, end: number) => [...(input.busy ?? []), ...(input.existing ?? [])].some((b) => b.userId === userId && b.date === date && b.startMin < end && b.endMin > start);
+  const minutes = new Map(input.people.map((p) => [p.userId, p.plannedMinutes + (input.existing ?? []).filter((e) => e.userId === p.userId).reduce((n, e) => n + shiftNetMinutes({ startMin: e.startMin, endMin: e.endMin, breakMin: e.breakMin ?? 0 }), 0)]));
   const shifts: SuggestedShift[] = [];
   const gaps: SuggestGap[] = [];
   const workingToday = new Map<string, Set<string>>();
@@ -84,10 +86,13 @@ export function suggestShifts(input: {
   weekDates(input.weekStart).forEach((date, i) => {
     const need = input.needs[i] ?? { lunchPeople: 0, dinnerPeople: 0 };
     const today = workingToday.get(date) ?? new Set<string>();
+    for (const e of (input.existing ?? []).filter((x) => x.date === date && x.userId)) today.add(e.userId!);
     workingToday.set(date, today);
     for (const service of ['LUNCH', 'DINNER'] as const) {
       const wanted = service === 'LUNCH' ? need.lunchPeople : need.dinnerPeople;
-      const chosen = new Set<string>(service === 'DINNER' ? (coveredDinner.get(date) ?? []) : []);
+      const win = WINDOWS[service];
+      // people already planned for this service (kept as they are) count towards the need
+      const chosen = new Set<string>([...(service === 'DINNER' ? (coveredDinner.get(date) ?? []) : []), ...(input.existing ?? []).filter((e) => e.userId && e.date === date && e.startMin < win.toMin && e.endMin > win.fromMin).map((e) => e.userId!)]);
       if (wanted <= 0) continue;
       for (const pass of ['contract', 'any'] as const) {
         while (chosen.size < wanted) {

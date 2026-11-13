@@ -757,6 +757,10 @@ export const EN: Record<string, string> = {
   'Passwort verbergen': 'Hide password',
 
   'Diese Woche vorschlagen': 'Suggest this week',
+  // --- Suggest for a partly planned week ---
+  'Behält, was schon geplant ist, und füllt nur die fehlenden Plätze.': 'Keeps what is already planned and fills only the missing places.',
+  'Vorschlag: {n} Schichten ergänzt. Bitte prüfen und anpassen.': 'Suggestion: {n} shifts added. Please check and adjust.',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

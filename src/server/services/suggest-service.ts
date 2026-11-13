@@ -76,10 +76,9 @@ function stationFor(siteId: string, member: Pick<TeamMember, 'usualStation'> | u
  */
 async function compute(db: AppDatabase, p: Principal, siteId: string, weekStart: string) {
   const ctx = await load(db, p, siteId, weekStart);
-  if (ctx.planned.length) throw domainError('VALIDATION_FAILED', 'Der Vorschlag geht nur für eine leere Woche.');
   if (ctx.needs.every((n) => n.lunchPeople === 0 && n.dinnerPeople === 0)) throw domainError('VALIDATION_FAILED', 'Der Bedarf ist noch nicht festgelegt (Mehr > Bedarf & Abdeckung).');
   if (ctx.team.length === 0) throw domainError('VALIDATION_FAILED', 'Noch niemand im Team.');
-  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway, busy: ctx.busy }) };
+  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway, busy: ctx.busy, existing: ctx.planned.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin })) }) };
 }
 
 /** The same suggestion without saving anything: what "Plan vorschlagen" would do. */
@@ -119,8 +118,7 @@ export async function suggestMonth(db: AppDatabase, p: Principal, siteId: string
     } catch (error) {
       const code = (error as { code?: string }).code;
       const message = (error as { message?: string }).message ?? '';
-      if (code === 'VALIDATION_FAILED' && message.includes('leere Woche')) weeks.push({ weekStart, created: 0, skipped: 'HAS_SHIFTS', gaps: [] });
-      else if (code === 'VALIDATION_FAILED' && message.includes('Bedarf')) weeks.push({ weekStart, created: 0, skipped: 'NO_NEED', gaps: [] });
+      if (code === 'VALIDATION_FAILED' && message.includes('Bedarf')) weeks.push({ weekStart, created: 0, skipped: 'NO_NEED', gaps: [] });
       else throw error;
     }
   }

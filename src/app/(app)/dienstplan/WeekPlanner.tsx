@@ -125,8 +125,8 @@ export function WeekPlanner(props: Props) {
           </button>
           <button
             className="btn-secondary min-h-0 px-3 py-1.5 text-sm"
-            disabled={pending || props.shifts.length > 0}
-            title={props.shifts.length > 0 ? t('Nur für eine leere Woche') : undefined}
+            disabled={pending}
+            title={props.shifts.length > 0 ? t('Behält, was schon geplant ist, und füllt nur die fehlenden Plätze.') : undefined}
             onClick={() =>
               start(async () => {
                 setError(null);
@@ -134,7 +134,7 @@ export function WeekPlanner(props: Props) {
                 if (!r.ok) return setError(r.error);
                 const gaps = r.gaps ?? [];
                 const names = gaps.map((g) => `${weekdayShort(g.date, t.lang)} ${g.service === 'LUNCH' ? t('Mittag') : t('Abend')} (${g.missing})`).join(', ');
-                setNotice(t('Vorschlag: {n} Schichten eingetragen. Bitte prüfen und anpassen.', { n: r.created ?? 0 }) + (gaps.length ? ` ${t('Lücken')}: ${names}.` : ''));
+                setNotice(t('Vorschlag: {n} Schichten ergänzt. Bitte prüfen und anpassen.', { n: r.created ?? 0 }) + (gaps.length ? ` ${t('Lücken')}: ${names}.` : ''));
                 router.refresh();
               })
             }
