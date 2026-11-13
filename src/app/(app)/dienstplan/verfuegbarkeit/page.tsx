@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { dueMonth, firstOpenDate, formatTime, shiftMonth } from '@/domain/roster';
+import { dueMonth, firstOpenDate, formatTime, mustReportTimes, shiftMonth } from '@/domain/roster';
 import { isPlanner } from '@/domain/roles';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { getAvailabilityMonth, getProfile, listTeam } from '@/server/services/roster-service';
+import { getAvailabilityMonth, getProfile, listAbsencesOfYear, listTeam } from '@/server/services/roster-service';
 import { getVacationBalance } from '@/server/services/hours-service';
 import { PatternPanel, type PatternRow } from './PatternPanel';
 import { getPattern } from '@/server/services/pattern-service';
@@ -53,6 +53,9 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const own = userId === p.userId;
   const href = (m: string) => `/dienstplan/verfuegbarkeit?monat=${m}${own ? '' : `&person=${userId}`}`;
   const firstOpen = firstOpenDate(today);
+  // People with a Pensum only enter holiday; casual staff also enter the times they can work
+  const reports = mustReportTimes(profile.employmentType as import('@/domain/roster').EmploymentType);
+  const yearAbsences = reports ? [] : await listAbsencesOfYear(database, p, userId, Number(month.slice(0, 4)));
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 pb-8">
@@ -62,6 +65,15 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         {!own && <p className="text-charcoal-muted">{t('für')} {person?.name}</p>}
       </div>
 
+      {!reports && (
+        <div className="rounded-btn bg-navy p-4 text-white">
+          <div className="font-semibold">{t('Sie müssen keine Zeiten melden.')}</div>
+          <p className="text-sm text-white/80">{t('Sie arbeiten nach dem Dienstplan. Hier tragen Sie nur Ihre Ferien ein. Eine Schicht ändern: über „Ändern“ bei der Schicht.')}</p>
+        </div>
+      )}
+
+      {reports && (
+      <>
       <div className="rounded-btn bg-navy p-4 text-white">
         <div className="font-semibold">{t('Bitte einen Monat im Voraus melden.')}</div>
         <p className="text-sm text-white/80">
@@ -90,6 +102,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         submittedAt={data.submittedAt ? data.submittedAt.toISOString() : null}
         isSelf={own}
       />
+      </>
+      )}
 
       <div className="card flex flex-wrap items-center justify-between gap-2 text-sm">
         <span>{t('Ferien')} {vacation.year}: <strong>{vacation.remaining} {t('Tage Rest')}</strong> {t('von')} {vacation.entitlement + vacation.carry} {t('(genommen')} {vacation.taken}{t(', angefragt')} {vacation.requested})</span>
@@ -100,7 +114,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         userId={userId}
         isPlanner={planner}
         minDate={firstOpen}
-        items={data.absences.map((a) => ({ id: a.id, startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status, note: a.note }))}
+        items={(reports ? data.absences : yearAbsences).map((a) => ({ id: a.id, startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status, note: a.note }))}
       />
     </div>
   );

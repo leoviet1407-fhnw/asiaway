@@ -59,8 +59,9 @@ describe('staffing need and coverage', () => {
     const [mon, tue, wed] = c.days;
     expect(mon).toMatchObject({ offeredLunch: 1, offeredDinner: 2, need: { lunchPeople: 2, dinnerPeople: 1 } });
     expect(tue).toMatchObject({ offeredLunch: 1, offeredDinner: 1 });
-    expect(wed).toMatchObject({ offeredLunch: 0, offeredDinner: 0 });
-    // Hours offered: Mon 8.4 + 4.5, Tue 8.4 (TH's holiday day does not count)
+    // people with a Pensum report nothing: on a day without entries they count as available (VN and TH)
+    expect(wed).toMatchObject({ offeredLunch: 2, offeredDinner: 2 });
+    // Hours offered (reported only): Mon 8.5 + 4.5, Tue 8.5 (TH's holiday day does not count)
     expect(c.totals.offeredHours).toBeCloseTo(8.5 + 4.5 + 8.5, 5);
     expect(c.totals.needHours).toBe(7 * (2 * 4 + 1 * 4.5));
     expect(c.totals.contractHours).toBeCloseTo(42.5 + 34 + 0 + 0, 1); // VN 100 %, TH 80 %, casual and management none

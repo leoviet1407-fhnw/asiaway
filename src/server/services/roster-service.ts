@@ -461,6 +461,16 @@ export async function submitMonth(db: AppDatabase, p: Principal, month: string, 
   await audit(db, p.userId, 'availability.submit', 'user', p.userId, { month });
 }
 
+/** All holiday, sick leave and other absences of a person in a year (staff with a Pensum only enter holiday). */
+export async function listAbsencesOfYear(db: AppDatabase, p: Principal, userId: string, year: number) {
+  if (userId !== p.userId && !isPlanner(p)) throw domainError('FORBIDDEN', 'Not allowed');
+  return db
+    .select()
+    .from(absences)
+    .where(and(eq(absences.userId, userId), lte(absences.startDate, `${year}-12-31`), gte(absences.endDate, `${year}-01-01`)))
+    .orderBy(asc(absences.startDate));
+}
+
 /** For the planner: who has reported for the month, and what they asked for. */
 export async function submissionOverview(db: AppDatabase, p: Principal, siteId: string, month: string) {
   requirePlanner(p);

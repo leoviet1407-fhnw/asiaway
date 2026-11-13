@@ -4,9 +4,9 @@ import { formatChf } from '@/domain/qty';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { addDays, dueMonth, formatTime, stationsOf } from '@/domain/roster';
+import { addDays, dueMonth, formatTime, mustReportTimes, stationsOf, type EmploymentType } from '@/domain/roster';
 import { getAvailabilityMonth, getProfile, getWeekStatuses, listMyShifts } from '@/server/services/roster-service';
-import { getMonthHours } from '@/server/services/hours-service';
+import { getMonthHours, getVacationBalance } from '@/server/services/hours-service';
 import { countOpenRequests } from '@/server/services/change-request-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
@@ -37,6 +37,7 @@ export default async function HomePage() {
   let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
   let availability: { done: boolean; missingDays: number; shortWeeks: number } | null = null;
   let unconfirmed = 0;
+  let vacation: Awaited<ReturnType<typeof getVacationBalance>> | null = null;
   const openRequests = profile || planner ? await countOpenRequests(database, p) : 0;
   if (profile) {
     myShifts = await listMyShifts(database, p, today, addDays(today, 13));
@@ -46,7 +47,9 @@ export default async function HomePage() {
       getMonthHours(database, p, p.userId, today.slice(0, 7)),
     ]);
     const shortWeeks = status.weeks.filter((w) => w.enforced && !w.ok).length;
-    availability = { done: reportMonth.submittedAt !== null && status.missingDays.length === 0 && shortWeeks === 0, missingDays: status.missingDays.length, shortWeeks };
+    // People with a Pensum report no times, only holiday; casual staff report the times they can work
+    if (mustReportTimes(profile.employmentType as EmploymentType)) availability = { done: reportMonth.submittedAt !== null && status.missingDays.length === 0 && shortWeeks === 0, missingDays: status.missingDays.length, shortWeeks };
+    if (!mustReportTimes(profile.employmentType as EmploymentType)) vacation = await getVacationBalance(database, p, p.userId, Number(today.slice(0, 4)));
     unconfirmed = hours.planned.filter((s) => s.date <= today && s.entryId === null).length;
   }
   const stationOf = (siteId: string, name: string) => stationsOf(siteId).find((x) => x.name === name);
@@ -60,6 +63,13 @@ export default async function HomePage() {
         <Link href="/dienstplan/anfragen" className="block rounded-btn bg-navy p-4 text-white">
           <div className="font-semibold">{t('{n} Änderungsanfragen warten', { n: openRequests })}</div>
           <div className="text-sm text-white/85">{t('Mitarbeiter möchten Schichten oder Arbeitszeiten ändern.')}</div>
+        </Link>
+      )}
+
+      {profile && vacation && (
+        <Link href="/dienstplan/verfuegbarkeit" className="flex items-center justify-between gap-3 rounded-btn bg-white p-3 ring-1 ring-surface-line">
+          <span className="font-semibold text-navy">{t('Ferien')} {vacation.year}: {vacation.remaining} {t('Tage Rest')}</span>
+          <span className="text-sm text-brand-600 underline">{t('Ferien eintragen')}</span>
         </Link>
       )}
 
@@ -128,7 +138,7 @@ export default async function HomePage() {
             <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} primary />
             <Action href="/dienstplan/stunden" icon="cash" label={t('Meine Stunden')} badge={unconfirmed} />
             <Action href="/dienstplan/anfragen" icon="calendar" label={t('Änderungsanfragen')} badge={openRequests} />
-            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="calendar" label={t('Verfügbarkeit & Ferien')} />
+            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="calendar" label={availability ? t('Verfügbarkeit & Ferien') : t('Ferien')} />
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
             <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
             <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} />

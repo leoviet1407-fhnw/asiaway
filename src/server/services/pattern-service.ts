@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { addDays, isOpenForStaff, weekDates, type AvailabilityKind } from '../../domain/roster';
+import { addDays, isOpenForStaff, mustReportTimes, weekDates, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
@@ -87,7 +87,7 @@ export async function fillMissingFromPatterns(db: AppDatabase, p: Principal, sit
   let people = 0;
   let days = 0;
   for (const m of team) {
-    if (done.has(m.userId) || !hasPattern.has(m.userId)) continue;
+    if (!mustReportTimes(m.employmentType) || done.has(m.userId) || !hasPattern.has(m.userId)) continue;
     const n = await applyPattern(db, p, m.userId, month, now);
     if (n > 0) people += 1;
     days += n;

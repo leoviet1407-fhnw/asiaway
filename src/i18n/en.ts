@@ -699,6 +699,12 @@ export const EN: Record<string, string> = {
   'Die üblichen Zeiten sind ungültig.': 'The usual times are invalid.',
   'Diese Person kann den Dienst nicht übernehmen.': 'This person cannot take the shift.',
 
+  // --- Holiday only for people with a Pensum ---
+  'Sie müssen keine Zeiten melden.': 'You do not have to report times.',
+  'Sie arbeiten nach dem Dienstplan. Hier tragen Sie nur Ihre Ferien ein. Eine Schicht ändern: über „Ändern“ bei der Schicht.': 'You work according to the roster. Here you only enter your holiday. To change a shift, use "Ändern" next to the shift.',
+  'Ferien eintragen': 'Enter holiday',
+  'Nur Aushilfen melden ihre Zeiten. Im Team gibt es noch keine.': 'Only casual staff report their times. There are none in the team yet.',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

@@ -22,6 +22,13 @@ export const DEFAULT_CLOSING_MIN = 22 * 60;
 
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'ON_CALL' | 'MANAGEMENT';
 
+/**
+ * Staff with a Pensum only enter their holiday and work the plan. Casual staff (Aushilfen)
+ * enter the times they can work. The Leitung (no Pensum, not casual) enters nothing.
+ */
+export const mustReportTimes = (type: EmploymentType): boolean => type === 'ON_CALL';
+export const worksByPlan = (p: { employmentType: EmploymentType; pensumPercent: number | null }): boolean => (p.employmentType === 'FULL_TIME' || p.employmentType === 'PART_TIME') && p.pensumPercent !== null;
+
 export const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
   FULL_TIME: 'Vollzeit',
   PART_TIME: 'Teilzeit',

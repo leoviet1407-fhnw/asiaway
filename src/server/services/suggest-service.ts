@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { ROSTER_SITES, mondayOf, shiftNetMinutes, stationsOf, weekDates, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { ROSTER_SITES, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { needFor } from '../../domain/season';
 import { findGaps, suggestShifts, type GapInfo, type Service, type SuggestGap, type SuggestPerson } from '../../domain/suggest';
@@ -34,6 +34,8 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
     dates.forEach((date, i) => {
       const src = rows.find((r) => r.userId === m.userId && r.workDate === date) ?? patterns.find((x) => x.userId === m.userId && x.weekday === i + 1);
       if (src) offers.push({ userId: m.userId, date, kind: src.kind as AvailabilityKind, fromMin: src.fromMin, toMin: src.toMin });
+      // People with a Pensum report nothing: they work the plan, so they are available unless they are away
+      else if (worksByPlan(m)) offers.push({ userId: m.userId, date, kind: 'AVAILABLE', fromMin: null, toMin: null });
     });
   }
   const away = ids.length ? await db.select().from(absences).where(and(inArray(absences.userId, ids), inArray(absences.status, ['APPROVED', 'REQUESTED']), lte(absences.startDate, dates[6]!), gte(absences.endDate, dates[0]!))) : [];

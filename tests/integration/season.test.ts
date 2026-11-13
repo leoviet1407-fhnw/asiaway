@@ -48,8 +48,8 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     const month = await getAvailabilityMonth(db, a, a.userId, '2027-01');
     expect(month.days.find((d) => d.date === '2027-01-04')).toMatchObject({ kind: 'AVAILABLE' }); // a Monday
     expect(month.days.find((d) => d.date === '2027-01-09')).toMatchObject({ kind: 'UNAVAILABLE' }); // a Saturday
-    // the Leitung fills the others who have not reported: b has no pattern, so nobody new
-    expect(await fillMissingFromPatterns(db, planner, 'winterthur', '2027-02', now)).toMatchObject({ people: 1 });
+    // people with a Pensum report nothing, so the Leitung's fill-in only concerns casual staff
+    expect(await fillMissingFromPatterns(db, planner, 'winterthur', '2027-02', now)).toMatchObject({ people: 0 });
   });
 
   it('special days change the need of that date only', async () => {
@@ -81,9 +81,9 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     const weekStart = '2027-01-11';
     await saveNeeds(db, planner, 'winterthur', Array.from({ length: 7 }, (_, i) => (i < 5 ? { lunchPeople: 1, dinnerPeople: 1 } : { lunchPeople: 0, dinnerPeople: 0 })));
     const r = await suggestWeek(db, planner, 'winterthur', weekStart, now);
-    // a has the Standardwoche (Mon–Fri whole day), b has nothing: a covers the week, within the contract
+    // a and b are contract staff: they report nothing and count as available
     expect(r.created).toBeGreaterThan(0);
-    const rows = await db.select().from(shifts).where(eq(shifts.userId, a.userId));
+    const rows = await db.select().from(shifts);
     expect(rows.filter((s) => s.workDate >= weekStart && s.workDate <= '2027-01-17').length).toBe(r.created);
     expect(r.gaps.length).toBe(0);
     await expect(suggestWeek(db, planner, 'winterthur', weekStart, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' }); // not an empty week any more

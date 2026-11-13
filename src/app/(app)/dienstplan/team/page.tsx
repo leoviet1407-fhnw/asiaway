@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, shiftMonth, stationsOf } from '@/domain/roster';
+import { ABSENCE_LABEL, EMPLOYMENT_LABEL, ROSTER_SITES, dueMonth, firstOpenDate, mustReportTimes, shiftMonth, stationsOf } from '@/domain/roster';
 import { isAdmin, isPlanner } from '@/domain/roles';
 import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
@@ -36,7 +36,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   ]);
   const yearly = await Promise.all(team.map((m) => getYearlyBalance(database, m.userId, year)));
   const href = (m: string, s = site.id) => `/dienstplan/team?site=${s}&monat=${m}`;
-  const missing = overview.filter((o) => !o.submittedAt).length;
+  // Only casual staff report the times they can work; people with a Pensum enter holiday only
+  const reporting = overview.filter((o) => mustReportTimes(o.person.employmentType));
+  const missing = reporting.filter((o) => !o.submittedAt).length;
 
   return (
     <div className="space-y-6 pb-8">
@@ -57,16 +59,16 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <span className="text-center text-sm text-charcoal-muted">{t('Mitarbeiter können Tage ab')} {formatDay(firstOpenDate(today), t.lang)} {t('ändern')}</span>
           <Link href={href(shiftMonth(month, 1))} className="btn-secondary px-3" aria-label={t('Folgemonat')}>→</Link>
         </div>
-        {overview.length === 0 ? (
-          <p className="card text-charcoal-muted">{t('Noch niemand im Team. Unten Mitarbeiter hinzufügen.')}</p>
+        {reporting.length === 0 ? (
+          <p className="card text-charcoal-muted">{t('Nur Aushilfen melden ihre Zeiten. Im Team gibt es noch keine.')}</p>
         ) : (
           <>
             {missing > 0 && <FillMissing site={site.id} month={month} />}
             <p className={`rounded-btn p-3 text-sm font-semibold ${missing === 0 ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>
-              {missing === 0 ? t('Alle haben gemeldet.') : t('{missing} von {total} haben noch nicht gemeldet.', { missing, total: overview.length })}
+              {missing === 0 ? t('Alle haben gemeldet.') : t('{missing} von {total} haben noch nicht gemeldet.', { missing, total: reporting.length })}
             </p>
             <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
-              {overview.map((o) => (
+              {reporting.map((o) => (
                 <li key={o.person.userId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                   <div>
                     <div className="font-semibold text-navy">{o.person.name}</div>
