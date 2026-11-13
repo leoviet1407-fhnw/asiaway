@@ -63,12 +63,22 @@ function stationFor(siteId: string, member: Pick<TeamMember, 'usualStation'> | u
  * Fills an empty week as a draft: who works Lunch and Dinner on each day, from the staffing need,
  * what staff offered (or their Standardwoche) and their contracts. Nothing is published.
  */
-export async function suggestWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<SuggestionResult> {
+async function compute(db: AppDatabase, p: Principal, siteId: string, weekStart: string) {
   const ctx = await load(db, p, siteId, weekStart);
   if (ctx.planned.length) throw domainError('VALIDATION_FAILED', 'Der Vorschlag geht nur für eine leere Woche.');
   if (ctx.needs.every((n) => n.lunchPeople === 0 && n.dinnerPeople === 0)) throw domainError('VALIDATION_FAILED', 'Der Bedarf ist noch nicht festgelegt (Mehr > Bedarf & Abdeckung).');
   if (ctx.team.length === 0) throw domainError('VALIDATION_FAILED', 'Noch niemand im Team.');
-  const result = suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway });
+  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway }) };
+}
+
+/** The same suggestion without saving anything: what "Plan vorschlagen" would do. */
+export async function previewWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string) {
+  const { ctx, result } = await compute(db, p, siteId, weekStart);
+  return { ...result, people: ctx.people };
+}
+
+export async function suggestWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<SuggestionResult> {
+  const { ctx, result } = await compute(db, p, siteId, weekStart);
   for (const s of result.shifts) {
     await saveShift(db, p, { site: siteId, date: s.date, userId: s.userId, startMin: s.startMin, endMin: s.endMin, breakMin: 0, station: stationFor(siteId, ctx.team.find((m) => m.userId === s.userId)), roleLabel: null }, now);
   }
