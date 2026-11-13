@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { formatTime, weekdayShort, type Shift } from '@/domain/roster';
@@ -104,7 +105,14 @@ export function HoursEditor(props: Props) {
                         </button>
                       </div>
                     )}
-                    {!open && <span className="text-xs text-charcoal-muted">{t('noch nicht gearbeitet')}</span>}
+                    {!open && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-charcoal-muted">{t('noch nicht gearbeitet')}</span>
+                        {props.isSelf && !props.isPlanner && (
+                          <Link href={`/dienstplan/anfragen?shift=${s.id}`} className="btn-secondary min-h-0 px-3 py-1.5 text-sm">{t('Ändern')}</Link>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {editing === s.id && (
                     <div className="mt-2 grid grid-cols-3 gap-2">
