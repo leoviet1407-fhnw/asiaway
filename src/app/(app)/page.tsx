@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { isOrderer } from '@/domain/roles';
 import { formatChf } from '@/domain/qty';
-import { formatDay, todayIso } from '@/lib/dates';
+import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { dueMonth, firstOpenDate } from '@/domain/roster';
-import { getAvailabilityMonth, getProfile } from '@/server/services/roster-service';
+import { addDays, dueMonth, formatTime, stationsOf } from '@/domain/roster';
+import { getAvailabilityMonth, getProfile, getWeekStatuses, listMyShifts } from '@/server/services/roster-service';
+import { getMonthHours } from '@/server/services/hours-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -27,27 +28,109 @@ export default async function HomePage() {
   const deliveries = await listReceivable(database, p);
   const orderer = isOrderer(p);
   const profile = await getProfile(database, p.userId);
-  const month = dueMonth(todayIso());
-  const reported = profile ? (await getAvailabilityMonth(database, p, p.userId, month)).submittedAt !== null : true;
+  const today = todayIso();
+  const month = dueMonth(today);
+
+  // For people on the roster: their next shifts and what they still have to do
+  let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
+  let availability: { done: boolean; missingDays: number; shortWeeks: number } | null = null;
+  let unconfirmed = 0;
+  if (profile) {
+    myShifts = await listMyShifts(database, p, today, addDays(today, 13));
+    const [status, reportMonth, hours] = await Promise.all([
+      getWeekStatuses(database, p, p.userId, month),
+      getAvailabilityMonth(database, p, p.userId, month),
+      getMonthHours(database, p, p.userId, today.slice(0, 7)),
+    ]);
+    const shortWeeks = status.weeks.filter((w) => w.enforced && !w.ok).length;
+    availability = { done: reportMonth.submittedAt !== null && status.missingDays.length === 0 && shortWeeks === 0, missingDays: status.missingDays.length, shortWeeks };
+    unconfirmed = hours.planned.filter((s) => s.date <= today && s.entryId === null).length;
+  }
+  const stationOf = (siteId: string, name: string) => stationsOf(siteId).find((x) => x.name === name);
+  const dayWord = (iso: string) => (iso === today ? t('Heute') : iso === addDays(today, 1) ? t('Morgen') : formatDay(iso, t.lang));
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl">{t('Hallo')} {p.name.split(' ')[0]}</h1>
 
-      {!reported && (
-        <Link href={`/dienstplan/verfuegbarkeit?monat=${month}`} className="block rounded-btn bg-brand-600 p-4 text-white">
-          <div className="font-semibold">{t('Verfügbarkeit & Ferien melden')}</div>
-          <div className="text-sm text-white/85">{t('Für {month} – bitte ab {date} einen Monat im Voraus eintragen →', { month: `${month.slice(5)}/${month.slice(0, 4)}`, date: formatDay(firstOpenDate(todayIso()), t.lang) })}</div>
-        </Link>
+      {profile && availability && (
+        <div className="space-y-3">
+          {!availability.done ? (
+            <Link href={`/dienstplan/verfuegbarkeit?monat=${month}`} className="block rounded-btn bg-brand-600 p-4 text-white">
+              <div className="text-lg font-semibold">{t('Verfügbarkeit melden')}</div>
+              <div className="text-sm text-white/90">
+                {t('Für {month} – einen Monat im Voraus.', { month: monthLabel(month, t.lang) })}
+                {availability.missingDays > 0 && ` ${t('{n} Tage sind noch offen.', { n: availability.missingDays })}`}
+                {availability.shortWeeks > 0 && ` ${t('{n} Wochen haben zu wenig Stunden.', { n: availability.shortWeeks })}`}
+              </div>
+              <div className="mt-2 inline-block rounded-btn bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide text-brand-600">{t('Jetzt melden')} →</div>
+            </Link>
+          ) : (
+            <Link href={`/dienstplan/verfuegbarkeit?monat=${month}`} className="flex items-center justify-between gap-3 rounded-btn bg-ok-50 p-3 text-ok-500">
+              <span className="font-semibold">✓ {t('Verfügbarkeit für {month} gemeldet', { month: monthLabel(month, t.lang) })}</span>
+              <span className="text-sm underline">{t('Ändern')}</span>
+            </Link>
+          )}
+          {unconfirmed > 0 && (
+            <Link href="/dienstplan/stunden" className="block rounded-btn bg-navy p-4 text-white">
+              <div className="font-semibold">{t('{n} Schichten bestätigen', { n: unconfirmed })}</div>
+              <div className="text-sm text-white/85">{t('Haben Sie diese Schichten gearbeitet? Ein Tipp genügt.')}</div>
+            </Link>
+          )}
+        </div>
+      )}
+
+      {profile && (
+        <section>
+          <h2 className="h-site mb-3 flex items-center justify-between gap-2">
+            <span>{t('Meine nächsten Schichten')}</span>
+            <Link href="/dienstplan" className="text-sm font-normal normal-case tracking-normal text-brand-600 underline">{t('Ganzer Plan')}</Link>
+          </h2>
+          {myShifts.length === 0 ? (
+            <p className="card text-sm text-charcoal-muted">{t('Noch keine Schichten veröffentlicht. Der Plan erscheint hier, sobald die Leitung ihn veröffentlicht hat.')}</p>
+          ) : (
+            <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
+              {myShifts.map((s, i) => {
+                const st = stationOf(s.site, s.station);
+                return (
+                  <li key={s.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${i === 0 ? 'bg-brand-50/50' : ''}`}>
+                    <div>
+                      <div className="font-semibold text-navy">{dayWord(s.date)}</div>
+                      <div className="text-lg font-bold text-navy">{formatTime(s.startMin)}–{formatTime(s.endMin)}</div>
+                    </div>
+                    <span className="rounded px-2.5 py-1 text-sm font-semibold" style={{ background: st?.color ?? '#e3e1df', color: st?.textColor ?? '#09141d' }}>
+                      {s.roleLabel ?? s.station}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} primary />
-        <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
-        <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
-        <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} />
-        {orderer && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
-        <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
+        {profile ? (
+          <>
+            <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} primary />
+            <Action href="/dienstplan/stunden" icon="cash" label={t('Meine Stunden')} badge={unconfirmed} />
+            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="calendar" label={t('Verfügbarkeit & Ferien')} />
+            <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
+            <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
+            <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} />
+            {orderer && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
+            <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
+          </>
+        ) : (
+          <>
+            <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} primary />
+            <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
+            <Action href="/tagesabschluss/neu" icon="cash" label={t('Tagesabschluss')} />
+            <Action href="/dienstplan" icon="calendar" label={t('Dienstplan')} />
+            {orderer && <Action href="/dienstplan/uebersicht" icon="calendar" label={t('Übersicht')} />}
+            <Action href={RESERVATIONS_URL} icon="calendar" label={t('Reservationen')} external />
+          </>
+        )}
       </div>
 
       {orderer && (

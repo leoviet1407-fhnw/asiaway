@@ -553,6 +553,20 @@ export const EN: Record<string, string> = {
   'Bedarf aus dem Plan dieser Woche übernommen.': 'Need taken from this week’s plan.',
   'Die Anzahl Personen ist ungültig (0 bis 60).': 'The number of people is invalid (0 to 60).',
 
+  // --- Home for the team ---
+  'Verfügbarkeit melden': 'Report availability',
+  'Für {month} – einen Monat im Voraus.': 'For {month} – one month ahead.',
+  '{n} Tage sind noch offen.': '{n} days are still open.',
+  '{n} Wochen haben zu wenig Stunden.': '{n} weeks have too few hours.',
+  'Jetzt melden': 'Report now',
+  'Verfügbarkeit für {month} gemeldet': 'Availability for {month} reported',
+  '{n} Schichten bestätigen': 'Confirm {n} shifts',
+  'Haben Sie diese Schichten gearbeitet? Ein Tipp genügt.': 'Did you work these shifts? One tap is enough.',
+  'Ganzer Plan': 'Full plan',
+  'Noch keine Schichten veröffentlicht. Der Plan erscheint hier, sobald die Leitung ihn veröffentlicht hat.': 'No shifts published yet. The plan shows up here as soon as the management has published it.',
+  Heute: 'Today',
+  Morgen: 'Tomorrow',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',
