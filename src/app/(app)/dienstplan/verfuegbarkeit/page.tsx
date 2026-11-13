@@ -6,6 +6,7 @@ import { formatDay, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getAvailabilityMonth, getProfile, listTeam } from '@/server/services/roster-service';
+import { getVacationBalance } from '@/server/services/hours-service';
 import { AvailabilityEditor } from './AvailabilityEditor';
 import { VacationPanel } from './VacationPanel';
 
@@ -40,6 +41,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const person = team.find((t) => t.userId === userId);
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : dueMonth(today);
   const data = await getAvailabilityMonth(database, p, userId, month);
+  const vacation = await getVacationBalance(database, p, userId, Number(month.slice(0, 4)));
   const dates = monthDates(month);
   const absentDates: Record<string, string> = {};
   for (const a of data.absences) {
@@ -84,6 +86,11 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         submittedAt={data.submittedAt ? data.submittedAt.toISOString() : null}
         isSelf={own}
       />
+
+      <div className="card flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span>Ferien {vacation.year}: <strong>{vacation.remaining} Tage Rest</strong> von {vacation.entitlement + vacation.carry} (genommen {vacation.taken}, angefragt {vacation.requested})</span>
+        <Link href={own ? '/dienstplan/stunden' : `/dienstplan/stunden?person=${userId}`} className="text-brand-600 underline">Meine Stunden</Link>
+      </div>
 
       <VacationPanel
         userId={userId}

@@ -13,6 +13,7 @@ const MESSAGES: Record<string, string> = {
   CLOSING_LOCKED: 'Dieser Abschluss ist bereits freigegeben und gesperrt.',
   TOO_LATE: 'Dieser Tag liegt weniger als 4 Wochen entfernt. Bitte direkt bei der Leitung melden.',
   ROSTER_BLOCKED: 'Der Plan hat noch Fehler und kann nicht veröffentlicht werden.',
+  MONTH_LOCKED: 'Dieser Monat ist bereits freigegeben und gesperrt.',
   MAIL_FAILED: 'Die E-Mail konnte nicht gesendet werden. Die Bestellung bleibt zur Prüfung.',
   INTERNAL_ERROR: 'Unerwarteter Fehler. Bitte nochmals versuchen.',
 };

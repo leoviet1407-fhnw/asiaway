@@ -14,6 +14,15 @@ import { db } from '@/server/db';
 import { mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
 import { updateItem, updateSupplier, type StorageArea } from '@/server/services/catalog-service';
 import {
+  approveMonth,
+  confirmShift,
+  correctShift,
+  deleteEntry,
+  reopenMonth,
+  saveEntry,
+  saveYearlyBalance,
+} from '@/server/services/hours-service';
+import {
   cancelAbsence,
   copyWeek,
   createStaffUser,
@@ -513,6 +522,95 @@ export async function changePasswordAction(_prev: { error?: string; saved?: bool
     const next = String(form.get('next') ?? '');
     if (next !== String(form.get('repeat') ?? '')) return { error: 'Die beiden neuen Passwörter sind nicht gleich.' };
     await changePassword(await db(), p.userId, String(form.get('current') ?? ''), next, (await cookies()).get(SESSION_COOKIE)?.value);
+    return { saved: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: fail(error).error };
+  }
+}
+
+// --- Hours, overtime, vacation balance ------------------------------------------------------
+
+type TimesInput = { start: string; end: string; breakMin: number; note: string };
+
+function times(input: TimesInput): { startMin: number; endMin: number; breakMin: number; note: string | null } | string {
+  const startMin = parseTime(input.start);
+  const endMin = parseTime(input.end);
+  if (startMin === null || endMin === null) return 'Zeit ist ungültig (z. B. 10:30).';
+  return { startMin, endMin, breakMin: Math.max(0, Math.round(Number(input.breakMin) || 0)), note: input.note || null };
+}
+
+export async function confirmShiftAction(shiftId: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await confirmShift(await db(), p, shiftId);
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function correctShiftAction(shiftId: string, input: TimesInput): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    const t = times(input);
+    if (typeof t === 'string') return { ok: false, error: t };
+    await correctShift(await db(), p, shiftId, t);
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function saveEntryAction(input: TimesInput & { userId: string; date: string; id?: string }): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    const t = times(input);
+    if (typeof t === 'string') return { ok: false, error: t };
+    await saveEntry(await db(), p, { id: input.id, userId: input.userId, date: input.date, ...t });
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function deleteEntryAction(entryId: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await deleteEntry(await db(), p, entryId);
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function monthStepAction(userId: string, month: string, step: 'approve' | 'reopen'): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    if (step === 'approve') await approveMonth(await db(), p, userId, month);
+    else await reopenMonth(await db(), p, userId, month);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function saveBalanceAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
+  try {
+    const p = await requirePrincipal();
+    const num = (name: string) => Number(String(form.get(name) ?? '0').replace(',', '.')) || 0;
+    await saveYearlyBalance(await db(), p, String(form.get('userId')), Number(form.get('year')), {
+      vacationDays: num('vacationDays'),
+      vacationCarry: num('vacationCarry'),
+      overtimeCarryMin: Math.round(num('overtimeCarryHours') * 60),
+    });
+    revalidatePath('/dienstplan', 'layout');
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;

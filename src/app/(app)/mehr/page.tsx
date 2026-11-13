@@ -12,6 +12,7 @@ export default async function MorePage() {
   const items: { href: string; label: string; text: string; icon: IconName }[] = [
     { href: '/artikel', label: 'Artikel', text: 'Artikelliste, Barcodes, Preise', icon: 'box' },
     ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: 'Lieferanten', text: 'Kontakte, Liefertage, Mindestbestellung', icon: 'truck' as const }] : []),
+    { href: '/dienstplan/stunden', label: 'Meine Stunden', text: 'Arbeitszeit, Überstunden, Ferien-Rest', icon: 'calendar' },
     { href: '/dienstplan/verfuegbarkeit', label: 'Verfügbarkeit & Ferien', text: 'Einen Monat im Voraus melden', icon: 'calendar' },
     ...(isOrderer(p) ? [{ href: '/dienstplan/team', label: 'Team & Meldungen', text: 'Wer hat gemeldet, Ferienanfragen, Mitarbeiter', icon: 'calendar' as const }] : []),
   ];

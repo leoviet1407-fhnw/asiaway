@@ -312,6 +312,36 @@ export const absences = pgTable('absences', {
   decidedAt: timestamp('decided_at', { withTimezone: true }),
 });
 
+
+export const yearlyBalances = pgTable('yearly_balances', {
+  userId: uuid('user_id').notNull(),
+  year: integer('year').notNull(),
+  vacationDays: numeric('vacation_days', { precision: 5, scale: 1 }).notNull().default('25'),
+  vacationCarry: numeric('vacation_carry', { precision: 5, scale: 1 }).notNull().default('0'),
+  overtimeCarryMin: integer('overtime_carry_min').notNull().default(0),
+});
+
+export const timeEntries = pgTable('time_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  workDate: date('work_date').notNull(),
+  startMin: integer('start_min').notNull(),
+  endMin: integer('end_min').notNull(),
+  breakMin: integer('break_min').notNull().default(0),
+  shiftId: uuid('shift_id'),
+  note: text('note'),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const timeMonthApprovals = pgTable('time_month_approvals', {
+  userId: uuid('user_id').notNull(),
+  month: text('month').notNull(),
+  approvedBy: uuid('approved_by').notNull(),
+  approvedAt: timestamp('approved_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schema = {
   locations,
   users,
@@ -337,4 +367,7 @@ export const schema = {
   availability,
   availabilitySubmissions,
   absences,
+  yearlyBalances,
+  timeEntries,
+  timeMonthApprovals,
 };

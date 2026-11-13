@@ -44,6 +44,11 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
               Verfügbarkeit & Ferien
             </Link>
           )}
+          {profile && (
+            <Link href="/dienstplan/stunden" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
+              Meine Stunden
+            </Link>
+          )}
           {planner && (
             <Link href="/dienstplan/team" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
               Team & Meldungen

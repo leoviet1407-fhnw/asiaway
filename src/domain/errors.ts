@@ -13,6 +13,7 @@ export type DomainErrorCode =
   | 'CLOSING_LOCKED'
   | 'TOO_LATE'
   | 'ROSTER_BLOCKED'
+  | 'MONTH_LOCKED'
   | 'MAIL_FAILED';
 
 export class DomainError extends Error {

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useActionState, useState, useTransition } from 'react';
 import { EMPLOYMENT_LABEL, ROSTER_SITES, type EmploymentType } from '@/domain/roster';
-import { absenceStepAction, createStaffAction, saveProfileAction } from '../../../actions';
+import { absenceStepAction, createStaffAction, saveBalanceAction, saveProfileAction } from '../../../actions';
 
 const TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'];
 
@@ -94,3 +94,18 @@ export function AbsenceDecision({ id }: { id: string }) {
 }
 
 export { ROSTER_SITES };
+
+export function BalanceForm({ userId, year, vacationDays, vacationCarry, overtimeCarryHours }: { userId: string; year: number; vacationDays: number; vacationCarry: number; overtimeCarryHours: number }) {
+  const [state, action, pending] = useActionState(saveBalanceAction, undefined);
+  return (
+    <form action={action} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[repeat(3,1fr)_auto]">
+      <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="year" value={year} />
+      <div><label className="label" htmlFor={`vd-${userId}`}>Ferientage {year}</label><input id={`vd-${userId}`} name="vacationDays" inputMode="decimal" className="w-full" defaultValue={vacationDays} /></div>
+      <div><label className="label" htmlFor={`vc-${userId}`}>Übertrag Ferien</label><input id={`vc-${userId}`} name="vacationCarry" inputMode="decimal" className="w-full" defaultValue={vacationCarry} /></div>
+      <div><label className="label" htmlFor={`oc-${userId}`}>Überstunden Vorjahr (h)</label><input id={`oc-${userId}`} name="overtimeCarryHours" inputMode="decimal" className="w-full" defaultValue={overtimeCarryHours} /></div>
+      <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending}>{state?.saved ? 'Gespeichert ✓' : 'Speichern'}</button>
+      {state?.error && <p className="col-span-full text-sm text-danger-500">{state.error}</p>}
+    </form>
+  );
+}

@@ -6,7 +6,9 @@ import { formatDateTime, formatDay, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listPendingAbsences, listTeam, submissionOverview } from '@/server/services/roster-service';
-import { AbsenceDecision, NewMemberForm, ProfileForm } from './TeamForms';
+import { AbsenceDecision, BalanceForm, NewMemberForm, ProfileForm } from './TeamForms';
+import { formatOvertime, vacationNeedsAttention } from '@/domain/hours';
+import { getYearlyBalance, teamBalances } from '@/server/services/hours-service';
 
 export const metadata = { title: 'Team & Meldungen' };
 
@@ -21,11 +23,14 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const site = ROSTER_SITES.find((s) => s.id === params.site) ?? ROSTER_SITES[1]!;
   const today = todayIso();
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : dueMonth(today);
-  const [overview, pending, team] = await Promise.all([
+  const year = Number(today.slice(0, 4));
+  const [balances, overview, pending, team] = await Promise.all([
+    teamBalances(database, p, site.id, today.slice(0, 7), today),
     submissionOverview(database, p, site.id, month),
     listPendingAbsences(database, p, site.id),
     listTeam(database, site.id, { includeInactive: true }),
   ]);
+  const yearly = await Promise.all(team.map((m) => getYearlyBalance(database, m.userId, year)));
   const href = (m: string, s = site.id) => `/dienstplan/team?site=${s}&monat=${m}`;
   const missing = overview.filter((o) => !o.submittedAt).length;
 
@@ -96,11 +101,33 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       </section>
 
       <section className="space-y-3">
+        <h2 className="h-site">Ferien & Überstunden</h2>
+        <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
+          {balances.map(({ person, vacation, hours }) => (
+            <li key={person.userId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+              <div>
+                <div className="font-semibold text-navy">{person.name}</div>
+                <div className="text-xs text-charcoal-muted">
+                  Ferien: {vacation.taken} genommen · {vacation.requested} angefragt · <span className={vacation.remaining < 0 || vacationNeedsAttention(vacation, today) ? 'font-bold text-brand-600' : ''}>Rest {vacation.remaining}</span> von {vacation.entitlement + vacation.carry}
+                  {vacationNeedsAttention(vacation, today) && ' – noch viel offen'}
+                </div>
+                <div className="text-xs text-charcoal-muted">
+                  {hours.totals.overtimeMinutes === null ? `Stunden diesen Monat: ${Math.round(hours.totals.workedMinutes / 60)} h` : `Überstunden Monat: ${formatOvertime(hours.totals.overtimeMinutes)} · Saldo ${formatOvertime(hours.yearBalanceMinutes ?? 0)}`}
+                </div>
+              </div>
+              <Link href={`/dienstplan/stunden?person=${person.userId}`} className="btn-secondary min-h-0 px-3 py-1.5 text-sm">Stunden prüfen</Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="h-site">Team {site.name}</h2>
         <ul className="space-y-3">
-          {team.map((m) => (
-            <li key={m.userId} className="card">
+          {team.map((m, i) => (
+            <li key={m.userId} className="card space-y-3">
               <ProfileForm member={m} />
+              <BalanceForm userId={m.userId} year={year} vacationDays={yearly[i]!.vacationDays} vacationCarry={yearly[i]!.vacationCarry} overtimeCarryHours={yearly[i]!.overtimeCarryMin / 60} />
             </li>
           ))}
         </ul>
@@ -109,3 +136,4 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     </div>
   );
 }
+
