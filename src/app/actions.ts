@@ -25,6 +25,9 @@ import {
   saveYearlyBalance,
 } from '@/server/services/hours-service';
 import { deriveNeedsFromWeek, saveNeeds } from '@/server/services/coverage-service';
+import { applyPattern, fillMissingFromPatterns, savePattern } from '@/server/services/pattern-service';
+import { deleteSpecialDay, deleteVacationRule, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
+import { suggestWeek } from '@/server/services/suggest-service';
 import { decideChangeRequest, requestChange, withdrawChangeRequest, type ChangeKind } from '@/server/services/change-request-service';
 import {
   cancelAbsence,
@@ -698,6 +701,122 @@ export async function withdrawChangeAction(id: string): Promise<ActionResult> {
     await withdrawChangeRequest(await db(), p, id);
     revalidatePath('/', 'layout');
     return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+// --- Standardwoche, special days, holiday limits, roster suggestion --------------------------------
+interface PatternInput {
+  weekday: number;
+  mode: '' | 'ALL' | 'WINDOW' | 'NO';
+  from?: string;
+  to?: string;
+}
+
+export async function savePatternAction(userId: string, days: PatternInput[]): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    const t = await getT();
+    const list = [];
+    for (const d of days) {
+      if (d.mode === 'WINDOW') {
+        const fromMin = parseTime(d.from ?? '');
+        const toMin = parseTime(d.to ?? '');
+        if (fromMin === null || toMin === null) return { ok: false, error: t('Zeit ist ungültig (z. B. 10:30).') };
+        list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin, toMin });
+      } else if (d.mode === 'ALL') list.push({ weekday: d.weekday, kind: 'AVAILABLE' as const, fromMin: null, toMin: null });
+      else if (d.mode === 'NO') list.push({ weekday: d.weekday, kind: 'UNAVAILABLE' as const, fromMin: null, toMin: null });
+      else list.push({ weekday: d.weekday, kind: null, fromMin: null, toMin: null });
+    }
+    await savePattern(await db(), p, userId, list);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function applyPatternAction(userId: string, month: string): Promise<ActionResult & { days?: number }> {
+  try {
+    const p = await requirePrincipal();
+    const n = await applyPattern(await db(), p, userId, month);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true, days: n };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function fillMissingAction(siteId: string, month: string): Promise<ActionResult & { people?: number; days?: number }> {
+  try {
+    const p = await requirePrincipal();
+    const r = await fillMissingFromPatterns(await db(), p, siteId, month);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true, ...r };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function saveSpecialDayAction(siteId: string, input: { date: string; label: string; closed: boolean; lunch: number; dinner: number }): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await saveSpecialDay(await db(), p, siteId, { date: input.date, label: input.label, closed: input.closed, lunchPeople: Math.round(Number(input.lunch) || 0), dinnerPeople: Math.round(Number(input.dinner) || 0) });
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function deleteSpecialDayAction(siteId: string, date: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await deleteSpecialDay(await db(), p, siteId, date);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function saveVacationRuleAction(siteId: string, input: { label: string; startDate: string; endDate: string; maxPeople: number }): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await saveVacationRule(await db(), p, siteId, { label: input.label, startDate: input.startDate, endDate: input.endDate || input.startDate, maxPeople: Math.round(Number(input.maxPeople)) });
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function deleteVacationRuleAction(id: string): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await deleteVacationRule(await db(), p, id);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+export async function suggestWeekAction(siteId: string, weekStart: string): Promise<ActionResult & { created?: number; gaps?: { date: string; service: 'LUNCH' | 'DINNER'; missing: number }[] }> {
+  try {
+    const p = await requirePrincipal();
+    const r = await suggestWeek(await db(), p, siteId, weekStart);
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true, created: r.created, gaps: r.gaps };
   } catch (error) {
     if (isRedirect(error)) throw error;
     return await fail(error);

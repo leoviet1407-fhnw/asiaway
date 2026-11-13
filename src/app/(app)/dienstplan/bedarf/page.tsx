@@ -43,6 +43,7 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
         <Link href="/dienstplan" className="text-sm text-charcoal-muted hover:text-navy">← {t('Dienstplan')}</Link>
         <h1 className="mt-1 text-2xl">{t('Bedarf & Abdeckung')}</h1>
         <p className="text-charcoal-muted">{t('Wie viele Personen gebraucht werden, und wie viele sich gemeldet haben.')}</p>
+        <Link href={`/dienstplan/saison?site=${site.id}`} className="text-sm text-brand-600 underline">{t('Feiertage & Ferienzeit')}</Link>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -86,7 +87,7 @@ export default async function CoveragePage({ searchParams }: { searchParams: Pro
             <tbody>
               {coverage.days.map((d) => (
                 <tr key={d.date} className="border-t border-surface-line">
-                  <td className="py-1.5 font-semibold text-navy">{weekdayShort(d.date, t.lang)} {d.date.slice(8)}.{d.date.slice(5, 7)}.</td>
+                  <td className="py-1.5 font-semibold text-navy">{weekdayShort(d.date, t.lang)} {d.date.slice(8)}.{d.date.slice(5, 7)}.{d.special ? <span className="ml-1 chip bg-navy-50 text-navy">{t(d.special)}</span> : null}</td>
                   <Cell need={d.need.lunchPeople} offered={d.offeredLunch} planned={d.plannedLunch} plannedLabel={t('eingeteilt')} />
                   <Cell need={d.need.dinnerPeople} offered={d.offeredDinner} planned={d.plannedDinner} plannedLabel={t('eingeteilt')} />
                 </tr>

@@ -405,3 +405,29 @@ export const changeRequests = pgTable('change_requests', {
   decidedAt: timestamp('decided_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const availabilityPatterns = pgTable('availability_patterns', {
+  userId: uuid('user_id').notNull(),
+  weekday: integer('weekday').notNull(),
+  kind: text('kind').notNull(),
+  fromMin: integer('from_min'),
+  toMin: integer('to_min'),
+});
+
+export const specialDays = pgTable('special_days', {
+  site: text('site').notNull(),
+  workDate: date('work_date').notNull(),
+  label: text('label').notNull(),
+  closed: boolean('closed').notNull().default(false),
+  lunchPeople: integer('lunch_people').notNull().default(0),
+  dinnerPeople: integer('dinner_people').notNull().default(0),
+});
+
+export const vacationRules = pgTable('vacation_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  site: text('site').notNull(),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  label: text('label').notNull(),
+  maxPeople: integer('max_people').notNull(),
+});

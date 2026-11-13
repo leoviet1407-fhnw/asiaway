@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { dueMonth, firstOpenDate, shiftMonth } from '@/domain/roster';
+import { dueMonth, firstOpenDate, formatTime, shiftMonth } from '@/domain/roster';
 import { isPlanner } from '@/domain/roles';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getAvailabilityMonth, getProfile, listTeam } from '@/server/services/roster-service';
 import { getVacationBalance } from '@/server/services/hours-service';
+import { PatternPanel, type PatternRow } from './PatternPanel';
+import { getPattern } from '@/server/services/pattern-service';
 import { AvailabilityEditor } from './AvailabilityEditor';
 import { VacationPanel } from './VacationPanel';
 import { getT } from '@/i18n/server';
@@ -45,6 +47,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const person = team.find((t) => t.userId === userId);
   const month = params.monat && /^\d{4}-\d{2}$/.test(params.monat) ? params.monat : dueMonth(today);
   const data = await getAvailabilityMonth(database, p, userId, month);
+  const pattern = await getPattern(database, p, userId);
+  const patternRows: PatternRow[] = pattern.map((d) => ({ weekday: d.weekday, mode: d.kind === 'UNAVAILABLE' ? 'NO' : d.kind === 'AVAILABLE' ? (d.fromMin === null ? 'ALL' : 'WINDOW') : '', from: d.fromMin === null ? '' : formatTime(d.fromMin), to: d.toMin === null ? '' : formatTime(d.toMin) }));
   const vacation = await getVacationBalance(database, p, userId, Number(month.slice(0, 4)));
   const own = userId === p.userId;
   const href = (m: string) => `/dienstplan/verfuegbarkeit?monat=${m}${own ? '' : `&person=${userId}`}`;
@@ -70,6 +74,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         <div className="font-semibold text-navy">{monthName(month, t.lang)}</div>
         <Link href={href(shiftMonth(month, 1))} className="btn-secondary px-3" aria-label={t('Folgemonat')}>→</Link>
       </div>
+
+      <PatternPanel key={`pattern-${userId}-${month}`} userId={userId} month={month} monthLabel={monthName(month, t.lang)} rows={patternRows} canApply />
 
       <AvailabilityEditor
         key={`${userId}-${month}`}

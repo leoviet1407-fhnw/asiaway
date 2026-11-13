@@ -18,7 +18,7 @@ import {
   type Shift,
   type Violation,
 } from '@/domain/roster';
-import { deleteShiftAction, saveShiftAction, weekStepAction } from '../../actions';
+import { deleteShiftAction, saveShiftAction, suggestWeekAction, weekStepAction } from '../../actions';
 import { useT } from '@/i18n/client';
 
 interface Props {
@@ -122,6 +122,24 @@ export function WeekPlanner(props: Props) {
           <span className={`chip ${props.status === 'PUBLISHED' ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>{props.status === 'PUBLISHED' ? t('Veröffentlicht') : t('Entwurf – Mitarbeiter sehen noch nichts')}</span>
           <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending || props.shifts.length > 0} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'copy'), () => setNotice(t('Letzte Woche übernommen.')))}>
             {t('Letzte Woche kopieren')}
+          </button>
+          <button
+            className="btn-secondary min-h-0 px-3 py-1.5 text-sm"
+            disabled={pending || props.shifts.length > 0}
+            title={props.shifts.length > 0 ? t('Nur für eine leere Woche') : undefined}
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const r = await suggestWeekAction(props.site, props.weekStart);
+                if (!r.ok) return setError(r.error);
+                const gaps = r.gaps ?? [];
+                const names = gaps.map((g) => `${weekdayShort(g.date, t.lang)} ${g.service === 'LUNCH' ? t('Mittag') : t('Abend')} (${g.missing})`).join(', ');
+                setNotice(t('Vorschlag: {n} Schichten eingetragen. Bitte prüfen und anpassen.', { n: r.created ?? 0 }) + (gaps.length ? ` ${t('Lücken')}: ${names}.` : ''));
+                router.refresh();
+              })
+            }
+          >
+            {t('Plan vorschlagen')}
           </button>
           {props.status === 'PUBLISHED' ? (
             <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'unpublish'))}>

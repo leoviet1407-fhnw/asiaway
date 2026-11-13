@@ -27,6 +27,7 @@ import {
 } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import { hashPassword } from '../auth/password';
+import { assertVacationAllowed } from './season-service';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import {
@@ -471,6 +472,7 @@ export async function requestAbsence(db: AppDatabase, p: Principal, input: Absen
   if (!planner && input.type !== 'VACATION') throw domainError('VALIDATION_FAILED', 'Staff can only request holidays.');
   if (!planner && input.startDate < todayIso(now)) throw domainError('VALIDATION_FAILED', 'Der Beginn liegt in der Vergangenheit.');
   if (!(await getProfile(db, input.userId))) throw domainError('VALIDATION_FAILED', 'Kein Team-Profil.');
+  if (!planner && input.type === 'VACATION') await assertVacationAllowed(db, input.userId, input.startDate, input.endDate);
   const [row] = await db
     .insert(absences)
     .values({

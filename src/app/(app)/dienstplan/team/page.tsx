@@ -6,7 +6,7 @@ import { formatDateTime, formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listPendingAbsences, listTeam, submissionOverview } from '@/server/services/roster-service';
-import { AbsenceDecision, BalanceForm, NewMemberForm, ProfileForm } from './TeamForms';
+import { AbsenceDecision, BalanceForm, FillMissing, NewMemberForm, ProfileForm } from './TeamForms';
 import { formatOvertime, vacationNeedsAttention } from '@/domain/hours';
 import { getYearlyBalance, teamBalances } from '@/server/services/hours-service';
 import { getT } from '@/i18n/server';
@@ -61,6 +61,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <p className="card text-charcoal-muted">{t('Noch niemand im Team. Unten Mitarbeiter hinzufügen.')}</p>
         ) : (
           <>
+            {missing > 0 && <FillMissing site={site.id} month={month} />}
             <p className={`rounded-btn p-3 text-sm font-semibold ${missing === 0 ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>
               {missing === 0 ? t('Alle haben gemeldet.') : t('{missing} von {total} haben noch nicht gemeldet.', { missing, total: overview.length })}
             </p>

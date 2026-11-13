@@ -21,6 +21,7 @@ export default async function MorePage() {
     { href: '/dienstplan/stunden', label: t('Meine Stunden'), text: t('Arbeitszeit, Überstunden, Ferien-Rest'), icon: 'calendar' },
     { href: '/dienstplan/verfuegbarkeit', label: t('Verfügbarkeit & Ferien'), text: t('Einen Monat im Voraus melden'), icon: 'calendar' },
     ...(isPlanner(p) ? [{ href: '/dienstplan/bedarf', label: t('Bedarf & Abdeckung'), text: t('Wie viele Personen gebraucht werden und wie viele gemeldet haben'), icon: 'calendar' as const }] : []),
+    ...(isPlanner(p) ? [{ href: '/dienstplan/saison', label: t('Feiertage & Ferienzeit'), text: t('Besondere Tage, Ferien-Limiten'), icon: 'calendar' as const }] : []),
     ...(isPlanner(p) ? [{ href: '/dienstplan/uebersicht', label: t('Übersicht'), text: t('Alle Mitarbeiter, Diagramme zu Stunden, Ferien und Umsatz'), icon: 'calendar' as const }] : []),
     ...(isPlanner(p) ? [{ href: '/dienstplan/team', label: t('Team & Meldungen'), text: t('Wer hat gemeldet, Ferienanfragen, Mitarbeiter'), icon: 'calendar' as const }] : []),
   ];

@@ -105,6 +105,8 @@ export interface DayNeed {
 export interface CoverageDay {
   readonly date: string;
   readonly need: DayNeed;
+  /** Name of a special day (holiday, Silvester, closed) that changes the need. */
+  readonly special?: string | null;
   /** People who offered a time that covers the service. */
   readonly offeredLunch: number;
   readonly offeredDinner: number;
