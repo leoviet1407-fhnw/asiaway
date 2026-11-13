@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { formatTime, weekdayShort, type Shift } from '@/domain/roster';
 import { formatWorked } from '@/domain/hours';
-import { confirmShiftAction, correctShiftAction, deleteEntryAction, monthStepAction, requestChangeAction, saveEntryAction } from '../../../actions';
+import { correctShiftAction, deleteEntryAction, monthStepAction, requestChangeAction, saveEntryAction } from '../../../actions';
 import { useT } from '@/i18n/client';
 
 interface Entry {
@@ -64,7 +64,7 @@ export function HoursEditor(props: Props) {
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-btn bg-danger-50 p-3 text-danger-500">{error}</p>}
       {notice && <p role="status" className="rounded-btn bg-ok-50 p-3 text-ok-500">{notice}</p>}
-      {!props.isPlanner && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Stimmt die Zeit wie geplant? Dann „Wie geplant ✓“. Sonst eine Änderung anfragen – die Leitung bestätigt sie.')}</p>}
+      {!props.isPlanner && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Ihre Schichten zählen automatisch wie geplant. War es anders (länger oder kürzer)? Dann „Ändern“ und eine Änderung anfragen – die Leitung bestätigt sie.')}</p>}
 
       <section className="space-y-2">
         <h2 className="h-site">{t('Geplante Schichten')}</h2>
@@ -89,11 +89,6 @@ export function HoursEditor(props: Props) {
                     </div>
                     {!locked && open && editing !== s.id && (
                       <div className="flex gap-2">
-                        {!e && (
-                          <button className="btn-primary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => run(() => confirmShiftAction(s.id))}>
-                            {t('Wie geplant ✓')}
-                          </button>
-                        )}
                         <button
                           className="btn-secondary min-h-0 px-3 py-1.5 text-sm"
                           onClick={() => {

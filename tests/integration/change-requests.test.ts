@@ -83,14 +83,15 @@ describe('change requests', () => {
 
   it('worked time differing from the plan is recorded once approved', async () => {
     const id = await requestChange(db, staff, { kind: 'WORKED_TIME', shiftId: pastShift, startMin: t('10:30'), endMin: t('16:00'), breakMin: 30, reason: 'Gäste blieben länger' }, now);
-    expect((await getMonthHours(db, staff, staff.userId, '2026-11')).totals.workedMinutes).toBe(0);
+    // the planned shift (4 h) already counts as worked as planned: the app records it by itself
+    expect((await getMonthHours(db, staff, staff.userId, '2026-11', now)).totals.workedMinutes).toBe(240);
     await decideChangeRequest(db, planner, id, true, now);
-    expect((await getMonthHours(db, staff, staff.userId, '2026-11')).totals.workedMinutes).toBe(300);
+    expect((await getMonthHours(db, staff, staff.userId, '2026-11', now)).totals.workedMinutes).toBe(300);
     // extra hours without a shift, in the future: not allowed
     await expect(requestChange(db, staff, { kind: 'WORKED_TIME', date: '2026-11-20', startMin: t('08:00'), endMin: t('11:00'), reason: 'Inventur' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     const extra = await requestChange(db, staff, { kind: 'WORKED_TIME', date: '2026-11-11', startMin: t('08:00'), endMin: t('11:00'), reason: 'Inventur' }, now);
     await decideChangeRequest(db, planner, extra, true, now);
-    expect((await getMonthHours(db, staff, staff.userId, '2026-11')).totals.workedMinutes).toBe(480);
+    expect((await getMonthHours(db, staff, staff.userId, '2026-11', now)).totals.workedMinutes).toBe(480);
   });
 
   it('a planner who also works in service cannot approve their own request', async () => {

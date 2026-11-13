@@ -4,11 +4,12 @@ import { formatChf } from '@/domain/qty';
 import { formatDay, monthLabel, todayIso } from '@/lib/dates';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { addDays, dueMonth, formatTime, mustReportTimes, stationsOf, type EmploymentType } from '@/domain/roster';
-import { getAvailabilityMonth, getProfile, getWeekStatuses, listMyShifts } from '@/server/services/roster-service';
-import { getMonthHours, getVacationBalance } from '@/server/services/hours-service';
+import { ROSTER_SITES, addDays, dueMonth, formatTime, mustReportTimes, stationsOf, type EmploymentType } from '@/domain/roster';
+import { getAvailabilityMonth, getProfile, listMyShifts } from '@/server/services/roster-service';
+import { getVacationBalance } from '@/server/services/hours-service';
 import { getPattern } from '@/server/services/pattern-service';
 import { countOpenRequests } from '@/server/services/change-request-service';
+import { getPlannerTodos } from '@/server/services/attention-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -37,21 +38,28 @@ export default async function HomePage() {
   // For people on the roster: their next shifts and what they still have to do
   let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
   let availability: { done: boolean; missingDays: number; shortWeeks: number } | null = null;
-  let unconfirmed = 0;
   let vacation: Awaited<ReturnType<typeof getVacationBalance>> | null = null;
   const openRequests = profile || planner ? await countOpenRequests(database, p) : 0;
+  const todos = planner ? await getPlannerTodos(database, p) : [];
+  const siteName = (id?: string) => ROSTER_SITES.find((x) => x.id === id)?.name ?? '';
+  const todoText = (x: (typeof todos)[number]) => {
+    const site = siteName(x.site);
+    switch (x.key) {
+      case 'REQUESTS': return t('{n} Änderungsanfragen entscheiden', { n: x.count });
+      case 'HOLIDAY': return t('{n} Ferienanfragen entscheiden', { n: x.count });
+      case 'REPORTS': return t('{site}: {n} Aushilfen haben ihre Zeiten noch nicht gemeldet', { site, n: x.count });
+      case 'UNPLANNED': return t('{site}: {n} Wochen sind noch nicht geplant', { site, n: x.count });
+      case 'UNPUBLISHED': return t('{site}: {n} Wochen sind geplant, aber nicht veröffentlicht', { site, n: x.count });
+      case 'GAPS': return t('{site}: {n} Plätze im Plan sind noch leer', { site, n: x.count });
+      case 'APPROVE': return t('{site}: Stunden vom Vormonat freigeben ({n})', { site, n: x.count });
+    }
+  };
   if (profile) {
     myShifts = await listMyShifts(database, p, today, addDays(today, 13));
-    const [status, reportMonth, hours] = await Promise.all([
-      getWeekStatuses(database, p, p.userId, month),
-      getAvailabilityMonth(database, p, p.userId, month),
-      getMonthHours(database, p, p.userId, today.slice(0, 7)),
-    ]);
-    const shortWeeks = status.weeks.filter((w) => w.enforced && !w.ok).length;
+    const reportMonth = await getAvailabilityMonth(database, p, p.userId, month);
     // People with a Pensum report no times, only holiday; casual staff report the times they can work
     if (mustReportTimes(profile.employmentType as EmploymentType)) availability = { done: reportMonth.submittedAt !== null || (await getPattern(database, p, p.userId)).some((d) => d.kind !== null), missingDays: 0, shortWeeks: 0 };
     if (!mustReportTimes(profile.employmentType as EmploymentType)) vacation = await getVacationBalance(database, p, p.userId, Number(today.slice(0, 4)));
-    unconfirmed = hours.planned.filter((s) => s.date <= today && s.entryId === null).length;
   }
   const stationOf = (siteId: string, name: string) => stationsOf(siteId).find((x) => x.name === name);
   const dayWord = (iso: string) => (iso === today ? t('Heute') : iso === addDays(today, 1) ? t('Morgen') : formatDay(iso, t.lang));
@@ -60,11 +68,29 @@ export default async function HomePage() {
     <div className="space-y-6">
       <h1 className="text-2xl">{t('Hallo')} {p.name.split(' ')[0]}</h1>
 
-      {planner && openRequests > 0 && (
-        <Link href="/dienstplan/anfragen" className="block rounded-btn bg-navy p-4 text-white">
-          <div className="font-semibold">{t('{n} Änderungsanfragen warten', { n: openRequests })}</div>
-          <div className="text-sm text-white/85">{t('Mitarbeiter möchten Schichten oder Arbeitszeiten ändern.')}</div>
-        </Link>
+      {planner && (
+        <section className="space-y-2">
+          <h2 className="h-site flex items-center gap-2">
+            {t('Offen für die Leitung')} <span className="chip bg-navy-50 text-navy">{todos.length}</span>
+          </h2>
+          {todos.length === 0 ? (
+            <p className="rounded-btn bg-ok-50 p-3 font-semibold text-ok-500">✓ {t('Nichts offen. Es wartet niemand auf Sie.')}</p>
+          ) : (
+            <ul className="divide-y divide-surface-line overflow-hidden rounded-btn border border-surface-line bg-white">
+              {todos.map((x) => (
+                <li key={`${x.key}-${x.site ?? ''}`}>
+                  <Link href={x.href} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-sunken">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-navy">{todoText(x)}</div>
+                      {x.detail && <div className="truncate text-sm text-charcoal-muted">{x.detail}</div>}
+                    </div>
+                    <span className="chip bg-brand-600 text-white">{x.count}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       {profile && vacation && (
@@ -90,12 +116,6 @@ export default async function HomePage() {
             <Link href={`/dienstplan/verfuegbarkeit?monat=${month}`} className="flex items-center justify-between gap-3 rounded-btn bg-ok-50 p-3 text-ok-500">
               <span className="font-semibold">✓ {t('Verfügbarkeit für {month} gemeldet', { month: monthLabel(month, t.lang) })}</span>
               <span className="text-sm underline">{t('Ändern')}</span>
-            </Link>
-          )}
-          {unconfirmed > 0 && (
-            <Link href="/dienstplan/stunden" className="block rounded-btn bg-navy p-4 text-white">
-              <div className="font-semibold">{t('{n} Schichten bestätigen', { n: unconfirmed })}</div>
-              <div className="text-sm text-white/85">{t('Haben Sie diese Schichten gearbeitet? Ein Tipp genügt.')}</div>
             </Link>
           )}
         </div>
@@ -137,7 +157,7 @@ export default async function HomePage() {
         {profile ? (
           <>
             <Action href="/dienstplan" icon="users" label={t('Dienstplan')} primary />
-            <Action href="/dienstplan/stunden" icon="clock" label={t('Meine Stunden')} badge={unconfirmed} />
+            <Action href="/dienstplan/stunden" icon="clock" label={t('Meine Stunden')} />
             <Action href="/dienstplan/anfragen" icon="swap" label={t('Änderungsanfragen')} badge={openRequests} />
             <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="sun" label={availability ? t('Verfügbarkeit & Ferien') : t('Ferien')} />
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />

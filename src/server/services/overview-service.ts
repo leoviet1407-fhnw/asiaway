@@ -5,7 +5,7 @@ import { isPlanner, type Principal, type Role } from '../../domain/roles';
 import { ROSTER_SITES, addDays, monthDates, shiftNetMinutes, weekDates, type EmploymentType } from '../../domain/roster';
 import type { AppDatabase } from '../db/client';
 import { dailyClosings, locations, shifts, staffProfiles, timeEntries, userRoles, users } from '../db/schema';
-import { getMonthHours, getVacationBalance } from './hours-service';
+import { autoConfirmShifts, getMonthHours, getVacationBalance } from './hours-service';
 
 /** Overview for the Leitung and admins: the whole team, hours, holidays, overtime, staffing and sales. */
 function requirePlanner(p: Principal) {
@@ -72,6 +72,9 @@ export async function getOverview(
   const filtered = profiles.filter((r) => !siteId || r.p.site === siteId || r.p.extraSites.includes(siteId));
   const ids = filtered.map((r) => r.u.id);
 
+  // Past shifts count as worked as planned: record them before the hours are added up
+  const now = new Date(`${today}T12:00:00Z`);
+  for (const id of ids) await autoConfirmShifts(db, id, from, to, now);
   const roleRows = ids.length ? await db.select().from(userRoles).where(inArray(userRoles.userId, ids)) : [];
   const monthShifts = ids.length ? await db.select().from(shifts).where(and(inArray(shifts.userId, ids), gte(shifts.workDate, from), lte(shifts.workDate, to))) : [];
   const monthEntries = ids.length ? await db.select().from(timeEntries).where(and(inArray(timeEntries.userId, ids), gte(timeEntries.workDate, from), lte(timeEntries.workDate, to))) : [];
@@ -79,7 +82,7 @@ export async function getOverview(
   const staff: StaffRow[] = [];
   for (const r of filtered) {
     const vacation = await getVacationBalance(db, p, r.u.id, year);
-    const hours = await getMonthHours(db, p, r.u.id, month);
+    const hours = await getMonthHours(db, p, r.u.id, month, now);
     const pensum = r.p.pensumPercent;
     staff.push({
       userId: r.u.id,

@@ -725,6 +725,18 @@ export const EN: Record<string, string> = {
   'Tage ohne Eintrag folgen Ihrer Standardwoche. Hier ändern Sie einzelne Tage oder ganze Wochen – zum Beispiel die 1. und 2. Woche im Dezember – und schicken es ab.': 'Days without an entry follow your standard week. Here you change single days or whole weeks – for example the 1st and 2nd week of December – and submit it.',
   'Wann Sie arbeiten können, Ferien': 'When you can work, holiday',
 
+  // --- Planner to-do, automatic hours ---
+  'Offen für die Leitung': 'Open for the management',
+  'Nichts offen. Es wartet niemand auf Sie.': 'Nothing open. Nobody is waiting for you.',
+  '{n} Änderungsanfragen entscheiden': 'Decide {n} change requests',
+  '{n} Ferienanfragen entscheiden': 'Decide {n} holiday requests',
+  '{site}: {n} Aushilfen haben ihre Zeiten noch nicht gemeldet': '{site}: {n} casual staff have not reported their times yet',
+  '{site}: {n} Wochen sind noch nicht geplant': '{site}: {n} weeks are not planned yet',
+  '{site}: {n} Wochen sind geplant, aber nicht veröffentlicht': '{site}: {n} weeks are planned but not published',
+  '{site}: {n} Plätze im Plan sind noch leer': '{site}: {n} places in the plan are still empty',
+  '{site}: Stunden vom Vormonat freigeben ({n})': '{site}: approve last month\'s hours ({n})',
+  'Ihre Schichten zählen automatisch wie geplant. War es anders (länger oder kürzer)? Dann „Ändern“ und eine Änderung anfragen – die Leitung bestätigt sie.': 'Your shifts count as planned automatically. Was it different (longer or shorter)? Then tap "Ändern" and request a change – the management confirms it.',
+
   // --- Shared ---
   OK: 'OK',
   'Zur Prüfung ': 'For review ',

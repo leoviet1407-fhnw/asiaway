@@ -8,7 +8,7 @@ import {
 } from '../../domain/hours';
 import { domainError } from '../../domain/errors';
 import { isAdmin, isPlanner, type Principal } from '../../domain/roles';
-import { checkShiftTimes, monthDates, shiftNetMinutes, type AbsenceType, type Shift } from '../../domain/roster';
+import { addDays, checkShiftTimes, mondayOf as weekMonday, monthDates, shiftNetMinutes, type AbsenceType, type Shift } from '../../domain/roster';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
@@ -89,11 +89,41 @@ export interface MonthHours {
   yearBalanceMinutes: number | null;
 }
 
-export async function getMonthHours(db: AppDatabase, p: Principal, userId: string, month: string): Promise<MonthHours> {
+/**
+ * Shifts of published weeks that are over count as worked "as planned" by themselves: the app
+ * creates the time entry. People only act when something was different (a change request).
+ * Approved months are left alone. Returns how many entries were created.
+ */
+export async function autoConfirmShifts(db: AppDatabase, userId: string, from: string, to: string, now = new Date()): Promise<number> {
+  const yesterday = addDays(todayIso(now), -1);
+  const last = to < yesterday ? to : yesterday;
+  if (last < from) return 0;
+  const rows = await db.select().from(shifts).where(and(eq(shifts.userId, userId), gte(shifts.workDate, from), lte(shifts.workDate, last)));
+  if (rows.length === 0) return 0;
+  const published = new Set((await db.select().from(rosterWeeks).where(eq(rosterWeeks.status, 'PUBLISHED'))).map((w) => `${w.site}:${w.weekStart}`));
+  const have = new Set((await db.select({ s: timeEntries.shiftId }).from(timeEntries).where(inArray(timeEntries.shiftId, rows.map((r) => r.id)))).map((r) => r.s));
+  const approved = new Map<string, boolean>();
+  const missing = [];
+  for (const s of rows) {
+    if (have.has(s.id) || !published.has(`${s.site}:${weekMonday(s.workDate)}`)) continue;
+    const month = s.workDate.slice(0, 7);
+    if (!approved.has(month)) approved.set(month, await isMonthApproved(db, userId, month));
+    if (!approved.get(month)) missing.push(s);
+  }
+  if (missing.length === 0) return 0;
+  await db
+    .insert(timeEntries)
+    .values(missing.map((s) => ({ userId, shiftId: s.id, workDate: s.workDate, startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin, createdBy: userId, createdAt: now, updatedAt: now })))
+    .onConflictDoNothing();
+  return missing.length;
+}
+
+export async function getMonthHours(db: AppDatabase, p: Principal, userId: string, month: string, now = new Date()): Promise<MonthHours> {
   canSee(p, userId);
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
   const dates = monthDates(month);
   const [first, last] = [dates[0]!, dates.at(-1)!];
+  await autoConfirmShifts(db, userId, first, last, now);
   const profile = await getProfile(db, userId);
   const pensum = profile?.pensumPercent ?? null;
 
@@ -232,6 +262,8 @@ export async function approveMonth(db: AppDatabase, p: Principal, userId: string
   if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung kann freigeben.');
   if (!/^\d{4}-\d{2}$/.test(month)) throw domainError('VALIDATION_FAILED', 'Invalid month');
   if (userId === p.userId && !isAdmin(p)) throw domainError('FORBIDDEN', 'Die eigenen Stunden gibt eine andere Person der Leitung frei.');
+  const dates = monthDates(month);
+  await autoConfirmShifts(db, userId, dates[0]!, dates.at(-1)!, now); // every shift of the month is recorded before it is locked
   await db.insert(timeMonthApprovals).values({ userId, month, approvedBy: p.userId, approvedAt: now }).onConflictDoNothing();
   await audit(db, p.userId, 'hours.approve', 'user', userId, { month });
 }
@@ -243,14 +275,14 @@ export async function reopenMonth(db: AppDatabase, p: Principal, userId: string,
 }
 
 /** For the planner: every person's balance at a glance. */
-export async function teamBalances(db: AppDatabase, p: Principal, siteId: string, month: string, today: string) {
+export async function teamBalances(db: AppDatabase, p: Principal, siteId: string, month: string, today: string, now = new Date()) {
   if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
   const year = Number(today.slice(0, 4));
   const team = await listTeam(db, siteId);
   const out = [];
   for (const person of team) {
     const vacation = await getVacationBalance(db, p, person.userId, year);
-    const hours = await getMonthHours(db, p, person.userId, month);
+    const hours = await getMonthHours(db, p, person.userId, month, now);
     out.push({ person, vacation, hours });
   }
   return out;
