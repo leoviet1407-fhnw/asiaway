@@ -13,6 +13,7 @@ import {
   validateRoster,
   worksAtSiteOn,
   FROZEN_MESSAGE,
+  dayHoursOf,
   isFrozen,
   requiredBreakMin,
   weekDates,
@@ -280,6 +281,12 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
     for (const s of weekShifts) {
       if (s.userId && lastDayOf.has(s.userId) && s.date > lastDayOf.get(s.userId)!) {
         violations.push({ severity: 'error', code: 'LEFT', userId: s.userId, date: s.date, message: `${people.find((x) => x.userId === s.userId)?.name ?? ''}, ${s.date.slice(8)}.${s.date.slice(5, 7)}.: arbeitet nach dem letzten Arbeitstag nicht mehr.` });
+      }
+    }
+    // Someone planned on a day the restaurant is closed
+    for (const s of weekShifts) {
+      if (s.userId && dayHoursOf(siteId, s.date).closed) {
+        violations.push({ severity: 'warn', code: 'CLOSED', userId: s.userId, date: s.date, message: `${people.find((x) => x.userId === s.userId)?.name ?? ''}, ${s.date.slice(8)}.${s.date.slice(5, 7)}.: an diesem Tag ist das Restaurant geschlossen.` });
       }
     }
     // Someone planned on a weekday they normally do not work at this site

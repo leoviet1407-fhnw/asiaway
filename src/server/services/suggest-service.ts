@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isPlanner, type Principal } from '../../domain/roles';
-import { FROZEN_MESSAGE, ROSTER_SITES, requiredBreakMin, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { FROZEN_MESSAGE, ROSTER_SITES, dayHoursOf, requiredBreakMin, firstPlannableWeek, mondayOf, shiftNetMinutes, stationsOf, weekDates, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeksOfMonth } from '../../domain/availability';
 import { needFor } from '../../domain/season';
 import { findGaps, suggestShifts, type GapInfo, type Service, type SuggestGap, type SuggestPerson } from '../../domain/suggest';
@@ -25,7 +25,8 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
   if (!ROSTER_SITES.some((s) => s.id === siteId)) throw domainError('NOT_FOUND', 'Unknown site');
   const dates = weekDates(weekStart);
   const [weekdayNeeds, team, specials] = await Promise.all([getNeeds(db, p, siteId), listTeam(db, siteId), listSpecialDays(db, siteId, dates[0]!, dates[6]!)]);
-  const needs = dates.map((date, i) => needFor(weekdayNeeds[i]!, specials.find((s) => s.date === date)));
+  // a closed day (Sunday in Oerlikon) needs nobody
+  const needs = dates.map((date, i) => (dayHoursOf(siteId, date).closed ? { lunchPeople: 0, dinnerPeople: 0 } : needFor(weekdayNeeds[i]!, specials.find((s) => s.date === date))));
   const ids = team.map((m) => m.userId);
   const rows = ids.length ? await db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates[6]!))) : [];
   const patterns = ids.length ? await db.select().from(availabilityPatterns).where(inArray(availabilityPatterns.userId, ids)) : [];
@@ -62,7 +63,8 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
     usualToMin: m.usualToMin,
   }));
   const busy = other.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin }));
-  return { team, needs, offers, people, busy, planned, isAway: (userId: string, date: string) => away.some((a) => a.userId === userId && a.startDate <= date && date <= a.endDate) };
+  const dayHours = (date: string) => dayHoursOf(siteId, date);
+  return { team, needs, offers, people, busy, dayHours, planned, isAway: (userId: string, date: string) => away.some((a) => a.userId === userId && a.startDate <= date && date <= a.endDate) };
 }
 
 /** A person's usual station if the site has it, else the site's first station. */
@@ -79,7 +81,7 @@ async function compute(db: AppDatabase, p: Principal, siteId: string, weekStart:
   const ctx = await load(db, p, siteId, weekStart);
   if (ctx.needs.every((n) => n.lunchPeople === 0 && n.dinnerPeople === 0)) throw domainError('VALIDATION_FAILED', 'Der Bedarf ist noch nicht festgelegt (Mehr > Bedarf & Abdeckung).');
   if (ctx.team.length === 0) throw domainError('VALIDATION_FAILED', 'Noch niemand im Team.');
-  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway, busy: ctx.busy, existing: ctx.planned.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin })) }) };
+  return { ctx, result: suggestShifts({ weekStart, people: ctx.people, needs: ctx.needs, offers: ctx.offers, away: ctx.isAway, busy: ctx.busy, dayHours: ctx.dayHours, existing: ctx.planned.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin })) }) };
 }
 
 /** The same suggestion without saving anything: what "Plan vorschlagen" would do. */
@@ -167,6 +169,7 @@ export async function listGaps(db: AppDatabase, p: Principal, siteId: string, we
     offers: ctx.offers,
     away: ctx.isAway,
     busy: ctx.busy,
+    dayHours: ctx.dayHours,
     planned: ctx.planned.map((s) => ({ userId: s.userId, date: s.workDate, startMin: s.startMin, endMin: s.endMin, breakMin: s.breakMin })),
   });
 }

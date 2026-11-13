@@ -22,6 +22,35 @@ export const DEFAULT_CLOSING_MIN = 22 * 60;
 
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'ON_CALL' | 'MANAGEMENT';
 
+export interface ServiceWindow {
+  readonly fromMin: number;
+  readonly toMin: number;
+}
+
+/** When a restaurant is open on a day, and how early the staff arrive. */
+export interface DayHours {
+  readonly closed: boolean;
+  readonly lunch: ServiceWindow;
+  readonly dinner: ServiceWindow;
+  /** Open all day without a break (e.g. Saturday): staff may stay the whole day, as far as their hours allow. */
+  readonly wholeDay: boolean;
+  /** Minutes before opening that the first person / the other persons arrive. */
+  readonly leadFirst: number;
+  readonly leadOther: number;
+}
+
+const STANDARD_DAY: DayHours = { closed: false, lunch: { fromMin: 10 * 60 + 30, toMin: 14 * 60 + 30 }, dinner: { fromMin: 17 * 60 + 30, toMin: 22 * 60 }, wholeDay: false, leadFirst: 0, leadOther: 0 };
+// Oerlikon: Mon–Fri 11:30–14:30 and 17:30–22:00, Sat 11:00–22:00, Sun closed. Staff come 30–60 min before opening.
+const OERLIKON_WEEKDAY: DayHours = { closed: false, lunch: { fromMin: 11 * 60 + 30, toMin: 14 * 60 + 30 }, dinner: { fromMin: 17 * 60 + 30, toMin: 22 * 60 }, wholeDay: false, leadFirst: 60, leadOther: 30 };
+const OERLIKON_SATURDAY: DayHours = { closed: false, lunch: { fromMin: 11 * 60, toMin: 14 * 60 + 30 }, dinner: { fromMin: 17 * 60 + 30, toMin: 22 * 60 }, wholeDay: true, leadFirst: 60, leadOther: 30 };
+
+/** The opening hours of a site on a date (Winterthur keeps the standard service times). */
+export function dayHoursOf(siteId: string, date: string): DayHours {
+  if (siteId !== 'oerlikon') return STANDARD_DAY;
+  const wd = weekdayNo(date);
+  return wd <= 5 ? OERLIKON_WEEKDAY : wd === 6 ? OERLIKON_SATURDAY : { ...STANDARD_DAY, closed: true };
+}
+
 /**
  * Staff with a Pensum only enter their holiday and work the plan. Casual staff (Aushilfen)
  * enter the times they can work. The Leitung (no Pensum, not casual) enters nothing.

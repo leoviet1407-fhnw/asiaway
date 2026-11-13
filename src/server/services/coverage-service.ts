@@ -14,7 +14,7 @@ import { isPlanner, type Principal } from '../../domain/roles';
 import { needFor } from '../../domain/season';
 import { getSiteDays } from './pattern-service';
 import { listSpecialDays } from './season-service';
-import { ROSTER_SITES, mustReportTimes, weekDates, shiftNetMinutes, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
+import { ROSTER_SITES, dayHoursOf, mustReportTimes, weekDates, shiftNetMinutes, worksAtSiteOn, worksByPlan, type AvailabilityDay, type AvailabilityKind } from '../../domain/roster';
 import { weeklyMinutes } from '../../domain/hours';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
@@ -93,7 +93,7 @@ export async function getCoverage(db: AppDatabase, p: Principal, siteId: string,
   const dates = weekDates(weekStart);
   const [weekdayNeeds, team, specials] = await Promise.all([getNeeds(db, p, siteId), listTeam(db, siteId), listSpecialDays(db, siteId, dates[0]!, dates[6]!)]);
   // Holidays, Silvester or closed days replace the usual need of that weekday
-  const needs = dates.map((date, i) => needFor(weekdayNeeds[i]!, specials.find((s) => s.date === date)));
+  const needs = dates.map((date, i) => (dayHoursOf(siteId, date).closed ? { lunchPeople: 0, dinnerPeople: 0 } : needFor(weekdayNeeds[i]!, specials.find((s) => s.date === date))));
   const ids = team.map((m) => m.userId);
   const av = ids.length
     ? (await db.select().from(availability).where(and(inArray(availability.userId, ids), gte(availability.workDate, dates[0]!), lte(availability.workDate, dates[6]!)))).map(

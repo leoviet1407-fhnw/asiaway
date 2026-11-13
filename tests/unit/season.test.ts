@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { easterSunday, swissHolidays, vacationConflict, needFor } from '@/domain/season';
 import { findGaps, suggestShifts } from '@/domain/suggest';
-import type { AvailabilityDay } from '@/domain/roster';
+import { dayHoursOf, type AvailabilityDay } from '@/domain/roster';
 
 describe('holiday season', () => {
   it('computes Easter and the Zürich holidays', () => {
@@ -90,5 +90,57 @@ describe('roster suggestion', () => {
     expect(g).toHaveLength(1); // lunch is covered, dinner is short by 2
     expect(g[0]).toMatchObject({ date: days[0], service: 'DINNER', missing: 2 });
     expect(g[0]!.candidates.map((c) => c.userId)).toEqual(['full', 'casual']); // part is on holiday; full already works that day
+  });
+
+  describe('Oerlikon opening hours', () => {
+    const OER_WEEK = '2026-11-16'; // Mon 16 – Sun 22 Nov
+    const oerDays = ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22'];
+    const wholeDay = (userId: string, date: string): AvailabilityDay => ({ userId, date, kind: 'AVAILABLE', fromMin: null, toMin: null });
+    const crew = [
+      { userId: 'k', name: 'Kiet', employmentType: 'FULL_TIME' as const, pensumPercent: 100, plannedMinutes: 0 },
+      { userId: 'm', name: 'Mallika', employmentType: 'PART_TIME' as const, pensumPercent: 80, plannedMinutes: 0 },
+    ];
+    const needs = oerDays.map(() => ({ lunchPeople: 2, dinnerPeople: 2 }));
+    const offers = crew.flatMap((p) => oerDays.map((d) => wholeDay(p.userId, d)));
+    const run = (people = crew) => suggestShifts({ weekStart: OER_WEEK, people, needs, offers, away: () => false, dayHours: (d) => dayHoursOf('oerlikon', d) });
+
+    it('opening hours: Mon–Fri 11:30–14:30 and 17:30–22:00, Saturday 11:00–22:00, Sunday closed', () => {
+      expect(dayHoursOf('oerlikon', '2026-11-16')).toMatchObject({ closed: false, lunch: { fromMin: 690, toMin: 870 }, dinner: { fromMin: 1050, toMin: 1320 }, wholeDay: false });
+      expect(dayHoursOf('oerlikon', '2026-11-21')).toMatchObject({ closed: false, wholeDay: true, lunch: { fromMin: 660 } });
+      expect(dayHoursOf('oerlikon', '2026-11-22').closed).toBe(true);
+      expect(dayHoursOf('winterthur', '2026-11-22').closed).toBe(false); // Winterthur keeps its standard times
+    });
+
+    it('staff come 60 min (first person) and 30 min (the others) before opening', () => {
+      const { shifts } = run();
+      const mon = shifts.filter((x) => x.date === '2026-11-16');
+      const lunch = mon.filter((x) => x.service === 'LUNCH').sort((a, b) => a.startMin - b.startMin);
+      expect(lunch.map((x) => [x.startMin, x.endMin])).toEqual([[10 * 60 + 30, 14 * 60 + 30], [11 * 60, 14 * 60 + 30]]); // 10:30 and 11:00, to the end of lunch
+      const dinner = mon.filter((x) => x.service === 'DINNER').sort((a, b) => a.startMin - b.startMin);
+      expect(dinner.map((x) => [x.startMin, x.endMin])).toEqual([[16 * 60 + 30, 22 * 60], [17 * 60, 22 * 60]]); // 16:30 and 17:00
+    });
+
+    it('Sunday is closed: nobody is planned and nothing is missing', () => {
+      const { shifts, gaps } = run();
+      expect(shifts.some((x) => x.date === '2026-11-22')).toBe(false);
+      expect(gaps.some((g) => g.date === '2026-11-22')).toBe(false);
+    });
+
+    it('Saturday: staff stay the whole day, as far as their remaining hours allow', () => {
+      const fresh = run().shifts.filter((x) => x.date === '2026-11-21');
+      // plenty of hours left (nothing planned before Saturday in this run is false, so look at the first person)
+      expect(fresh.length).toBeGreaterThan(0);
+      expect(Math.max(...fresh.map((x) => x.endMin))).toBe(22 * 60); // someone stays until closing
+      expect(Math.min(...fresh.map((x) => x.startMin))).toBe(10 * 60); // and the first came 60 min before 11:00
+      // a person with only 5 h left stays for 5 h net (plus the legal break), not the whole day
+      const tired = suggestShifts({
+        weekStart: OER_WEEK, people: [{ ...crew[0]!, plannedMinutes: 100 * 60 - 0 + 0 + (42.5 * 60 - 100 * 60) + 37.5 * 60 }], // 5 h left of 42.5 h
+        needs: oerDays.map((_, i) => (i === 5 ? { lunchPeople: 1, dinnerPeople: 0 } : { lunchPeople: 0, dinnerPeople: 0 })),
+        offers: oerDays.map((d) => wholeDay('k', d)), away: () => false, dayHours: (d) => dayHoursOf('oerlikon', d),
+      }).shifts.find((x) => x.date === '2026-11-21');
+      expect(tired).toBeDefined();
+      expect(tired!.endMin - tired!.startMin).toBeLessThanOrEqual(5 * 60 + 30); // 5 h + 15–30 min break
+      expect(tired!.endMin).toBeGreaterThanOrEqual(14 * 60 + 30); // but at least the lunch service
+    });
   });
 });
