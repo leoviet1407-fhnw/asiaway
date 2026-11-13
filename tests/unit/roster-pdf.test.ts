@@ -15,7 +15,7 @@ describe('roster PDF', () => {
     shift('4', null, '2026-12-23', 1050, 1320, '1. OG'), // an open shift
   ];
 
-  it('renders the three pages with holidays, special days and the draft mark', async () => {
+  it('renders two pages with holidays, special days, the notes and the draft mark', async () => {
     const pdf = await renderRosterPdf({
       siteId: 'winterthur', siteName: 'Winterthur', weekStart: '2026-12-21', people, shifts, generatedAt: new Date('2026-12-14T09:00:00Z'),
       status: 'DRAFT',
@@ -23,7 +23,7 @@ describe('roster PDF', () => {
       specialDays: [{ date: '2026-12-25', label: 'Weihnachten', closed: true }],
     });
     expect(Buffer.from(pdf).subarray(0, 5).toString()).toBe('%PDF-');
-    expect((await PDFDocument.load(pdf)).getPageCount()).toBe(3);
+    expect((await PDFDocument.load(pdf)).getPageCount()).toBe(2);
   });
 
   it('renders an empty published week and a week without people', async () => {

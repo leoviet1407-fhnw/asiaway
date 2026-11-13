@@ -20,8 +20,8 @@ import { LOGO_PNG_BASE64 } from './logo-data';
  * The weekly plan as PDF (A4 landscape), in the layout of the paper plan the restaurants know,
  * with the extras that make it useful at a glance:
  *   page 1  the station plan: who stands where, Lunch / Dinner per day, how many people per service
- *   page 2  the plan by person: times, holidays, hours against the contract, people and hours per day
- *   page 3  at a glance: hours against the contract as bars, holidays, open shifts, special days, breaks
+ *   page 2  the plan by person: times, holidays, hours against the contract, people and hours per day,
+ *           and below it holidays, special days, open shifts and the week's totals
  * A draft carries an "ENTWURF" watermark so nobody takes it for the final plan.
  */
 const W = 841.89;
@@ -335,74 +335,34 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
       lx += w + 4;
     }
     text(page, "P30' = Pause in Minuten, nicht zeitlich festgelegt: jede Person nimmt sie, wann sie möchte. Die Pause ist in den Stunden schon abgezogen.", M, y - 25, 6.4, regular, MUTED);
-  }
 
-  // ---- Page 3: at a glance ----------------------------------------------------------------
-  {
-    const page = newPage('Dienstplan · Auf einen Blick');
-    let y = H - M - 62;
-    // Left: hours against the contract
-    text(page, 'STUNDEN GEGEN VERTRAG', M, y, 8, bold, RED);
-    y -= 14;
-    const barX = M + 86;
-    const barW = 250;
-    const rows = byPerson.filter((p) => minutesOf(p.userId) > 0 || ((p.employmentType === 'FULL_TIME' || p.employmentType === 'PART_TIME') && p.pensumPercent));
-    for (const person of rows) {
-      const worked = minutesOf(person.userId);
-      const hasPensum = (person.employmentType === 'FULL_TIME' || person.employmentType === 'PART_TIME') && person.pensumPercent;
-      text(page, fit(person.name, bold, 7.6, 80), M, y, 7.6, bold);
-      const scale = hasPensum ? weeklyTargetCorridor(person.pensumPercent!).maxMin * 1.2 : 42.5 * 60;
-      page.drawRectangle({ x: barX, y: y - 3, width: barW, height: 11, color: rgb(0.93, 0.93, 0.91) });
-      if (hasPensum) {
-        const c = weeklyTargetCorridor(person.pensumPercent!);
-        page.drawRectangle({ x: barX + (c.minMin / scale) * barW, y: y - 3, width: ((c.maxMin - c.minMin) / scale) * barW, height: 11, color: rgb(0.8, 0.91, 0.83) });
-        const tone = worked < c.minMin ? WARN : worked > c.maxMin ? RED : OK;
-        page.drawRectangle({ x: barX, y: y - 0.5, width: Math.min(barW, (worked / scale) * barW), height: 6, color: tone });
-        text(page, `${hoursText(worked)}  ·  Soll ${Math.round(c.minMin / 60)}–${(Math.round(c.maxMin / 6) / 10).toFixed(1).replace('.0', '')} h (${person.pensumPercent} %)`, barX + barW + 8, y, 7, regular, NAVY);
-      } else {
-        page.drawRectangle({ x: barX, y: y - 0.5, width: Math.min(barW, (worked / scale) * barW), height: 6, color: NAVY });
-        text(page, `${hoursText(worked)}  ·  ${EMPLOYMENT_LABEL[person.employmentType]}`, barX + barW + 8, y, 7, regular, NAVY);
-      }
-      y -= 17;
-      if (y < bottom + 20) break;
+    // What the Leitung wants to know at a glance, in four short columns
+    y -= 44;
+    const colWidth = (W - 2 * M) / 4;
+    const need = 14 + 5 * 10;
+    if (y - need < bottom) {
+      page = newPage('Dienstplan · Mitarbeitende (Fortsetzung)');
+      y = top - 6;
     }
-    text(page, 'Grüner Bereich = Soll der Woche. Balken grün: im Soll · orange: darunter · rot: darüber.', M, Math.max(bottom + 6, y - 4), 6.4, regular, MUTED);
-
-    // Right: notes
-    const nx = W - M - 215;
-    let ny = H - M - 62;
-    const heading = (value: string) => {
-      text(page, value, nx, ny, 8, bold, RED);
-      ny -= 13;
+    const column = (index: number, heading: string, items: { t: string; c?: ReturnType<typeof rgb> }[]) => {
+      const x = M + index * colWidth;
+      page.drawRectangle({ x, y: y - 2, width: colWidth - 8, height: 0.8, color: RED });
+      text(page, heading, x, y - 12, 7, bold, RED);
+      items.slice(0, 5).forEach((it, k) => text(page, fit(it.t, regular, 7, colWidth - 12), x, y - 23 - k * 10, 7, regular, it.c ?? NAVY));
+      if (items.length > 5) text(page, `… und ${items.length - 5} weitere`, x, y - 23 - 5 * 10, 6.4, regular, MUTED);
     };
-    const line = (value: string, color = NAVY) => {
-      text(page, fit(value, regular, 7.4, 215), nx, ny, 7.4, regular, color);
-      ny -= 11;
-    };
-    heading('FERIEN & ABWESENHEIT');
-    const week = absences.filter((a) => a.startDate <= dates[6]! && a.endDate >= dates[0]!);
-    if (week.length === 0) line('Keine.', MUTED);
-    for (const a of week) line(`${names.get(a.userId) ?? '?'}: ${ABSENCE_LABEL[a.type]} ${dm(a.startDate < dates[0]! ? dates[0]! : a.startDate)}${a.endDate > a.startDate ? `–${dm(a.endDate > dates[6]! ? dates[6]! : a.endDate)}` : ''}`);
-    ny -= 8;
-    heading('BESONDERE TAGE');
+    const weekAbs = absences.filter((a) => a.startDate <= dates[6]! && a.endDate >= dates[0]!);
+    column(0, 'FERIEN & ABWESENHEIT', weekAbs.length ? weekAbs.map((a) => ({ t: `${names.get(a.userId) ?? '?'}: ${ABSENCE_LABEL[a.type]} ${dm(a.startDate < dates[0]! ? dates[0]! : a.startDate)}${a.endDate > a.startDate ? `–${dm(a.endDate > dates[6]! ? dates[6]! : a.endDate)}` : ''}` })) : [{ t: 'Keine', c: MUTED }]);
     const sp = dates.filter((d) => specials.has(d));
-    if (sp.length === 0) line('Keine.', MUTED);
-    for (const d of sp) line(`${weekdayShort(d)} ${dm(d)}: ${specials.get(d)!.label}${specials.get(d)!.closed ? ' (geschlossen)' : ''}`);
-    ny -= 8;
-    heading('OFFENE SCHICHTEN');
-    const open = input.shifts.filter((s) => !s.userId);
-    if (open.length === 0) line('Keine, alles besetzt.', OK);
-    for (const s of open.slice(0, 8)) line(`${weekdayShort(s.date)} ${dm(s.date)} ${formatTime(s.startMin)}–${formatTime(s.endMin)} · ${s.station}`, RED);
-    ny -= 8;
-    heading('IN DIESER WOCHE');
-    line(`${input.shifts.filter((s) => s.userId).length} Schichten · ${hoursText(input.shifts.filter((s) => s.userId).reduce((n, s) => n + shiftNetMinutes(s), 0))} geplant`);
-    line(`${new Set(input.shifts.filter((s) => s.userId).map((s) => s.userId)).size} Personen im Einsatz`);
-    const breaks = input.shifts.filter((s) => s.userId && s.breakMin > 0);
-    line(`${breaks.length} Schichten mit Pause (frei wählbar)`);
-    if (draft) {
-      ny -= 8;
-      line('Entwurf: die Mitarbeitenden sehen diesen Plan noch nicht.', WARN);
-    }
+    column(1, 'BESONDERE TAGE', sp.length ? sp.map((d) => ({ t: `${weekdayShort(d)} ${dm(d)}: ${specials.get(d)!.label}${specials.get(d)!.closed ? ' (geschlossen)' : ''}` })) : [{ t: 'Keine', c: MUTED }]);
+    const openShifts = input.shifts.filter((s) => !s.userId);
+    column(2, 'OFFENE SCHICHTEN', openShifts.length ? openShifts.map((s) => ({ t: `${weekdayShort(s.date)} ${dm(s.date)} ${formatTime(s.startMin)}–${formatTime(s.endMin)} · ${s.station}`, c: RED })) : [{ t: 'Keine, alles besetzt', c: OK }]);
+    const planned = input.shifts.filter((s) => s.userId);
+    column(3, 'IN DIESER WOCHE', [
+      { t: `${planned.length} Schichten · ${hoursText(planned.reduce((n, s) => n + shiftNetMinutes(s), 0))}` },
+      { t: `${new Set(planned.map((s) => s.userId)).size} Personen im Einsatz` },
+      ...(draft ? [{ t: 'Entwurf: noch nicht für Mitarbeitende sichtbar', c: WARN }] : []),
+    ]);
   }
 
   // Footer on every page
