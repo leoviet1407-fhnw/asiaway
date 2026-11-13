@@ -96,7 +96,8 @@ export interface TeamMember extends RosterPerson {
   lastDay: string | null;
 }
 
-export async function listTeam(db: AppDatabase, siteId: string, { includeInactive = false } = {}): Promise<TeamMember[]> {
+/** `asOf`: people whose last working day is before that date are left out (they have left by then). */
+export async function listTeam(db: AppDatabase, siteId: string, { includeInactive = false, asOf }: { includeInactive?: boolean; asOf?: string } = {}): Promise<TeamMember[]> {
   const rows = await db
     .select({ p: staffProfiles, u: users })
     .from(staffProfiles)
@@ -104,6 +105,7 @@ export async function listTeam(db: AppDatabase, siteId: string, { includeInactiv
     .orderBy(asc(staffProfiles.sort), asc(users.name));
   return rows
     .filter((r) => worksAt(r.p, siteId))
+    .filter((r) => !asOf || !r.p.lastDay || r.p.lastDay >= asOf)
     .filter((r) => includeInactive || (r.p.active && r.u.active))
     .map((r) => ({
       userId: r.u.id,
@@ -252,7 +254,8 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
   const [week] = await db.select().from(rosterWeeks).where(and(eq(rosterWeeks.site, siteId), eq(rosterWeeks.weekStart, weekStart))).limit(1);
   const status = (week?.status ?? 'DRAFT') as 'DRAFT' | 'PUBLISHED';
   const planner = isPlanner(p);
-  const people = await listTeam(db, siteId);
+  // people who have left (last working day before this week) are no longer shown in the week
+  const people = await listTeam(db, siteId, { asOf: weekStart });
   if (!planner && status !== 'PUBLISHED') {
     return { site: siteId, weekStart, status, publishedAt: null, people, shifts: [], availability: [], absences: [], violations: [], hidden: true };
   }

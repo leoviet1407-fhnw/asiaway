@@ -91,7 +91,7 @@ export async function getCoverage(db: AppDatabase, p: Principal, siteId: string,
   requirePlanner(p);
   requireSite(siteId);
   const dates = weekDates(weekStart);
-  const [weekdayNeeds, team, specials] = await Promise.all([getNeeds(db, p, siteId), listTeam(db, siteId), listSpecialDays(db, siteId, dates[0]!, dates[6]!)]);
+  const [weekdayNeeds, team, specials] = await Promise.all([getNeeds(db, p, siteId), listTeam(db, siteId, { asOf: dates[0]! }), listSpecialDays(db, siteId, dates[0]!, dates[6]!)]);
   // Holidays, Silvester or closed days replace the usual need of that weekday
   const needs = dates.map((date, i) => (dayHoursOf(siteId, date).closed ? { lunchPeople: 0, dinnerPeople: 0 } : needFor(weekdayNeeds[i]!, specials.find((s) => s.date === date))));
   const ids = team.map((m) => m.userId);

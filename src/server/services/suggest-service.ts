@@ -24,7 +24,7 @@ async function load(db: AppDatabase, p: Principal, siteId: string, weekStart: st
   if (!isPlanner(p)) throw domainError('FORBIDDEN', 'Nur die Leitung.');
   if (!ROSTER_SITES.some((s) => s.id === siteId)) throw domainError('NOT_FOUND', 'Unknown site');
   const dates = weekDates(weekStart);
-  const [weekdayNeeds, team, specials] = await Promise.all([getNeeds(db, p, siteId), listTeam(db, siteId), listSpecialDays(db, siteId, dates[0]!, dates[6]!)]);
+  const [weekdayNeeds, team, specials] = await Promise.all([getNeeds(db, p, siteId), listTeam(db, siteId, { asOf: dates[0]! }), listSpecialDays(db, siteId, dates[0]!, dates[6]!)]);
   // a closed day (Sunday in Oerlikon) needs nobody
   const needs = dates.map((date, i) => (dayHoursOf(siteId, date).closed ? { lunchPeople: 0, dinnerPeople: 0 } : needFor(weekdayNeeds[i]!, specials.find((s) => s.date === date))));
   const ids = team.map((m) => m.userId);

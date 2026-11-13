@@ -218,4 +218,13 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     // the weeks before the last Sunday do not warn
     expect((await getWeekView(db, planner, 'winterthur', '2027-10-18')).violations.some((v) => v.code === 'SUNDAY')).toBe(false);
   });
+
+  it('people who have left are no longer in the weeks after their last day', async () => {
+    // a's last day was set to 2027-09-08 in the copy test above
+    const before = await getWeekView(db, planner, 'winterthur', '2027-09-06');
+    const after = await getWeekView(db, planner, 'winterthur', '2027-09-13');
+    expect(before.people.some((x) => x.userId === a.userId)).toBe(true); // still there in the week of the last day
+    expect(after.people.some((x) => x.userId === a.userId)).toBe(false); // gone the week after
+    expect((await getCoverage(db, planner, 'winterthur', '2027-09-13')).totals.contractHours).toBeLessThan((await getCoverage(db, planner, 'winterthur', '2027-09-06')).totals.contractHours);
+  });
 });
