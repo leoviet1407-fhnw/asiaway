@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { DomainError } from '@/domain/errors';
-import { ROSTER_SITES, mondayOf } from '@/domain/roster';
+import { ROSTER_SITES, addDays, mondayOf } from '@/domain/roster';
 import { todayIso } from '@/lib/dates';
 import { currentPrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { renderRosterPdf } from '@/server/pdf/roster-pdf';
 import { getWeekView } from '@/server/services/roster-service';
+import { listSpecialDays } from '@/server/services/season-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,18 @@ export async function GET(request: Request) {
   try {
     const view = await getWeekView(await db(), p, site.id, week);
     if (view.hidden) return NextResponse.json({ error: 'NOT_PUBLISHED' }, { status: 404 });
-    const pdf = await renderRosterPdf({ siteId: site.id, siteName: site.name, weekStart: week, people: view.people, shifts: view.shifts, generatedAt: new Date() });
+    const specials = await listSpecialDays(await db(), site.id, week, addDays(week, 6));
+    const pdf = await renderRosterPdf({
+      siteId: site.id,
+      siteName: site.name,
+      weekStart: week,
+      people: view.people,
+      shifts: view.shifts,
+      generatedAt: new Date(),
+      status: view.status,
+      absences: view.absences,
+      specialDays: specials.map((s) => ({ date: s.date, label: s.label, closed: s.closed })),
+    });
     return new NextResponse(Buffer.from(pdf), {
       headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="Asiaway-Service-${week}-${site.name}.pdf"`, 'Cache-Control': 'private, no-store' },
     });

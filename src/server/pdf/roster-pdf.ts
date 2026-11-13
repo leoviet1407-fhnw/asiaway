@@ -1,33 +1,59 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { DINNER_WINDOW, LUNCH_WINDOW } from '../../domain/availability';
 import {
+  ABSENCE_LABEL,
   EMPLOYMENT_LABEL,
   formatTime,
   isLunch,
+  shiftNetMinutes,
   stationsOf,
   weekDates,
   weekdayShort,
+  weeklyTargetCorridor,
+  type Absence,
   type RosterPerson,
   type Shift,
 } from '../../domain/roster';
 import { LOGO_PNG_BASE64 } from './logo-data';
 
 /**
- * The weekly plan as PDF, in the layout of the paper plan the restaurants know:
- * page 1 the station plan (who stands where, Lunch/Dinner per day), page 2 the
- * plan by person with contract. Both pages are drawn from the same shifts.
+ * The weekly plan as PDF (A4 landscape), in the layout of the paper plan the restaurants know,
+ * with the extras that make it useful at a glance:
+ *   page 1  the station plan: who stands where, Lunch / Dinner per day, how many people per service
+ *   page 2  the plan by person: times, holidays, hours against the contract, people and hours per day
+ *   page 3  at a glance: hours against the contract as bars, holidays, open shifts, special days, breaks
+ * A draft carries an "ENTWURF" watermark so nobody takes it for the final plan.
  */
 const W = 841.89;
 const H = 595.28;
 const M = 28;
 const NAVY = rgb(0.035, 0.078, 0.114);
 const RED = rgb(0xac / 255, 0x20 / 255, 0x25 / 255);
-const GREY = rgb(0.9, 0.9, 0.9);
+const MUTED = rgb(0.45, 0.45, 0.45);
+const FAINT = rgb(0.62, 0.62, 0.62);
+const HEAD = rgb(0.875, 0.898, 0.855); // day header
+const HEAD2 = rgb(0.914, 0.933, 0.898); // Lunch / Dinner header
+const GREY = rgb(0.92, 0.92, 0.91);
+const PAPER = rgb(0.965, 0.965, 0.95);
 const LINE = rgb(1, 1, 1);
+const OK = rgb(0.12, 0.42, 0.23);
+const WARN = rgb(0.76, 0.5, 0.05);
 
 const hex = (c: string) => rgb(parseInt(c.slice(1, 3), 16) / 255, parseInt(c.slice(3, 5), 16) / 255, parseInt(c.slice(5, 7), 16) / 255);
 
 const DAY_NAMES = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const dm = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.`;
 const dmy = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+const hoursText = (min: number) => `${(Math.round(min / 6) / 10).toFixed(1)} h`;
+
+/** ISO week number (KW). */
+function isoWeek(iso: string): number {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
 
 function safe(font: PDFFont, text: string): string {
   let out = '';
@@ -49,11 +75,16 @@ export interface RosterPdfInput {
   people: readonly RosterPerson[];
   shifts: readonly Shift[];
   generatedAt: Date;
+  /** A draft gets an "ENTWURF" watermark. */
+  status?: 'DRAFT' | 'PUBLISHED';
+  absences?: readonly Pick<Absence, 'userId' | 'startDate' | 'endDate' | 'type'>[];
+  /** Holidays, Silvester, closed days. */
+  specialDays?: readonly { date: string; label: string; closed: boolean }[];
 }
 
 export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`Schichteinteilung ${input.siteName} ${input.weekStart}`);
+  pdf.setTitle(`Dienstplan ${input.siteName} ${input.weekStart}`);
   pdf.setAuthor('AsiaWay');
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -61,71 +92,90 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
   const dates = weekDates(input.weekStart);
   const names = new Map(input.people.map((p) => [p.userId, p.name]));
   const stations = stationsOf(input.siteId);
-  const colorOf = (station: string) => stations.find((s) => s.name === station);
+  const stationOf = (name: string) => stations.find((s) => s.name === name);
+  const absences = input.absences ?? [];
+  const specials = new Map((input.specialDays ?? []).map((s) => [s.date, s]));
+  const draft = input.status === 'DRAFT';
+  const kw = isoWeek(input.weekStart);
+  const range = `${Number(dates[0]!.slice(8))}. ${dates[0]!.slice(5, 7) === dates[6]!.slice(5, 7) ? '' : MONTHS[Number(dates[0]!.slice(5, 7)) - 1] + ' '}– ${Number(dates[6]!.slice(8))}. ${MONTHS[Number(dates[6]!.slice(5, 7)) - 1]} ${dates[6]!.slice(0, 4)}`;
 
   const pages: PDFPage[] = [];
-  const range = `${dmy(dates[0]!)} - ${dmy(dates[6]!)}`;
-
-  const text = (page: PDFPage, value: string, x: number, y: number, size: number, font = regular, color = NAVY) =>
-    page.drawText(safe(font, value), { x, y, size, font, color });
+  const text = (page: PDFPage, value: string, x: number, y: number, size: number, font = regular, color = NAVY) => page.drawText(safe(font, value), { x, y, size, font, color });
   const centered = (page: PDFPage, value: string, cx: number, y: number, size: number, font = regular, color = NAVY) => {
     const v = safe(font, value);
     page.drawText(v, { x: cx - font.widthOfTextAtSize(v, size) / 2, y, size, font, color });
   };
-  const box = (page: PDFPage, x: number, y: number, w: number, h: number, color: ReturnType<typeof rgb>) =>
-    page.drawRectangle({ x, y, width: w, height: h, color, borderColor: LINE, borderWidth: 0.8 });
+  /** The text cut with "…" so it fits into the width. */
+  const fit = (value: string, font: PDFFont, size: number, width: number) => {
+    let v = safe(font, value);
+    if (font.widthOfTextAtSize(v, size) <= width) return v;
+    while (v.length > 1 && font.widthOfTextAtSize(`${v}…`, size) > width) v = v.slice(0, -1);
+    return `${v.trimEnd()}…`;
+  };
+  const box = (page: PDFPage, x: number, y: number, w: number, h: number, color: ReturnType<typeof rgb>) => page.drawRectangle({ x, y, width: w, height: h, color, borderColor: LINE, borderWidth: 0.8 });
 
   const newPage = (title: string) => {
     const page = pdf.addPage([W, H]);
     pages.push(page);
-    text(page, title, M, H - M - 8, 15, bold, RED);
-    text(page, range, M, H - M - 22, 8.5, regular, NAVY);
+    text(page, title, M, H - M - 8, 17, bold, RED);
+    text(page, `${input.siteName} · KW ${kw} · ${range}`, M, H - M - 23, 9.5, bold, NAVY);
     const lh = 24;
     const lw = (lh * logo.width) / logo.height;
-    page.drawImage(logo, { x: W - M - lw, y: H - M - lh + 2, width: lw, height: lh });
+    page.drawImage(logo, { x: W - M - lw, y: H - M - lh + 4, width: lw, height: lh });
+    // status pill under the logo
+    const label = draft ? 'Entwurf' : 'Veröffentlicht';
+    const pw = bold.widthOfTextAtSize(label, 7) + 14;
+    page.drawRectangle({ x: W - M - pw, y: H - M - lh - 14, width: pw, height: 11, color: draft ? rgb(1, 0.93, 0.78) : rgb(0.86, 0.94, 0.88) });
+    centered(page, label, W - M - pw / 2, H - M - lh - 11.5, 7, bold, draft ? WARN : OK);
     return page;
   };
 
   const labelW = 150;
   const colW = (W - 2 * M - labelW) / 14;
-  const top = H - M - 36;
+  const top = H - M - 44;
   const bottom = 40;
 
-  const dayHeader = (page: PDFPage, firstLabel: string, secondLabel?: string): number => {
-    let y = top;
-    box(page, M, y - 24, labelW, 24, hex('#dfe5da'));
-    text(page, firstLabel, M + 4, y - 15, 8, bold);
-    if (secondLabel) text(page, secondLabel, M + 80, y - 15, 8, bold);
+  const dayHeader = (page: PDFPage, labels: [string, string?]): number => {
+    const y = top;
+    box(page, M, y - 32, labelW, 32, HEAD);
+    text(page, labels[0], M + 5, y - 20, 8, bold);
+    if (labels[1]) text(page, labels[1], M + 80, y - 20, 8, bold);
     dates.forEach((d, i) => {
       const x = M + labelW + i * 2 * colW;
-      box(page, x, y - 14, 2 * colW, 14, hex('#dfe5da'));
-      centered(page, `${DAY_NAMES[i]} ${dmy(d).slice(0, 5)}`, x + colW, y - 10, 6.6, bold);
-      box(page, x, y - 24, colW, 10, hex('#e9eee5'));
-      box(page, x + colW, y - 24, colW, 10, hex('#e9eee5'));
-      centered(page, 'Lunch', x + colW / 2, y - 21.5, 5.8);
-      centered(page, 'Dinner', x + colW * 1.5, y - 21.5, 5.8);
+      const special = specials.get(d);
+      box(page, x, y - 22, 2 * colW, 22, special ? rgb(0.98, 0.9, 0.9) : HEAD);
+      centered(page, `${DAY_NAMES[i]} ${dm(d)}`, x + colW, y - 9, 7.4, bold);
+      if (special) centered(page, fit(`${special.label}${special.closed ? ' · geschlossen' : ''}`, regular, 5.6, 2 * colW - 4), x + colW, y - 17.5, 5.6, bold, RED);
+      box(page, x, y - 32, colW, 10, HEAD2);
+      box(page, x + colW, y - 32, colW, 10, HEAD2);
+      centered(page, 'Lunch', x + colW / 2, y - 29.5, 5.8, regular, MUTED);
+      centered(page, 'Dinner', x + colW * 1.5, y - 29.5, 5.8, regular, MUTED);
     });
-    y -= 24;
-    return y;
+    return y - 32;
   };
 
-  // ---- Page 1: station plan ----------------------------------------------------------
+  const covers = (s: Shift, w: { fromMin: number; toMin: number }) => s.userId !== null && s.startMin < w.toMin && s.endMin > w.fromMin;
+  const peopleIn = (date: string, w: { fromMin: number; toMin: number }) => new Set(input.shifts.filter((s) => s.date === date && covers(s, w)).map((s) => s.userId)).size;
+  const breakNote = (s: Shift) => (s.breakMin > 0 ? ` · P${s.breakMin}'` : '');
+
+  // ---- Page 1: station plan ------------------------------------------------------------
   {
-    let page = newPage('ASIAWAY - Schichteinteilung · Service');
-    let y = dayHeader(page, 'STATIONSEINTEILUNG');
+    let page = newPage('Dienstplan · Stationen');
+    let y = dayHeader(page, ['STATIONEN']);
     const ensure = (need: number) => {
-      if (y - need < bottom) {
-        page = newPage('ASIAWAY - Schichteinteilung · Service (Fortsetzung)');
-        y = dayHeader(page, 'STATIONSEINTEILUNG');
+      if (y - need < bottom + 6) {
+        page = newPage('Dienstplan · Stationen (Fortsetzung)');
+        y = dayHeader(page, ['STATIONEN']);
       }
     };
     for (const station of stations) {
       const inStation = input.shifts.filter((s) => s.station === station.name);
       if (inStation.length === 0) continue;
-      ensure(14 + 22);
-      box(page, M, y - 14, W - 2 * M, 14, hex('#f3f3f0'));
-      text(page, station.title, M + 4, y - 10, 7.5, bold);
-      y -= 14;
+      ensure(13 + 20);
+      box(page, M, y - 13, W - 2 * M, 13, PAPER);
+      page.drawRectangle({ x: M, y: y - 13, width: 4, height: 13, color: hex(station.color) });
+      text(page, fit(station.title, bold, 7.5, W - 2 * M - 12), M + 9, y - 9.4, 7.5, bold);
+      y -= 13;
       const labels = [...new Set(inStation.map((s) => s.roleLabel ?? 'Schicht'))].sort((a, b) => {
         const first = (l: string) => Math.min(...inStation.filter((s) => (s.roleLabel ?? 'Schicht') === l).map((s) => s.startMin));
         return first(a) - first(b);
@@ -134,23 +184,26 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
         const rowShifts = inStation.filter((s) => (s.roleLabel ?? 'Schicht') === label);
         const cell = (d: string, lunch: boolean) => rowShifts.filter((s) => s.date === d && isLunch(s.startMin) === lunch).sort((a, b) => a.startMin - b.startMin);
         const most = Math.max(1, ...dates.flatMap((d) => [cell(d, true).length, cell(d, false).length]));
-        const rowH = Math.max(20, most * 15 + 5);
+        const rowH = Math.max(17, most * 13.2 + 4.5);
         ensure(rowH);
+        const ink = station.textColor ? hex(station.textColor) : NAVY;
         box(page, M, y - rowH, labelW, rowH, hex(station.color));
         const first = Math.min(...rowShifts.map((s) => s.startMin));
-        text(page, `${formatTime(first)}`, M + 4, y - rowH / 2 - 2, 6.5, bold, station.textColor ? hex(station.textColor) : NAVY);
-        text(page, label, M + 30, y - rowH / 2 - 2, 7, regular, station.textColor ? hex(station.textColor) : NAVY);
+        text(page, `${formatTime(first)}`, M + 5, y - rowH / 2 - 2, 6.8, bold, ink);
+        text(page, fit(label, regular, 7, labelW - 40), M + 33, y - rowH / 2 - 2, 7, regular, ink);
         dates.forEach((d, i) => {
           for (const lunch of [true, false]) {
             const x = M + labelW + i * 2 * colW + (lunch ? 0 : colW);
             const list = cell(d, lunch);
             box(page, x, y - rowH, colW, rowH, list.length ? hex(station.color) : GREY);
             list.forEach((s, k) => {
-              const name = s.userId ? names.get(s.userId) ?? '?' : 'offen';
-              const baseY = y - 8 - k * 15;
-              const color = station.textColor ? hex(station.textColor) : NAVY;
-              centered(page, name, x + colW / 2, baseY, 6.6, bold, s.userId ? color : RED);
-              centered(page, `${formatTime(s.startMin)}-${formatTime(s.endMin)}`, x + colW / 2, baseY - 7, 5.2, regular, color);
+              const baseY = y - 7.4 - k * 13.2;
+              if (!s.userId) {
+                centered(page, 'OFFEN', x + colW / 2, baseY, 6.6, bold, RED);
+              } else {
+                centered(page, fit(names.get(s.userId) ?? '?', bold, 6.8, colW - 3), x + colW / 2, baseY, 6.8, bold, ink);
+              }
+              centered(page, `${formatTime(s.startMin)}-${formatTime(s.endMin)}${breakNote(s)}`, x + colW / 2, baseY - 6.2, 5.2, regular, ink);
             });
           }
         });
@@ -158,66 +211,118 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
       }
     }
     if (input.shifts.length === 0) text(page, 'Für diese Woche sind noch keine Schichten geplant.', M, y - 20, 9);
-  }
-
-  // ---- Page 2: plan by person ------------------------------------------------------------
-  {
-    let page = newPage('ASIAWAY - Arbeitsplan nach Uhrzeit · Service');
-    const headerFor = (p: PDFPage) => {
-      let y = top;
-      box(p, M, y - 24, 75, 24, hex('#dfe5da'));
-      text(p, 'Mitarbeiter', M + 4, y - 15, 8, bold);
-      box(p, M + 75, y - 24, labelW - 75, 24, hex('#dfe5da'));
-      text(p, 'Vertrag', M + 79, y - 15, 8, bold);
-      dates.forEach((d, i) => {
-        const x = M + labelW + i * 2 * colW;
-        box(p, x, y - 14, 2 * colW, 14, hex('#dfe5da'));
-        centered(p, `${weekdayShort(d)} · ${dmy(d).slice(0, 5)}`, x + colW, y - 10, 6.6, bold);
-        box(p, x, y - 24, colW, 10, hex('#e9eee5'));
-        box(p, x + colW, y - 24, colW, 10, hex('#e9eee5'));
-        centered(p, 'Lunch', x + colW / 2, y - 21.5, 5.8);
-        centered(p, 'Dinner', x + colW * 1.5, y - 21.5, 5.8);
-      });
-      return y - 24;
-    };
-    let y = headerFor(page);
-    for (const person of input.people) {
-      const mine = input.shifts.filter((s) => s.userId === person.userId);
-      const cell = (d: string, lunch: boolean) => mine.filter((s) => s.date === d && isLunch(s.startMin) === lunch).sort((a, b) => a.startMin - b.startMin);
-      const most = Math.max(1, ...dates.flatMap((d) => [cell(d, true).length, cell(d, false).length]));
-      const rowH = Math.max(20, most * 8.5 + 7);
-      if (y - rowH < bottom) {
-        page = newPage('ASIAWAY - Arbeitsplan nach Uhrzeit · Service (Fortsetzung)');
-        y = headerFor(page);
-      }
-      box(page, M, y - rowH, 75, rowH, hex('#f3f3f0'));
-      text(page, person.name, M + 4, y - rowH / 2 - 2.5, 8, bold);
-      box(page, M + 75, y - rowH, labelW - 75, rowH, hex('#f3f3f0'));
-      const contract = person.employmentType === 'FULL_TIME' || person.employmentType === 'PART_TIME' ? `${person.pensumPercent} %` : EMPLOYMENT_LABEL[person.employmentType];
-      text(page, contract, M + 79, y - rowH / 2 - 2.5, 7.5);
+    // How many people work each service
+    if (input.shifts.length > 0) {
+      ensure(18);
+      y -= 4;
+      box(page, M, y - 14, labelW, 14, HEAD);
+      text(page, 'Personen im Service', M + 5, y - 10, 7, bold);
       dates.forEach((d, i) => {
         for (const lunch of [true, false]) {
           const x = M + labelW + i * 2 * colW + (lunch ? 0 : colW);
+          const n = peopleIn(d, lunch ? LUNCH_WINDOW : DINNER_WINDOW);
+          box(page, x, y - 14, colW, 14, HEAD2);
+          centered(page, n > 0 ? String(n) : '–', x + colW / 2, y - 10, 7.4, bold, n > 0 ? NAVY : FAINT);
+        }
+      });
+    }
+  }
+
+  // ---- Page 2: plan by person ------------------------------------------------------------
+  const byPerson = [...input.people].sort((a, b) => Number(a.employmentType === 'ON_CALL' || a.employmentType === 'MANAGEMENT') - Number(b.employmentType === 'ON_CALL' || b.employmentType === 'MANAGEMENT'));
+  const minutesOf = (id: string) => input.shifts.filter((s) => s.userId === id).reduce((n, s) => n + shiftNetMinutes(s), 0);
+  const absenceOn = (id: string, date: string) => absences.find((a) => a.userId === id && a.startDate <= date && date <= a.endDate);
+  {
+    let page = newPage('Dienstplan · Mitarbeitende');
+    const nameW = 64;
+    const contractW = 40;
+    const hoursW = labelW - nameW - contractW;
+    const headerFor = (p: PDFPage) => {
+      const y = dayHeader(p, ['MITARBEITENDE']);
+      // replace the single label block by three columns
+      box(p, M, y, labelW, 32, HEAD);
+      text(p, 'Name', M + 5, y + 12, 7.5, bold);
+      text(p, 'Vertrag', M + nameW + 3, y + 12, 7.5, bold);
+      text(p, 'Stunden', M + nameW + contractW + 3, y + 12, 7.5, bold);
+      return y;
+    };
+    let y = headerFor(page);
+    for (const person of byPerson) {
+      const mine = input.shifts.filter((s) => s.userId === person.userId);
+      const cell = (d: string, lunch: boolean) => mine.filter((s) => s.date === d && isLunch(s.startMin) === lunch).sort((a, b) => a.startMin - b.startMin);
+      const most = Math.max(1, ...dates.flatMap((d) => [cell(d, true).length, cell(d, false).length]));
+      const rowH = Math.max(22, most * 9 + 8);
+      if (y - rowH < bottom + 30) {
+        page = newPage('Dienstplan · Mitarbeitende (Fortsetzung)');
+        y = headerFor(page);
+      }
+      box(page, M, y - rowH, nameW, rowH, PAPER);
+      text(page, fit(person.name, bold, 8, nameW - 6), M + 4, y - rowH / 2 - 2.5, 8, bold);
+      box(page, M + nameW, y - rowH, contractW, rowH, PAPER);
+      const hasPensum = (person.employmentType === 'FULL_TIME' || person.employmentType === 'PART_TIME') && person.pensumPercent;
+      text(page, fit(hasPensum ? `${person.pensumPercent} %` : person.employmentType === 'MANAGEMENT' ? 'Leitung' : EMPLOYMENT_LABEL[person.employmentType], regular, 6.8, contractW - 4), M + nameW + 3, y - rowH / 2 - 2.5, 6.8);
+      // hours against the contract
+      box(page, M + nameW + contractW, y - rowH, hoursW, rowH, PAPER);
+      const worked = minutesOf(person.userId);
+      const hx = M + nameW + contractW + 3;
+      text(page, worked > 0 ? hoursText(worked) : '–', hx, y - rowH / 2 + 1, 7.5, bold, worked > 0 ? NAVY : FAINT);
+      if (hasPensum) {
+        const c = weeklyTargetCorridor(person.pensumPercent!);
+        const tone = worked < c.minMin ? WARN : worked > c.maxMin ? RED : OK;
+        const barW = hoursW - 8;
+        page.drawRectangle({ x: hx, y: y - rowH / 2 - 8, width: barW, height: 3, color: rgb(0.85, 0.85, 0.83) });
+        page.drawRectangle({ x: hx, y: y - rowH / 2 - 8, width: Math.min(barW, (worked / (c.maxMin * 1.15)) * barW), height: 3, color: tone });
+      }
+      dates.forEach((d, i) => {
+        const x0 = M + labelW + i * 2 * colW;
+        const away = absenceOn(person.userId, d);
+        if (away && mine.every((s) => s.date !== d)) {
+          // holiday / sick leave: one band over the whole day
+          box(page, x0, y - rowH, 2 * colW, rowH, away.type === 'VACATION' ? rgb(0.84, 0.88, 0.95) : rgb(0.95, 0.86, 0.86));
+          centered(page, ABSENCE_LABEL[away.type], x0 + colW, y - rowH / 2 - 2, 6.4, bold, away.type === 'VACATION' ? rgb(0.2, 0.3, 0.55) : RED);
+          return;
+        }
+        for (const lunch of [true, false]) {
+          const x = x0 + (lunch ? 0 : colW);
           const list = cell(d, lunch);
           if (list.length === 0) {
             box(page, x, y - rowH, colW, rowH, GREY);
-            centered(page, '-', x + colW / 2, y - rowH / 2 - 2, 7, regular, rgb(0.6, 0.6, 0.6));
+            centered(page, '-', x + colW / 2, y - rowH / 2 - 2, 7, regular, FAINT);
           }
-          // Each shift is its own band in the colour of its station.
           list.forEach((s, k) => {
-            const station = colorOf(s.station);
+            const st = stationOf(s.station);
             const band = rowH / list.length;
-            box(page, x, y - (k + 1) * band, colW, band, hex(station?.color ?? '#e3e1df'));
-            centered(page, `${formatTime(s.startMin)} - ${formatTime(s.endMin)}`, x + colW / 2, y - k * band - band / 2 - 2, 5.9, bold, station?.textColor ? hex(station.textColor) : NAVY);
+            box(page, x, y - (k + 1) * band, colW, band, hex(st?.color ?? '#e3e1df'));
+            const ink = st?.textColor ? hex(st.textColor) : NAVY;
+            centered(page, `${formatTime(s.startMin)} - ${formatTime(s.endMin)}`, x + colW / 2, y - k * band - band / 2 - 0.5, 6, bold, ink);
+            if (s.breakMin > 0) centered(page, `Pause ${s.breakMin}'`, x + colW / 2, y - k * band - band / 2 - 6.6, 4.8, regular, ink);
           });
         }
       });
       y -= rowH;
     }
+    // totals per day
+    if (y - 30 < bottom) {
+      page = newPage('Dienstplan · Mitarbeitende (Fortsetzung)');
+      y = headerFor(page);
+    }
+    y -= 3;
+    for (const row of ['Personen', 'Stunden'] as const) {
+      box(page, M, y - 13, labelW, 13, HEAD);
+      text(page, row === 'Personen' ? 'Personen pro Tag' : 'Stunden pro Tag', M + 5, y - 9.5, 7, bold);
+      dates.forEach((d, i) => {
+        const x = M + labelW + i * 2 * colW;
+        box(page, x, y - 13, 2 * colW, 13, HEAD2);
+        const dayShifts = input.shifts.filter((s) => s.date === d && s.userId);
+        const value = row === 'Personen' ? String(new Set(dayShifts.map((s) => s.userId)).size) : hoursText(dayShifts.reduce((n, s) => n + shiftNetMinutes(s), 0));
+        centered(page, value, x + colW, y - 9.5, 7.2, bold);
+      });
+      y -= 13;
+    }
     // Legend
-    y -= 14;
-    if (y < bottom) {
-      page = newPage('ASIAWAY - Arbeitsplan nach Uhrzeit · Service (Fortsetzung)');
+    y -= 12;
+    if (y - 28 < bottom) {
+      page = newPage('Dienstplan · Mitarbeitende (Fortsetzung)');
       y = top - 10;
     }
     let lx = M;
@@ -229,15 +334,86 @@ export async function renderRosterPdf(input: RosterPdfInput): Promise<Uint8Array
       centered(page, s.name, lx + w / 2, y - 8.5, 6.5, bold, s.textColor ? hex(s.textColor) : NAVY);
       lx += w + 4;
     }
+    text(page, "P30' = Pause in Minuten, nicht zeitlich festgelegt: jede Person nimmt sie, wann sie möchte. Die Pause ist in den Stunden schon abgezogen.", M, y - 25, 6.4, regular, MUTED);
+  }
+
+  // ---- Page 3: at a glance ----------------------------------------------------------------
+  {
+    const page = newPage('Dienstplan · Auf einen Blick');
+    let y = H - M - 62;
+    // Left: hours against the contract
+    text(page, 'STUNDEN GEGEN VERTRAG', M, y, 8, bold, RED);
+    y -= 14;
+    const barX = M + 86;
+    const barW = 250;
+    const rows = byPerson.filter((p) => minutesOf(p.userId) > 0 || ((p.employmentType === 'FULL_TIME' || p.employmentType === 'PART_TIME') && p.pensumPercent));
+    for (const person of rows) {
+      const worked = minutesOf(person.userId);
+      const hasPensum = (person.employmentType === 'FULL_TIME' || person.employmentType === 'PART_TIME') && person.pensumPercent;
+      text(page, fit(person.name, bold, 7.6, 80), M, y, 7.6, bold);
+      const scale = hasPensum ? weeklyTargetCorridor(person.pensumPercent!).maxMin * 1.2 : 42.5 * 60;
+      page.drawRectangle({ x: barX, y: y - 3, width: barW, height: 11, color: rgb(0.93, 0.93, 0.91) });
+      if (hasPensum) {
+        const c = weeklyTargetCorridor(person.pensumPercent!);
+        page.drawRectangle({ x: barX + (c.minMin / scale) * barW, y: y - 3, width: ((c.maxMin - c.minMin) / scale) * barW, height: 11, color: rgb(0.8, 0.91, 0.83) });
+        const tone = worked < c.minMin ? WARN : worked > c.maxMin ? RED : OK;
+        page.drawRectangle({ x: barX, y: y - 0.5, width: Math.min(barW, (worked / scale) * barW), height: 6, color: tone });
+        text(page, `${hoursText(worked)}  ·  Soll ${Math.round(c.minMin / 60)}–${(Math.round(c.maxMin / 6) / 10).toFixed(1).replace('.0', '')} h (${person.pensumPercent} %)`, barX + barW + 8, y, 7, regular, NAVY);
+      } else {
+        page.drawRectangle({ x: barX, y: y - 0.5, width: Math.min(barW, (worked / scale) * barW), height: 6, color: NAVY });
+        text(page, `${hoursText(worked)}  ·  ${EMPLOYMENT_LABEL[person.employmentType]}`, barX + barW + 8, y, 7, regular, NAVY);
+      }
+      y -= 17;
+      if (y < bottom + 20) break;
+    }
+    text(page, 'Grüner Bereich = Soll der Woche. Balken grün: im Soll · orange: darunter · rot: darüber.', M, Math.max(bottom + 6, y - 4), 6.4, regular, MUTED);
+
+    // Right: notes
+    const nx = W - M - 215;
+    let ny = H - M - 62;
+    const heading = (value: string) => {
+      text(page, value, nx, ny, 8, bold, RED);
+      ny -= 13;
+    };
+    const line = (value: string, color = NAVY) => {
+      text(page, fit(value, regular, 7.4, 215), nx, ny, 7.4, regular, color);
+      ny -= 11;
+    };
+    heading('FERIEN & ABWESENHEIT');
+    const week = absences.filter((a) => a.startDate <= dates[6]! && a.endDate >= dates[0]!);
+    if (week.length === 0) line('Keine.', MUTED);
+    for (const a of week) line(`${names.get(a.userId) ?? '?'}: ${ABSENCE_LABEL[a.type]} ${dm(a.startDate < dates[0]! ? dates[0]! : a.startDate)}${a.endDate > a.startDate ? `–${dm(a.endDate > dates[6]! ? dates[6]! : a.endDate)}` : ''}`);
+    ny -= 8;
+    heading('BESONDERE TAGE');
+    const sp = dates.filter((d) => specials.has(d));
+    if (sp.length === 0) line('Keine.', MUTED);
+    for (const d of sp) line(`${weekdayShort(d)} ${dm(d)}: ${specials.get(d)!.label}${specials.get(d)!.closed ? ' (geschlossen)' : ''}`);
+    ny -= 8;
+    heading('OFFENE SCHICHTEN');
+    const open = input.shifts.filter((s) => !s.userId);
+    if (open.length === 0) line('Keine, alles besetzt.', OK);
+    for (const s of open.slice(0, 8)) line(`${weekdayShort(s.date)} ${dm(s.date)} ${formatTime(s.startMin)}–${formatTime(s.endMin)} · ${s.station}`, RED);
+    ny -= 8;
+    heading('IN DIESER WOCHE');
+    line(`${input.shifts.filter((s) => s.userId).length} Schichten · ${hoursText(input.shifts.filter((s) => s.userId).reduce((n, s) => n + shiftNetMinutes(s), 0))} geplant`);
+    line(`${new Set(input.shifts.filter((s) => s.userId).map((s) => s.userId)).size} Personen im Einsatz`);
+    const breaks = input.shifts.filter((s) => s.userId && s.breakMin > 0);
+    line(`${breaks.length} Schichten mit Pause (frei wählbar)`);
+    if (draft) {
+      ny -= 8;
+      line('Entwurf: die Mitarbeitenden sehen diesen Plan noch nicht.', WARN);
+    }
   }
 
   // Footer on every page
-  const stamp = `${input.siteName}, ${new Intl.DateTimeFormat('de-CH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Zurich' }).format(input.generatedAt)}`;
+  const stamp = `${input.siteName} · ${new Intl.DateTimeFormat('de-CH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Zurich' }).format(input.generatedAt)}`;
   pages.forEach((p, i) => {
-    text(p, 'AsiaWay Staff', M, 20, 6.5, regular, rgb(0.5, 0.5, 0.5));
-    centered(p, stamp, W / 2, 20, 6.5, regular, rgb(0.5, 0.5, 0.5));
+    // the draft mark lies on top of everything so it is never hidden by a coloured cell
+    if (draft) p.drawText('ENTWURF', { x: 190, y: 110, size: 120, font: bold, color: RED, opacity: 0.07, rotate: degrees(28) });
+    text(p, 'asiaway - Gastro App', M, 20, 6.5, regular, FAINT);
+    centered(p, stamp, W / 2, 20, 6.5, regular, FAINT);
     const right = `Seite ${i + 1} / ${pages.length}`;
-    text(p, right, W - M - regular.widthOfTextAtSize(right, 6.5), 20, 6.5, regular, rgb(0.5, 0.5, 0.5));
+    text(p, right, W - M - regular.widthOfTextAtSize(right, 6.5), 20, 6.5, regular, FAINT);
   });
   return pdf.save();
 }
