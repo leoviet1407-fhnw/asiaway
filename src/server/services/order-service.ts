@@ -86,6 +86,7 @@ export interface OrderLineView {
   sku: string;
   nameDe: string;
   nameVi: string | null;
+  nameEn: string | null;
   storageArea: string;
   isFresh: boolean;
   qty: number;
@@ -136,6 +137,7 @@ export async function getOrderLines(db: AppDatabase, orderId: string): Promise<O
       sku: items.sku,
       nameDe: items.nameDe,
       nameVi: items.nameVi,
+      nameEn: items.nameEn,
       storageArea: items.storageArea,
       isFresh: items.isFresh,
       qty: purchaseOrderLines.qty,

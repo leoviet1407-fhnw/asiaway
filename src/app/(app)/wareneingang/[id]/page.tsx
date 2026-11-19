@@ -35,6 +35,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
         itemId: l.itemId,
         nameDe: l.nameDe,
         nameVi: l.nameVi,
+        nameEn: l.nameEn,
         area: t(STORAGE_AREA_LABEL[l.storageArea as StorageArea]),
         isFresh: l.isFresh,
         orderUnit: l.orderUnit,

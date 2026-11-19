@@ -1,110 +1,110 @@
-sku;name_de;name_vi;storage_area;stock_unit;fresh;key_item;supplier;supplier_sku;order_unit;pack_size;price_chf;ean;department;group
-AW-52180;Mochi Ice Sorbet Lychee 12x156g 'Buono';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52180;Karton;1;0.00;;TK;Dessert
-AW-52178;Mochi Ice Green Tea 12x156g 'Buono';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52178;Karton;1;0.00;;TK;Dessert
-AW-52176;Mochi Ice Coconut 12x156g 'Buono';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52176;Karton;1;0.00;;TK;Dessert
-AW-52174;Mochi Ice Black Sesame 12x156g 'Buono';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52174;Karton;1;0.00;;TK;Dessert
-AW-52594;Frozen Garlic Grind 200g (60) 'Sen Foods';Toi Xay;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52594;Karton;1;0.00;;TK;Früchte/Gemüse/Nüsse
-AW-52942;Schweinerippen 1KG (20);Suon Heo;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52942;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-52595;Frozen Lemongrass Grind 200g (60) 'Sen Foods';Sa Xay;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52595;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-52587;Frozen Pangasius Fillet 1KG (10) 'Sen Foods';Ca Tra Phi Le;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52587;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-52583;Frozen Red Tilapia Whole Cleaned 1KG (10) 'Sen Foods';Ca Dieu Hong Lam Sach;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52583;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-52226;Flour for pancake 30x400g 'Vinh Thuan';Bot banh xeo;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52226;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-52021;Vannamei Crevetten Torpedo paniert 21-25 10x1kg 'Senfoods';Tom rat banh mi;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52021;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51988;Black tiger o/K 21-25 10x900g 'Senfoods';Tom su khong dau (HLSO);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51988;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51955;Shrimp hakao 14x700g 'Senfoods';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51955;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51948;Black tiger TO 21-25 900g (10) 'Senfoods';Tom su lot sach con duoi (PTO);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51948;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51642;Vannamei o/S 16-20 900g (10) 'Senfoods';Tom The lot sach (PD);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51642;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51634;Black tiger o/K 21-25 900g (10) 'Senfoods';Tom su khong dau (HLSO);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51634;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-50822;Schweinefüssli weight 'Cao Hoang';Gio Heo (cat khoanh);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;50822;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-50710;Whole Cleaned Cuttlefish U3 1kg (10) 'SM Star';Muc Nang Nguyen Con;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;50710;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-32519;Coconut Ice bar 5pc (6) 'Foco';Kem cay dua;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;32519;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-32174;Seafood cocktail 1kg (10) 'SM Star';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;32174;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-31771;Sepien ganz & geputzt U5 1kg (10) 'SM Star';Muc nang;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;31771;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-30081;Schweinsfuss 1kg (20);Gio Heo cat khoanh dong da;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;30081;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-29966;Pouletbrustfilet rest 6x2kg 'Seara' (Preis für 12 kg);Uc ga;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;29966;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-29963;Peking-Enten 'CN Mr Lee' Rest. (18);Vit quay rut xuong;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;29963;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-26594;Dried pangasius 500g (20) 'NAM';Kho ca tra;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26594;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-26412;Entenbrust 1kg Rest. (5);Uc vit;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;26412;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-22722;Suppenhuhn 1KG (12);Ga gia;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;22722;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-21331;Fortune cookies ca. 20stk;Glückskekse;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21331;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-21326;Har Gao (Shrimp Dumpling) 18p (24) 'Little Chef';Ha cao hop nho;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;21326;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-20102;So 1 'Viet-Hung';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;20102;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51993;Black tiger TO 16-20 10x900g 'Senfoods';Tom su lot sach con duoi (PTO);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51993;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-51989;Black tiger o/S 16-20 10x900g 'Senfoods';Tom su lot sach (PD);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51989;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
-AW-34013;GYOZA Dumplings Beef Bulgogi - 600g (12) 'BIBIGO';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;34013;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
-AW-33696;GYOZA Dumplings Tofu & Vegetable - 600g (12) 'BIBIGO';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;33696;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
-AW-33240;Frozen Vegetable Samosa 240g (24) 'Little Chef';;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;33240;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
-AW-30007;Spring roll Tsingtao 900g (10) 'CN';Cha gio chay;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;30007;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
-AW-26522;Spring roll w/pork meat 1.9kg (4) 'FR';Cha gio thit;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;26522;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
-AW-22367;Fortune cookies ca. 275pc;Banh hen;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;22367;Karton;1;0.00;;UK;Dessert
-AW-52305;Mat Kimchi 20x200g 'JONGGA';;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;52305;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-52086;Lychee in syrup 24x565g 'Aroy-D';Trai vai lon;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52086;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-33394;Peanut without Skin 1KG (20) 'Raitip';Dau Phong lot da;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33394;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-33232;Frozen Lime Leaves 114g (30) 'Cock';La chanh;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;33232;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-30935;Frozen soybeans 1kg (10) 'Ita-san';Dau nanh tuoi luot;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;30935;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-27276;Straw mushroom peeled 2840g (6) 'Dayat';Nam rom boc vo;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;27276;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-22055;Tofu Gebraten 'OB Thuy' 500g;;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;22055;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-22054;Tofu nature 'OB Thuy' 500g;;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;22054;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-21997;Limetten 1kg 'Brazil';Chanh Tuoi;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;21997;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-21202;Lemon Grass 100g 'Viet Rau';Sa Tuoi;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;21202;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-21149;Ingwer (Ginger) 1kg;Gung tuoi;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;21149;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-20716;Cashew nut 1kg (12) 'Flower';Hat dieu;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20716;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
-AW-53365;Coconut Water 500ml (12) 'BAMBOO TREE';;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;53365;Karton;1;0.00;;UK;Getränke
-AW-53295;Aloe Vera Juice Drink Mixed Fruit 500ml (24) 'Chin Chin';;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;53295;Karton;1;0.00;;UK;Getränke
-AW-52070;Roasted coconut juice 24x350ml 'Foco';Nuoc dua nuong;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52070;Karton;1;0.00;;UK;Getränke
-AW-52069;Mango juice 24x350ml 'Foco';Nuoc xoai;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52069;Karton;1;0.00;;UK;Getränke
-AW-52067;Tamarind juice 24x350ml 'Foco';Nuoc me;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52067;Karton;1;0.00;;UK;Getränke
-AW-52066;Lychee juice drink 24x350ml 'Foco';Nuoc trai vai;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52066;Karton;1;0.00;;UK;Getränke
-AW-52065;Coconut juice 24x350ml 'Foco';Nuoc dua tuoi;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52065;Karton;1;0.00;;UK;Getränke
-AW-51999;Green Tea Original Flavour 24x500ml 'Oishi';Tra Xanh Uong;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51999;Karton;1;0.00;;UK;Getränke
-AW-51997;Green Tea Honey Lemon Flavour 24x500ml 'Oishi';Tra Xanh Uong;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51997;Karton;1;0.00;;UK;Getränke
-AW-51995;Black Tea Lemon Flavour 24x500ml 'Oishi';Tra Den Uong;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51995;Karton;1;0.00;;UK;Getränke
-AW-51574;Green Tea Kabusecha Sugar Free 400ml (24) 'Oishi';;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51574;Karton;1;0.00;;UK;Getränke
-AW-34047;Aloe Vera Juice Drink 500ml (24) 'Chin Chin';;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;34047;Karton;1;0.00;;UK;Getränke
-AW-32262;Jasmine green tea 20 pack 56g (12) 'Tradition';Tra Lai Tui Loc;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;32262;Karton;1;0.00;;UK;Getränke
-AW-25977;Aloe vera drink lychee flavour 350ml (24) 'Foco';Nuoc nha dam mui vai;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;25977;Karton;1;0.00;;UK;Getränke
-AW-23301;Beer Saigon 355ml x 24btl;;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;23301;Karton;1;0.00;;UK;Getränke
-AW-22627;Beer Asahi 330ml x 24;;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22627;Karton;1;0.00;;UK;Getränke
-AW-22420;Mango nectar 240ml (30) 'Gina';Nuoc xoai;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22420;Karton;1;0.00;;UK;Getränke
-AW-22206;Beer Chang 330ml x 24btl 'Elephant';;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22206;Karton;1;0.00;;UK;Getränke
-AW-22106;Beer Singha 330ml x 24btl 'Boon Rawd';;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22106;Karton;1;0.00;;UK;Getränke
-AW-22015;Beer Tsingtao 355ml x 24btl;;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22015;Karton;1;0.00;;UK;Getränke
-AW-23554;Kartoffelstärke 25kg;Bot khoai tay;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;23554;Karton;1;0.00;;UK;Pulver
-AW-52804;Rice Noodle XL 10MM 400g (30) 'Tufoco';Banh pho;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52804;Karton;1;0.00;;UK;Reis/Nudeln
-AW-52154;Instant Fresh Udon Noodle 15x200g x 4 'Nittin';Banh canh udon;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52154;Karton;1;0.00;;UK;Reis/Nudeln
-AW-51968;Mung Bean Vermicelli 48x250g 'Sen Food';Mien Dau;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;51968;Karton;1;0.00;;UK;Reis/Nudeln
-AW-51964;Hues rice vermicelli 2mm 30x400g 'Sen Foods';Bun bo hue;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;51964;Karton;1;0.00;;UK;Reis/Nudeln
-AW-51956;Rice Noodles 3mm 30x400g 'Sen Foods';Banh Pho 3mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;51956;Karton;1;0.00;;UK;Reis/Nudeln
-AW-50225;TH Jasmine Rice 20KG 'SENFOODS';Gao Sen Foods;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;50225;Karton;1;0.00;;UK;Reis/Nudeln
-AW-33704;Rice Noodle S 1MM 400g (30) 'Tufoco';Banh pho;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33704;Karton;1;0.00;;UK;Reis/Nudeln
-AW-33115;Hues rice vermicelli 2mm 400g (30) 'Duy Anh';Bun bo hue;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33115;Karton;1;0.00;;UK;Reis/Nudeln
-AW-33102;Vegetarian Wheat Noodle 400g (30) 'Duy Anh';Mi Chay Soi Nho;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33102;Karton;1;0.00;;UK;Reis/Nudeln
-AW-31433;Rice noodle M 3MM 400g (30) 'Tufoco';Banh pho;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;31433;Karton;1;0.00;;UK;Reis/Nudeln
-AW-31027;Fresh rice vermicelli green 400g (30) 'Tufoco';Bun tuoi;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;31027;Karton;1;0.00;;UK;Reis/Nudeln
-AW-2689;Rice stick 10mm 500g (30) 'How How';Pho how how;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;2689;Karton;1;0.00;;UK;Reis/Nudeln
-AW-26889;Rice stick 3mm 500g (30) 'How How';Pho how how;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26889;Karton;1;0.00;;UK;Reis/Nudeln
-AW-26888;Rice stick 1mm 500g (30) 'How How';Pho how how;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26888;Karton;1;0.00;;UK;Reis/Nudeln
-AW-53285;Sukang Maasim Vinegar 1L (12) 'Datu Puti';Giam Philippines;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;53285;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52280;Satay sauce 24x454g 'Foodex';Tuong satay;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52280;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52267;Red curry paste 10x1kg 'Nittaya';;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52267;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52257;Masaman curry paste 20x500g 'Nittaya';;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52257;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52242;Oyster sauce 3x4500ml 'Maekrua';Dau hao;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52242;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52241;Fish sauce 12x700ml 'Tiparose';Nuoc mam;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52241;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52238;White Soy Sauce 3x4.5l 'HB';Xi Dau Trang;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52238;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52234;Distilled vinegar 4x5lt 'GM';Dam gao;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52234;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52132;Concentrate cooking tamarind 24x454g 'Cock';Tuong me chua;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52132;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52122;Sriracha chilli sauce 4x4.5lt 'Cock';Tuong ot;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52122;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-52109;Chilli sauce for chicken 3x4.5lt 'Cock';Tuong ot cham ga;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52109;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-33213;Coconut in Sweetened Coconut Milk 400g (24) 'Foco';;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33213;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-33127;Green curry paste 1kg (20) 'Nittaya';;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33127;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-32131;Crab paste with bean oil 200g (24) 'POR KWAN';Gach cua xao dau;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;32131;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-29799;Fried onion 1kg (6) 'Nang Fah';Hanh phi;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;29799;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-27399;Soy sauce light 8lt (2) 'Pearl River Bridge';Xi dau lot;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;27399;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-26811;Coconut milk 6x2900g Rest. 'Aroy-D';Nuoc cot dua;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26811;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-22891;Coconut milk 1000ml (12) 'Aroy-D';Nuoc cot dua;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;22891;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-21653;Sambal Oelek 10kg 'Royal Orient';Ot bam so nap vang;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21653;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-21545;Fish Sauce 4.5lt (2) 'Tiparose';Nuoc mam;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21545;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-21489;Palm sugar 454g (24) 'Cock';Duong tan boc;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21489;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-20969;Soy sauce 1lt (12) 'Kikkoman';;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20969;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-20644;Hoisin sauce 2.4kg (6) 'LKK';Tuong ngot;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20644;Karton;1;0.00;;UK;Sauce/Gewürz
-AW-20399;Peking duck sauce 383g (12) 'LKK';;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20399;Karton;1;0.00;;UK;Sauce/Gewürz
+sku;name_de;name_vi;name_en;storage_area;stock_unit;fresh;key_item;supplier;supplier_sku;order_unit;pack_size;price_chf;ean;department;group
+AW-52180;Mochi Ice Sorbet Lychee 12x156g 'Buono';Kem mochi vải;Lychee sorbet mochi ice cream;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52180;Karton;1;0.00;;TK;Dessert
+AW-52178;Mochi Ice Green Tea 12x156g 'Buono';Kem mochi trà xanh;Green tea mochi ice cream;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52178;Karton;1;0.00;;TK;Dessert
+AW-52176;Mochi Ice Coconut 12x156g 'Buono';Kem mochi dừa;Coconut mochi ice cream;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52176;Karton;1;0.00;;TK;Dessert
+AW-52174;Mochi Ice Black Sesame 12x156g 'Buono';Kem mochi mè đen;Black sesame mochi ice cream;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52174;Karton;1;0.00;;TK;Dessert
+AW-52594;Frozen Garlic Grind 200g (60) 'Sen Foods';Tỏi xay đông lạnh;Frozen minced garlic;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52594;Karton;1;0.00;;TK;Früchte/Gemüse/Nüsse
+AW-52942;Schweinerippen 1KG (20);Sườn heo;Pork ribs;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52942;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-52595;Frozen Lemongrass Grind 200g (60) 'Sen Foods';Sả xay đông lạnh;Frozen minced lemongrass;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52595;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-52587;Frozen Pangasius Fillet 1KG (10) 'Sen Foods';Cá tra phi lê đông lạnh;Frozen pangasius fillet;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52587;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-52583;Frozen Red Tilapia Whole Cleaned 1KG (10) 'Sen Foods';Cá điêu hồng làm sạch đông lạnh;Frozen whole red tilapia, cleaned;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52583;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-52226;Flour for pancake 30x400g 'Vinh Thuan';Bột bánh xèo;Vietnamese pancake flour;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52226;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-52021;Vannamei Crevetten Torpedo paniert 21-25 10x1kg 'Senfoods';Tôm rắc bột chiên xù;Breaded vannamei shrimp;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;52021;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51988;Black tiger o/K 21-25 10x900g 'Senfoods';Tôm sú bỏ đầu còn vỏ (HLSO);Black tiger shrimp, headless shell-on;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51988;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51955;Shrimp hakao 14x700g 'Senfoods';Há cảo tôm;Shrimp har gow dumplings;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51955;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51948;Black tiger TO 21-25 900g (10) 'Senfoods';Tôm sú lột sạch còn đuôi (PTO);Black tiger shrimp, peeled tail-on;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51948;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51642;Vannamei o/S 16-20 900g (10) 'Senfoods';Tôm thẻ lột sạch (PD);Vannamei shrimp, peeled and deveined;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51642;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51634;Black tiger o/K 21-25 900g (10) 'Senfoods';Tôm sú bỏ đầu còn vỏ (HLSO);Black tiger shrimp, headless shell-on;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51634;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-50822;Schweinefüssli weight 'Cao Hoang';Giò heo cắt khoanh;Pork trotters, sliced;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;50822;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-50710;Whole Cleaned Cuttlefish U3 1kg (10) 'SM Star';Mực nang nguyên con làm sạch;Whole cleaned cuttlefish;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;50710;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-32519;Coconut Ice bar 5pc (6) 'Foco';Kem cây dừa;Coconut ice cream bar;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;32519;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-32174;Seafood cocktail 1kg (10) 'SM Star';Hải sản thập cẩm đông lạnh;Frozen mixed seafood;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;32174;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-31771;Sepien ganz & geputzt U5 1kg (10) 'SM Star';Mực nang làm sạch;Whole cleaned cuttlefish;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;31771;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-30081;Schweinsfuss 1kg (20);Giò heo cắt khoanh đông lạnh;Frozen pork trotters, sliced;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;30081;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-29966;Pouletbrustfilet rest 6x2kg 'Seara' (Preis für 12 kg);Ức gà phi lê;Chicken breast fillet;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;29966;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-29963;Peking-Enten 'CN Mr Lee' Rest. (18);Vịt quay Bắc Kinh rút xương;Boneless Peking roast duck;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;29963;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-26594;Dried pangasius 500g (20) 'NAM';Khô cá tra;Dried pangasius fish;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26594;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-26412;Entenbrust 1kg Rest. (5);Ức vịt;Duck breast;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;26412;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-22722;Suppenhuhn 1KG (12);Gà già (gà nấu súp);Boiling hen (soup chicken);Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;22722;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-21331;Fortune cookies ca. 20stk;Bánh may mắn;Fortune cookies;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21331;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-21326;Har Gao (Shrimp Dumpling) 18p (24) 'Little Chef';Há cảo tôm;Shrimp har gow dumplings;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;21326;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-20102;So 1 'Viet-Hung';;;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;20102;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51993;Black tiger TO 16-20 10x900g 'Senfoods';Tôm sú lột sạch còn đuôi (PTO);Black tiger shrimp, peeled tail-on;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51993;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-51989;Black tiger o/S 16-20 10x900g 'Senfoods';Tôm sú lột sạch (PD);Black tiger shrimp, peeled and deveined;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;51989;Karton;1;0.00;;TK;Poulet/Fleisch/Crevetten
+AW-34013;GYOZA Dumplings Beef Bulgogi - 600g (12) 'BIBIGO';Bánh xếp gyoza bò bulgogi;Beef bulgogi gyoza dumplings;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;34013;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
+AW-33696;GYOZA Dumplings Tofu & Vegetable - 600g (12) 'BIBIGO';Bánh xếp gyoza đậu hũ rau củ;Tofu and vegetable gyoza dumplings;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;33696;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
+AW-33240;Frozen Vegetable Samosa 240g (24) 'Little Chef';Bánh samosa rau củ đông lạnh;Frozen vegetable samosas;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;33240;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
+AW-30007;Spring roll Tsingtao 900g (10) 'CN';Chả giò chay;Vegetarian spring rolls;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;30007;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
+AW-26522;Spring roll w/pork meat 1.9kg (4) 'FR';Chả giò thịt heo;Pork spring rolls;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;26522;Karton;1;0.00;;TK;Frühlingsrollen/Dumplings
+AW-22367;Fortune cookies ca. 275pc;Bánh may mắn;Fortune cookies;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;22367;Karton;1;0.00;;UK;Dessert
+AW-52305;Mat Kimchi 20x200g 'JONGGA';Kim chi cải thảo;Napa cabbage kimchi;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;52305;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-52086;Lychee in syrup 24x565g 'Aroy-D';Vải ngâm nước đường;Lychees in syrup;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52086;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-33394;Peanut without Skin 1KG (20) 'Raitip';Đậu phộng lột vỏ lụa;Skinless peanuts;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33394;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-33232;Frozen Lime Leaves 114g (30) 'Cock';Lá chanh đông lạnh;Frozen kaffir lime leaves;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;33232;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-30935;Frozen soybeans 1kg (10) 'Ita-san';Đậu nành tươi luộc (edamame);Frozen edamame soybeans;Tiefkühler;Karton;nein;nein;AsiaWay Lager Regensdorf;30935;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-27276;Straw mushroom peeled 2840g (6) 'Dayat';Nấm rơm bóc vỏ;Peeled straw mushrooms;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;27276;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-22055;Tofu Gebraten 'OB Thuy' 500g;Đậu hũ chiên;Fried tofu;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;22055;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-22054;Tofu nature 'OB Thuy' 500g;Đậu hũ trắng;Plain tofu;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;22054;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-21997;Limetten 1kg 'Brazil';Chanh tươi;Fresh limes;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;21997;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-21202;Lemon Grass 100g 'Viet Rau';Sả tươi;Fresh lemongrass;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;21202;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-21149;Ingwer (Ginger) 1kg;Gừng tươi;Fresh ginger;Kühlraum;Karton;ja;nein;AsiaWay Lager Regensdorf;21149;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-20716;Cashew nut 1kg (12) 'Flower';Hạt điều;Cashew nuts;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20716;Karton;1;0.00;;UK;Früchte/Gemüse/Nüsse
+AW-53365;Coconut Water 500ml (12) 'BAMBOO TREE';Nước dừa;Coconut water;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;53365;Karton;1;0.00;;UK;Getränke
+AW-53295;Aloe Vera Juice Drink Mixed Fruit 500ml (24) 'Chin Chin';Nước nha đam trái cây thập cẩm;Aloe vera drink, mixed fruit;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;53295;Karton;1;0.00;;UK;Getränke
+AW-52070;Roasted coconut juice 24x350ml 'Foco';Nước dừa nướng;Roasted coconut juice;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52070;Karton;1;0.00;;UK;Getränke
+AW-52069;Mango juice 24x350ml 'Foco';Nước xoài;Mango juice;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52069;Karton;1;0.00;;UK;Getränke
+AW-52067;Tamarind juice 24x350ml 'Foco';Nước me;Tamarind juice;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52067;Karton;1;0.00;;UK;Getränke
+AW-52066;Lychee juice drink 24x350ml 'Foco';Nước vải;Lychee juice drink;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52066;Karton;1;0.00;;UK;Getränke
+AW-52065;Coconut juice 24x350ml 'Foco';Nước dừa tươi;Coconut juice;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;52065;Karton;1;0.00;;UK;Getränke
+AW-51999;Green Tea Original Flavour 24x500ml 'Oishi';Trà xanh vị nguyên bản;Green tea, original;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51999;Karton;1;0.00;;UK;Getränke
+AW-51997;Green Tea Honey Lemon Flavour 24x500ml 'Oishi';Trà xanh mật ong chanh;Green tea, honey lemon;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51997;Karton;1;0.00;;UK;Getränke
+AW-51995;Black Tea Lemon Flavour 24x500ml 'Oishi';Trà đen vị chanh;Black tea, lemon;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51995;Karton;1;0.00;;UK;Getränke
+AW-51574;Green Tea Kabusecha Sugar Free 400ml (24) 'Oishi';Trà xanh Kabusecha không đường;Kabusecha green tea, sugar-free;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;51574;Karton;1;0.00;;UK;Getränke
+AW-34047;Aloe Vera Juice Drink 500ml (24) 'Chin Chin';Nước nha đam;Aloe vera drink;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;34047;Karton;1;0.00;;UK;Getränke
+AW-32262;Jasmine green tea 20 pack 56g (12) 'Tradition';Trà lài túi lọc;Jasmine green tea bags;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;32262;Karton;1;0.00;;UK;Getränke
+AW-25977;Aloe vera drink lychee flavour 350ml (24) 'Foco';Nước nha đam vị vải;Aloe vera drink, lychee;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;25977;Karton;1;0.00;;UK;Getränke
+AW-23301;Beer Saigon 355ml x 24btl;Bia Sài Gòn;Saigon beer;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;23301;Karton;1;0.00;;UK;Getränke
+AW-22627;Beer Asahi 330ml x 24;Bia Asahi;Asahi beer;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22627;Karton;1;0.00;;UK;Getränke
+AW-22420;Mango nectar 240ml (30) 'Gina';Nước ép xoài;Mango nectar;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22420;Karton;1;0.00;;UK;Getränke
+AW-22206;Beer Chang 330ml x 24btl 'Elephant';Bia Chang;Chang beer;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22206;Karton;1;0.00;;UK;Getränke
+AW-22106;Beer Singha 330ml x 24btl 'Boon Rawd';Bia Singha;Singha beer;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22106;Karton;1;0.00;;UK;Getränke
+AW-22015;Beer Tsingtao 355ml x 24btl;Bia Tsingtao;Tsingtao beer;Getränke;Karton;nein;nein;AsiaWay Lager Regensdorf;22015;Karton;1;0.00;;UK;Getränke
+AW-23554;Kartoffelstärke 25kg;Bột khoai tây;Potato starch;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;23554;Karton;1;0.00;;UK;Pulver
+AW-52804;Rice Noodle XL 10MM 400g (30) 'Tufoco';Bánh phở sợi to 10 mm;Wide rice noodles, 10 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52804;Karton;1;0.00;;UK;Reis/Nudeln
+AW-52154;Instant Fresh Udon Noodle 15x200g x 4 'Nittin';Mì udon tươi ăn liền;Instant fresh udon noodles;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52154;Karton;1;0.00;;UK;Reis/Nudeln
+AW-51968;Mung Bean Vermicelli 48x250g 'Sen Food';Miến đậu xanh;Mung bean vermicelli (glass noodles);Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;51968;Karton;1;0.00;;UK;Reis/Nudeln
+AW-51964;Hues rice vermicelli 2mm 30x400g 'Sen Foods';Bún bò Huế sợi 2 mm;Hue-style rice vermicelli, 2 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;51964;Karton;1;0.00;;UK;Reis/Nudeln
+AW-51956;Rice Noodles 3mm 30x400g 'Sen Foods';Bánh phở 3 mm;Rice noodles, 3 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;51956;Karton;1;0.00;;UK;Reis/Nudeln
+AW-50225;TH Jasmine Rice 20KG 'SENFOODS';Gạo thơm lài Thái;Thai jasmine rice;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;50225;Karton;1;0.00;;UK;Reis/Nudeln
+AW-33704;Rice Noodle S 1MM 400g (30) 'Tufoco';Bánh phở sợi nhỏ 1 mm;Thin rice noodles, 1 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33704;Karton;1;0.00;;UK;Reis/Nudeln
+AW-33115;Hues rice vermicelli 2mm 400g (30) 'Duy Anh';Bún bò Huế sợi 2 mm;Hue-style rice vermicelli, 2 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33115;Karton;1;0.00;;UK;Reis/Nudeln
+AW-33102;Vegetarian Wheat Noodle 400g (30) 'Duy Anh';Mì chay sợi nhỏ;Thin vegetarian wheat noodles;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33102;Karton;1;0.00;;UK;Reis/Nudeln
+AW-31433;Rice noodle M 3MM 400g (30) 'Tufoco';Bánh phở sợi vừa 3 mm;Medium rice noodles, 3 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;31433;Karton;1;0.00;;UK;Reis/Nudeln
+AW-31027;Fresh rice vermicelli green 400g (30) 'Tufoco';Bún tươi;Fresh rice vermicelli;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;31027;Karton;1;0.00;;UK;Reis/Nudeln
+AW-2689;Rice stick 10mm 500g (30) 'How How';Hủ tiếu sợi 10 mm;Rice sticks, 10 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;2689;Karton;1;0.00;;UK;Reis/Nudeln
+AW-26889;Rice stick 3mm 500g (30) 'How How';Hủ tiếu sợi 3 mm;Rice sticks, 3 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26889;Karton;1;0.00;;UK;Reis/Nudeln
+AW-26888;Rice stick 1mm 500g (30) 'How How';Hủ tiếu sợi 1 mm;Rice sticks, 1 mm;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26888;Karton;1;0.00;;UK;Reis/Nudeln
+AW-53285;Sukang Maasim Vinegar 1L (12) 'Datu Puti';Giấm Philippines;Filipino cane vinegar;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;53285;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52280;Satay sauce 24x454g 'Foodex';Tương sa tế;Satay sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52280;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52267;Red curry paste 10x1kg 'Nittaya';Cà ri đỏ dạng sệt;Red curry paste;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52267;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52257;Masaman curry paste 20x500g 'Nittaya';Cà ri Massaman dạng sệt;Massaman curry paste;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52257;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52242;Oyster sauce 3x4500ml 'Maekrua';Dầu hào;Oyster sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52242;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52241;Fish sauce 12x700ml 'Tiparose';Nước mắm;Fish sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52241;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52238;White Soy Sauce 3x4.5l 'HB';Xì dầu trắng;White soy sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52238;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52234;Distilled vinegar 4x5lt 'GM';Giấm gạo;Distilled vinegar;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52234;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52132;Concentrate cooking tamarind 24x454g 'Cock';Me chua cô đặc;Tamarind concentrate;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52132;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52122;Sriracha chilli sauce 4x4.5lt 'Cock';Tương ớt Sriracha;Sriracha chilli sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52122;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-52109;Chilli sauce for chicken 3x4.5lt 'Cock';Tương ớt chấm gà;Sweet chilli sauce for chicken;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;52109;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-33213;Coconut in Sweetened Coconut Milk 400g (24) 'Foco';Dừa ngâm nước cốt dừa ngọt;Coconut in sweetened coconut milk;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33213;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-33127;Green curry paste 1kg (20) 'Nittaya';Cà ri xanh dạng sệt;Green curry paste;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;33127;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-32131;Crab paste with bean oil 200g (24) 'POR KWAN';Gạch cua xào dầu;Crab paste in soybean oil;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;32131;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-29799;Fried onion 1kg (6) 'Nang Fah';Hành phi;Fried shallots;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;29799;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-27399;Soy sauce light 8lt (2) 'Pearl River Bridge';Xì dầu nhạt;Light soy sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;27399;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-26811;Coconut milk 6x2900g Rest. 'Aroy-D';Nước cốt dừa;Coconut milk;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;26811;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-22891;Coconut milk 1000ml (12) 'Aroy-D';Nước cốt dừa;Coconut milk;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;22891;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-21653;Sambal Oelek 10kg 'Royal Orient';Ớt băm Sambal Oelek;Sambal oelek chilli paste;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21653;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-21545;Fish Sauce 4.5lt (2) 'Tiparose';Nước mắm;Fish sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21545;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-21489;Palm sugar 454g (24) 'Cock';Đường thốt nốt;Palm sugar;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;21489;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-20969;Soy sauce 1lt (12) 'Kikkoman';Xì dầu Kikkoman;Kikkoman soy sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20969;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-20644;Hoisin sauce 2.4kg (6) 'LKK';Tương ngọt (hoisin);Hoisin sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20644;Karton;1;0.00;;UK;Sauce/Gewürz
+AW-20399;Peking duck sauce 383g (12) 'LKK';Tương chấm vịt quay Bắc Kinh;Peking duck sauce;Trockenlager;Karton;nein;nein;AsiaWay Lager Regensdorf;20399;Karton;1;0.00;;UK;Sauce/Gewürz

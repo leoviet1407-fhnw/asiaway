@@ -46,6 +46,7 @@ export interface CatalogItem {
   sku: string;
   nameDe: string;
   nameVi: string | null;
+  nameEn: string | null;
   storageArea: StorageArea;
   stockUnit: string;
   isFresh: boolean;
@@ -93,6 +94,7 @@ export async function listItems(db: AppDatabase, { supplierId, includeInactive =
       sku: i.sku,
       nameDe: i.nameDe,
       nameVi: i.nameVi,
+      nameEn: i.nameEn,
       storageArea: i.storageArea as StorageArea,
       stockUnit: i.stockUnit,
       isFresh: i.isFresh,
@@ -133,6 +135,7 @@ function requireAdmin(p: Principal) {
 export interface ItemUpdate {
   nameDe: string;
   nameVi: string | null;
+  nameEn: string | null;
   storageArea: StorageArea;
   stockUnit: string;
   isFresh: boolean;
@@ -171,6 +174,7 @@ export async function updateItem(db: AppDatabase, p: Principal, id: string, upda
       .set({
         nameDe: update.nameDe.trim(),
         nameVi: update.nameVi?.trim() || null,
+        nameEn: update.nameEn?.trim() || null,
         storageArea: update.storageArea,
         stockUnit: update.stockUnit.trim() || 'Stk',
         isFresh: update.isFresh,

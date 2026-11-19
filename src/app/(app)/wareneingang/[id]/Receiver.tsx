@@ -1,5 +1,6 @@
 'use client';
 
+import { ItemSubtitle } from '@/components/ItemSubtitle';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatQty, parseQty, roundQty } from '@/domain/qty';
@@ -15,6 +16,7 @@ export interface ReceiverLine {
   itemId: string;
   nameDe: string;
   nameVi: string | null;
+  nameEn: string | null;
   area: string;
   isFresh: boolean;
   orderUnit: string;
@@ -284,6 +286,7 @@ export function Receiver(props: Props) {
                       <StatusDot status={qty === 0 && line.expectedNow > 0 ? null : status} />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium leading-snug text-navy">{line.nameDe}</div>
+                        <ItemSubtitle vi={line.nameVi} en={line.nameEn} />
                         <div className="text-xs text-charcoal-muted">
                           {line.orderUnit}
                           {line.isFresh ? ` · ${t('frisch – antippen')}` : line.hasBarcode ? '' : ` · ${t('ohne Barcode – antippen')}`}

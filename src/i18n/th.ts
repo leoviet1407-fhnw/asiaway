@@ -5,6 +5,15 @@
 import { PATTERNS } from './en';
 
 export const TH: Record<string, string> = {
+  "Name (EN)": "ชื่อ (EN)",
+  "Rückgängig": "เลิกทำ",
+  "Gelöscht": "ลบแล้ว",
+  "Kopieren & einfügen": "คัดลอกและวาง",
+  "Speichern (+{n} Tage)": "บันทึก (+{n} วัน)",
+  "Auch an diesen Tagen": "วันอื่นด้วย",
+  "Fertig ({n} eingefügt)": "เสร็จ (วางแล้ว {n})",
+  "Gespeichert, auch an {n} weiteren Tagen.": "บันทึกแล้ว รวมอีก {n} วัน",
+  "Schliessen": "ปิด",
   "Bitte ergänzen Sie einmalig Ihre persönlichen Angaben. Wir brauchen sie für den Vertrag und die Lohnzahlung.": "กรุณากรอกข้อมูลส่วนตัวหนึ่งครั้ง เราต้องใช้สำหรับสัญญาจ้างและการจ่ายเงินเดือน",
   "← Start": "← หน้าแรก",
   "Jetzt ausfüllen": "กรอกตอนนี้",

@@ -1,0 +1,17 @@
+sku;name_de;name_vi;name_en;storage_area;stock_unit;fresh;key_item;supplier;supplier_sku;order_unit;pack_size;price_chf;ean;department;group;quantity_unit
+PR-WEISSMEHL;Weissmehl;Bột mì trắng;White flour;Trockenlager;kg;nein;nein;Prodega;;Sack zu 10kg;1;0.00;;KÜCHE;FOOD;kg
+PR-00590111;Quality Sonnenblumenöl;Dầu hướng dương;Sunflower oil;Trockenlager;Karton;nein;nein;Prodega;00590111;Karton zu 20l;1;0.00;;KÜCHE;FOOD;Karton
+PR-56005330;Salz Jurasel mit Jod u. Fluor;Muối i-ốt có flo;Iodised salt with fluoride;Trockenlager;kg;nein;nein;Prodega;56005330;Pack zu 1 kg;1;0.00;;KÜCHE;FOOD;kg
+PR-09521010;Eier Import Bodenhaltung 53g+;Trứng gà;Eggs;Trockenlager;Karton;nein;nein;Prodega;09521010;Karton zu 90 Stück;1;0.00;;PRODUCTION;FOOD;Karton
+PR-11006000;Zucker Feinkristall;Đường cát trắng;Fine granulated sugar;Trockenlager;kg;nein;nein;Prodega;11006000;Pack zu 10 x 1 kg;1;0.00;;PRODUCTION;FOOD;kg
+PR-00040454;Blumenkohl (IFCO 64);Súp lơ trắng;Cauliflower;Kühlraum;kg;ja;nein;Prodega;00040454;kg;1;0.00;;KÜCHE;GEMÜSE;kg
+PR-00040673;Broccoli (IFCO 43);Bông cải xanh;Broccoli;Kühlraum;kg;ja;nein;Prodega;00040673;Karton zu 5 kg;1;0.00;;KÜCHE;GEMÜSE;kg
+PR-00042007;Gurke (bitte nur knackige);Dưa leo;Cucumber;Kühlraum;Stück;ja;nein;Prodega;00042007;Stk. (1 Box/12 Stück);1;0.00;;KÜCHE;GEMÜSE;Stück
+PR-00042707;Kopfsalat (IFCO 64);Xà lách;Lettuce;Kühlraum;Gitter;ja;nein;Prodega;00042707;Gitter zu 12 Stück;1;0.00;;KÜCHE;GEMÜSE;Gitter
+PR-04411790;Peperoni Tri-Color;Ớt chuông ba màu;Tri-colour bell peppers;Kühlraum;kg;ja;nein;Prodega;04411790;Karton zu 5 kg;1;0.00;;KÜCHE;GEMÜSE;kg
+PR-00045208;Tomaten Inland (IFCO 43);Cà chua;Tomatoes;Kühlraum;kg;ja;nein;Prodega;00045208;Grosskg;1;0.00;;KÜCHE;GEMÜSE;kg
+PR-00045708;Zucchetti (IFCO 43);Bí ngòi;Courgettes;Kühlraum;Karton;ja;nein;Prodega;00045708;Karton zu 5 kg;1;0.00;;KÜCHE;GEMÜSE;Karton
+PR-04590750;Zwiebeln gross;Hành tây;Onions;Kühlraum;Säcke;ja;nein;Prodega;04590750;Sack zu 10kg;1;0.00;;KÜCHE;GEMÜSE;Säcke
+PR-00887110;Frosch Abwaschmittel;Nước rửa chén;Dishwashing liquid;Trockenlager;Bidon;nein;nein;Prodega;00887110;Bidon zu 10l;1;0.00;;REINIGUNG;REINIGUNG;Bidon
+PR-00911840;Blattspinat Ditzler tiefgekühlt;Rau chân vịt đông lạnh;Frozen leaf spinach;Tiefkühler;Karton;nein;nein;Prodega;00911840;Karton zu 2 x 2,5 kg;1;0.00;;KÜCHE;TK PRODUKT;Karton
+PR-09188790;Bohnen Ditzler mittel-fein tiefgekühlt;Đậu que đông lạnh;Frozen green beans;Tiefkühler;Karton;nein;nein;Prodega;09188790;Karton zu 2 x 2,5 kg;1;0.00;;KÜCHE;TK PRODUKT;Karton

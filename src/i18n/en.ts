@@ -5,6 +5,14 @@
  */
 export const EN: Record<string, string> = {
   // --- Roster: planner-only plan, time picker, copy & paste ---
+  "Rückgängig": "Undo",
+  "Gelöscht": "Deleted",
+  "Kopieren & einfügen": "Copy & paste",
+  "Speichern (+{n} Tage)": "Save (+{n} days)",
+  "Auch an diesen Tagen": "Also on these days",
+  "Fertig ({n} eingefügt)": "Done ({n} pasted)",
+  "Gespeichert, auch an {n} weiteren Tagen.": "Saved, also on {n} more days.",
+  "Schliessen": "Close",
   "Bitte ergänzen Sie einmalig Ihre persönlichen Angaben. Wir brauchen sie für den Vertrag und die Lohnzahlung.": "Please fill in your personal details once. We need them for your contract and salary payment.",
   "← Start": "← Home",
   "Jetzt ausfüllen": "Fill in now",
@@ -211,6 +219,7 @@ export const EN: Record<string, string> = {
   'Interne Art.-Nr.:': 'Internal item no.:',
   'Name (DE)': 'Name (DE)',
   'Name (VI)': 'Name (VI)',
+  'Name (EN)': 'Name (EN)',
   Lagerort: 'Storage',
   Lagereinheit: 'Stock unit',
   Abteilung: 'Department',

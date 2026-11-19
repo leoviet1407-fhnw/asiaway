@@ -123,6 +123,7 @@ export interface ReceiptView {
     itemId: string;
     nameDe: string;
     nameVi: string | null;
+    nameEn: string | null;
     storageArea: string;
     isFresh: boolean;
     orderUnit: string;
@@ -196,6 +197,7 @@ export async function getReceiptView(db: AppDatabase, p: Principal, receiptId: s
         itemId: l.itemId,
         nameDe: l.nameDe,
         nameVi: l.nameVi,
+        nameEn: l.nameEn,
         storageArea: l.storageArea,
         isFresh: l.isFresh,
         orderUnit: l.orderUnit,

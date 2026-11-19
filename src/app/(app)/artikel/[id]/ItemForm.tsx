@@ -22,6 +22,7 @@ export function ItemForm({ item }: { item: CatalogItem }) {
       <section className="card grid gap-3 sm:grid-cols-2">
         <Field label={t('Name (DE)')} name="nameDe" defaultValue={item.nameDe} required />
         <Field label={t('Name (VI)')} name="nameVi" defaultValue={item.nameVi ?? ''} />
+        <Field label={t('Name (EN)')} name="nameEn" defaultValue={item.nameEn ?? ''} />
         <div>
           <label className="label">{t('Lagerort')}</label>
           <select name="storageArea" defaultValue={item.storageArea} className="w-full">

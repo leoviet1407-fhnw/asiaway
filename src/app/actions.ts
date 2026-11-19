@@ -267,6 +267,7 @@ export async function updateItemAction(_prev: { error?: string; saved?: boolean 
     await updateItem(await db(), p, id, {
       nameDe: String(form.get('nameDe') ?? ''),
       nameVi: String(form.get('nameVi') ?? '') || null,
+      nameEn: String(form.get('nameEn') ?? '') || null,
       storageArea: AREAS.includes(area) ? area : 'DRY',
       stockUnit: String(form.get('stockUnit') ?? ''),
       isFresh: form.get('isFresh') === 'on',

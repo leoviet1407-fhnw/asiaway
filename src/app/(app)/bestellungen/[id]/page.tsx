@@ -79,6 +79,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               id: i.id,
               nameDe: i.nameDe,
               nameVi: i.nameVi,
+              nameEn: i.nameEn,
               sku: offer.supplierSku ?? i.sku,
               area: t(STORAGE_AREA_LABEL[i.storageArea]),
               areaKey: i.storageArea,

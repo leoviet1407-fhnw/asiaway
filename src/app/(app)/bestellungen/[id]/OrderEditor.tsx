@@ -1,5 +1,6 @@
 'use client';
 
+import { ItemSubtitle } from '@/components/ItemSubtitle';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { belowMinimum } from '@/domain/order';
@@ -12,6 +13,7 @@ export interface EditorItem {
   id: string;
   nameDe: string;
   nameVi: string | null;
+  nameEn: string | null;
   sku: string;
   area: string;
   areaKey: string;
@@ -84,7 +86,7 @@ export function OrderEditor(props: { orderId: string; items: EditorItem[]; deliv
     const visible = props.items.filter(
       (i) =>
         (!onlyOrdered || (qty[i.id] ?? 0) > 0) &&
-        (!q || i.nameDe.toLowerCase().includes(q) || (i.nameVi ?? '').toLowerCase().includes(q) || i.sku.toLowerCase().includes(q)),
+        (!q || i.nameDe.toLowerCase().includes(q) || (i.nameVi ?? '').toLowerCase().includes(q) || (i.nameEn ?? '').toLowerCase().includes(q) || i.sku.toLowerCase().includes(q)),
     );
     return AREA_ORDER.map((area) => ({ area, items: visible.filter((i) => i.areaKey === area) })).filter((g) => g.items.length > 0);
   }, [props.items, query, onlyOrdered, qty]);
@@ -182,7 +184,7 @@ function ItemRow({ item, qty, onChange }: { item: EditorItem; qty: number; onCha
           {item.isKeyItem && <span className="chip ml-1 bg-navy-50 text-[10px] text-navy">{t('Key')}</span>}
           {item.isFresh && <span className="chip ml-1 bg-ok-50 text-[10px] text-ok-500">{t('frisch')}</span>}
         </div>
-        {item.nameVi && <div className="text-xs text-charcoal-muted">{item.nameVi}</div>}
+        <ItemSubtitle vi={item.nameVi} en={item.nameEn} />
         <div className="text-xs text-charcoal-muted">
           {item.orderUnit} · {formatChf(item.priceCents)}
         </div>

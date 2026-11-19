@@ -100,6 +100,7 @@ export const items = pgTable('items', {
   sku: text('sku').notNull(),
   nameDe: text('name_de').notNull(),
   nameVi: text('name_vi'),
+  nameEn: text('name_en'),
   storageArea: storageArea('storage_area').notNull().default('DRY'),
   stockUnit: text('stock_unit').notNull().default('Stk'),
   isFresh: boolean('is_fresh').notNull().default(false),

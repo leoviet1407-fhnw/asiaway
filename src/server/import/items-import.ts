@@ -11,7 +11,7 @@ import { itemBarcodes, items, supplierItems, suppliers } from '../db/schema';
  * One CSV row per supplier item:
  *   sku, name_de, name_vi, storage_area, stock_unit, fresh, key_item,
  *   supplier, supplier_sku, order_unit, pack_size, price_chf, ean
- * Optional: department (Abteilung), group (Gruppe), quantity_unit (Menge in: kg, Karton, Stück)
+ * Optional: name_en, department (Abteilung), group (Gruppe), quantity_unit (Menge in: kg, Karton, Stück)
  * `ean` may hold several codes separated by "|"; a code may carry its units
  * per scan after a colon ("7610000000001:0.0833" for one bottle of a 12-case).
  * Separators "," and ";" are both accepted (Excel in Switzerland writes ";").
@@ -25,6 +25,7 @@ export interface ImportRow {
   sku: string;
   nameDe: string;
   nameVi: string | null;
+  nameEn: string | null;
   storageArea: 'COLD' | 'FREEZER' | 'DRY' | 'BAR';
   stockUnit: string;
   isFresh: boolean;
@@ -91,6 +92,7 @@ export function parseItemsCsv(text: string): ParseResult {
       sku,
       nameDe: r.name_de!,
       nameVi: r.name_vi || null,
+      nameEn: r.name_en || null,
       storageArea: area!,
       stockUnit: r.stock_unit || 'Stk',
       isFresh: yes(r.fresh),
@@ -143,7 +145,7 @@ export async function applyItemsImport(db: AppDatabase, rows: ImportRow[], { dry
       supplierIds.set(name, s!.id);
     }
     for (const row of rows) {
-      const values = { nameDe: row.nameDe, nameVi: row.nameVi, storageArea: row.storageArea, stockUnit: row.stockUnit, isFresh: row.isFresh, isKeyItem: row.isKeyItem, department: row.department, itemGroup: row.group, active: true };
+      const values = { nameDe: row.nameDe, nameVi: row.nameVi, nameEn: row.nameEn, storageArea: row.storageArea, stockUnit: row.stockUnit, isFresh: row.isFresh, isKeyItem: row.isKeyItem, department: row.department, itemGroup: row.group, active: true };
       let itemId = itemIds.get(row.sku);
       if (itemId) await tx.update(items).set(values).where(eq(items.id, itemId));
       else {

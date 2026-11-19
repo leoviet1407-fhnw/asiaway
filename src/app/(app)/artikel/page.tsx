@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ItemSubtitle } from '@/components/ItemSubtitle';
 import { formatChf } from '@/domain/qty';
 import { isAdmin } from '@/domain/roles';
 import { requirePrincipal } from '@/server/auth/current';
@@ -18,7 +19,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const all = await listItems(await db(), { includeInactive: isAdmin(p) });
   const query = q.trim().toLowerCase();
   const items = query
-    ? all.filter((i) => [i.nameDe, i.nameVi ?? '', i.sku, ...i.barcodes.map((b) => b.code)].some((s) => s.toLowerCase().includes(query)))
+    ? all.filter((i) => [i.nameDe, i.nameVi ?? '', i.nameEn ?? '', i.sku, ...i.barcodes.map((b) => b.code)].some((s) => s.toLowerCase().includes(query)))
     : all;
 
   return (
@@ -46,7 +47,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                         {i.isKeyItem && <span className="chip ml-1 bg-navy-50 text-[10px] text-navy">{t('Key')}</span>}
                         {i.isFresh && <span className="chip ml-1 bg-ok-50 text-[10px] text-ok-500">{t('frisch')}</span>}
                       </div>
-                      {i.nameVi && <div className="text-xs text-charcoal-muted">{i.nameVi}</div>}
+                      <ItemSubtitle vi={i.nameVi} en={i.nameEn} />
                       <div className="text-xs text-charcoal-muted">
                         {i.sku} · {i.barcodes.length > 0 ? i.barcodes.map((b) => b.code).join(', ') : t('kein Barcode')}
                       </div>

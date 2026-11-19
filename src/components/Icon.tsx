@@ -1,4 +1,4 @@
-export type IconName = 'home' | 'cart' | 'scan' | 'box' | 'truck' | 'camera' | 'check' | 'plus' | 'minus' | 'alert' | 'file' | 'cash' | 'calendar' | 'more' | 'clock' | 'users' | 'swap' | 'sun' | 'receipt' | 'chart' | 'ticket' | 'eye' | 'eye-off';
+export type IconName = 'home' | 'cart' | 'scan' | 'box' | 'truck' | 'camera' | 'check' | 'plus' | 'minus' | 'alert' | 'file' | 'cash' | 'calendar' | 'more' | 'clock' | 'users' | 'swap' | 'sun' | 'receipt' | 'chart' | 'ticket' | 'eye' | 'eye-off' | 'copy' | 'trash' | 'undo';
 
 const PATHS: Record<IconName, string> = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -8,6 +8,9 @@ const PATHS: Record<IconName, string> = {
   truck: 'M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm10 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
   camera: 'M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   check: 'M5 13l4 4L19 7',
+  copy: 'M9 9h10v12H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  undo: 'M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3',
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
   alert: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
