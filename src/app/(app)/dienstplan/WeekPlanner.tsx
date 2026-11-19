@@ -20,6 +20,7 @@ import {
 } from '@/domain/roster';
 import { deleteShiftAction, publishMonthAction, saveShiftAction, suggestMonthAction, suggestWeekAction, weekStepAction } from '../../actions';
 import { useT } from '@/i18n/client';
+import { TimeField, normalizeTime } from '@/components/TimeField';
 
 interface Props {
   site: string;
@@ -44,6 +45,15 @@ interface Editing {
   roleLabel: string;
 }
 
+/** A copied shift: pasted with one tap into other cells. */
+type Clip = Pick<Editing, 'start' | 'end' | 'breakMin' | 'station' | 'roleLabel'>;
+
+const toMin = (v: string) => {
+  const m = /^(\d{2}):(\d{2})$/.exec(v);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+const BREAKS = [0, 15, 30, 45, 60, 90];
+
 const dm = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.`;
 
 /** The week: a row per person, a column per day. The planner clicks a cell to add or change a shift. */
@@ -56,6 +66,8 @@ export function WeekPlanner(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [clip, setClip] = useState<Clip | null>(null);
+  const [pasted, setPasted] = useState<string | null>(null);
 
   const colorOf = (station: string) => stations.find((s) => s.name === station);
   const absenceOn = (userId: string, date: string) => props.absences.find((a) => a.userId === userId && a.startDate <= date && date <= a.endDate);
@@ -79,9 +91,32 @@ export function WeekPlanner(props: Props) {
   const save = () => {
     if (!editing) return;
     run(
-      () => saveShiftAction({ id: editing.id, site: props.site, date: editing.date, userId: editing.userId, start: editing.start, end: editing.end, breakMin: Number(editing.breakMin) || 0, station: editing.station, roleLabel: editing.roleLabel }),
+      () => saveShiftAction({ id: editing.id, site: props.site, date: editing.date, userId: editing.userId, start: normalizeTime(editing.start), end: normalizeTime(editing.end), breakMin: Number(editing.breakMin) || 0, station: editing.station, roleLabel: editing.roleLabel }),
       () => setEditing(null),
     );
+  };
+
+  const copy = () => {
+    if (!editing) return;
+    setClip({ start: normalizeTime(editing.start), end: normalizeTime(editing.end), breakMin: editing.breakMin, station: editing.station, roleLabel: editing.roleLabel });
+    setEditing(null);
+    setNotice(null);
+    setPasted(null);
+  };
+
+  /** In paste mode a tap on a cell adds the copied shift there at once. */
+  const paste = (userId: string | null, date: string) => {
+    if (!clip) return;
+    const who = userId ? props.people.find((p) => p.userId === userId)?.name : t('Offen');
+    run(
+      () => saveShiftAction({ site: props.site, date, userId, start: clip.start, end: clip.end, breakMin: Number(clip.breakMin) || 0, station: clip.station, roleLabel: clip.roleLabel }),
+      () => setPasted(t('Eingefügt: {who}, {day}', { who: who ?? '', day: `${weekdayShort(date, t.lang)} ${dm(date)}` })),
+    );
+  };
+  const cellClick = (userId: string | null, date: string) => {
+    if (!props.editable) return;
+    if (clip) paste(userId, date);
+    else setEditing(blank(userId, date));
   };
 
   const byDay = useMemo(() => {
@@ -103,7 +138,8 @@ export function WeekPlanner(props: Props) {
         disabled={!props.editable}
         onClick={(e) => {
           e.stopPropagation();
-          setEditing(edit(s));
+          if (clip) paste(s.userId, s.date);
+          else setEditing(edit(s));
         }}
         className="block w-full rounded px-1 py-0.5 text-left text-[11px] font-semibold leading-tight"
         style={{ background: st?.color ?? '#e3e1df', color: st?.textColor ?? '#09141d' }}
@@ -183,6 +219,13 @@ export function WeekPlanner(props: Props) {
           )}
         </div>
       )}
+      {clip && props.editable && (
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-btn bg-navy p-3 text-white">
+          <span className="font-semibold">{t('Einfügen')}: {clip.start}–{clip.end} · {clip.roleLabel || clip.station}</span>
+          <span className="text-sm text-white/80">{pending ? '…' : pasted ? `✓ ${pasted}` : t('Tippen Sie auf ein Feld, um die Schicht dort einzufügen.')}</span>
+          <button className="btn-secondary ml-auto min-h-0 px-3 py-1.5 text-sm" onClick={() => { setClip(null); setPasted(null); }}>{t('Fertig')}</button>
+        </div>
+      )}
       {error && <p role="alert" className="rounded-btn bg-danger-50 p-3 text-danger-500">{error}</p>}
       {notice && <p className="rounded-btn bg-ok-50 p-3 text-ok-500">{notice}</p>}
 
@@ -217,8 +260,8 @@ export function WeekPlanner(props: Props) {
                     return (
                       <td
                         key={d}
-                        onClick={() => props.editable && setEditing(blank(person.userId, d))}
-                        className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? 'cursor-pointer hover:bg-brand-50/40' : ''} ${absence ? 'bg-surface-line/70' : ''}`}
+                        onClick={() => cellClick(person.userId, d)}
+                        className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? (clip ? 'cursor-copy hover:bg-ok-50' : 'cursor-pointer hover:bg-brand-50/40') : ''} ${absence ? 'bg-surface-line/70' : ''}`}
                       >
                         <div className="min-h-[34px] space-y-0.5">
                           {absence && <div className="rounded bg-navy/80 px-1 text-[10px] font-semibold text-white">{absence.type === 'VACATION' ? t('Ferien') : absence.type === 'SICK' ? t('Krank') : t('Abwesend')}</div>}
@@ -245,7 +288,7 @@ export function WeekPlanner(props: Props) {
                   <div className="text-[11px]">{t('ohne Person')}</div>
                 </td>
                 {dates.map((d) => (
-                  <td key={d} onClick={() => props.editable && setEditing(blank(null, d))} className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? 'cursor-pointer hover:bg-brand-50/40' : ''}`}>
+                  <td key={d} onClick={() => cellClick(null, d)} className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? (clip ? 'cursor-copy hover:bg-ok-50' : 'cursor-pointer hover:bg-brand-50/40') : ''}`}>
                     <div className="min-h-[34px] space-y-0.5">{(byDay.get(`open|${d}`) ?? []).map(chip)}</div>
                   </td>
                 ))}
@@ -285,20 +328,25 @@ export function WeekPlanner(props: Props) {
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="label" htmlFor="start">{t('Beginn')}</label>
-              <input id="start" inputMode="numeric" className="w-full" value={editing.start} onChange={(e) => setEditing({ ...editing, start: e.target.value })} />
-            </div>
-            <div>
-              <label className="label" htmlFor="end">{t('Ende')}</label>
-              <input id="end" inputMode="numeric" className="w-full" value={editing.end} onChange={(e) => setEditing({ ...editing, end: e.target.value })} />
-            </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <TimeField id="start" label={t('Beginn')} value={editing.start} onChange={(v) => setEditing({ ...editing, start: v })} />
+            <TimeField id="end" label={t('Ende')} value={editing.end} onChange={(v) => setEditing({ ...editing, end: v })} />
             <div>
               <label className="label" htmlFor="brk">{t('Pause (Min.)')}</label>
-              <input id="brk" inputMode="numeric" className="w-full" value={editing.breakMin} onChange={(e) => setEditing({ ...editing, breakMin: e.target.value })} />
+              <select id="brk" className="w-full" value={editing.breakMin} onChange={(e) => setEditing({ ...editing, breakMin: e.target.value })}>
+                {(BREAKS.includes(Number(editing.breakMin)) ? BREAKS : [...BREAKS, Number(editing.breakMin) || 0].sort((a, b) => a - b)).map((b) => (
+                  <option key={b} value={String(b)}>{b === 0 ? t('keine') : `${b} min`}</option>
+                ))}
+              </select>
             </div>
           </div>
+          {(() => {
+            const s = toMin(normalizeTime(editing.start));
+            const e = toMin(normalizeTime(editing.end));
+            if (s === null || e === null) return null;
+            const net = (e > s ? e - s : e + 1440 - s) - (Number(editing.breakMin) || 0);
+            return <p className="text-sm text-charcoal-muted">{t('Arbeitszeit')}: <strong className="text-navy">{formatHours(net)}</strong></p>;
+          })()}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor="station">{t('Station')}</label>
@@ -315,6 +363,7 @@ export function WeekPlanner(props: Props) {
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="btn-primary" disabled={pending} onClick={save}>{t('Speichern')}</button>
+            <button className="btn-secondary" disabled={pending} onClick={copy} title={t('Diese Zeiten kopieren und in andere Felder einfügen')}>{t('Kopieren')}</button>
             <button className="btn-secondary" onClick={() => setEditing(null)}>{t('Abbrechen')}</button>
             {editing.id && (
               <button className="btn-danger ml-auto" disabled={pending} onClick={() => run(() => deleteShiftAction(editing.id!), () => setEditing(null))}>

@@ -128,7 +128,7 @@ describe('roster rules', () => {
     const by = (code: string) => v.filter((x) => x.code === code);
     expect(by('OUTSIDE_OFFER')[0]!.severity).toBe('error');
     expect(by('UNAVAILABLE').map((x) => [x.userId, x.severity]).sort()).toEqual([['aus', 'error'], ['fix', 'warn']]);
-    expect(by('NO_OFFER')[0]!.severity).toBe('warn'); // casual staff without a report: a note, the Leitung confirms by phone
+    expect(by('NO_OFFER')).toEqual([]); // casual staff no longer report times: no note for a day without an entry
     expect(by('ABSENCE')[0]!.severity).toBe('error');
   });
 

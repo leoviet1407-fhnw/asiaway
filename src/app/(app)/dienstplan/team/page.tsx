@@ -17,7 +17,7 @@ export async function generateMetadata() {
   return { title: t('Team & Meldungen') };
 }
 
-const monthName = (m: string, lang: 'de' | 'en') => monthLabel(m, lang);
+const monthName = (m: string, lang: import('@/i18n/translate').Lang) => monthLabel(m, lang);
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ site?: string; monat?: string }> }) {
   const t = await getT();

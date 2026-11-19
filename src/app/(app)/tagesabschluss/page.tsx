@@ -3,6 +3,7 @@ import { DIFFERENCE_LABEL, differenceTone, type DifferenceTone } from '@/domain/
 import { formatChf } from '@/domain/qty';
 import { isOrderer, locationsFor } from '@/domain/roles';
 import { formatDay, todayIso } from '@/lib/dates';
+import { LOCALE } from '@/i18n/translate';
 import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
@@ -34,7 +35,7 @@ export default async function ClosingsPage({ searchParams }: { searchParams: Pro
   const list = await listClosings(database, p, { month, ...(locationId ? { locationId } : {}) });
   const sum = sumClosings(list);
   const href = (m: string, ort?: string) => `/tagesabschluss?monat=${m}${ort ? `&ort=${ort}` : ''}`;
-  const monthLabel = new Intl.DateTimeFormat('de-CH', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${month}-01T00:00:00Z`));
+  const monthLabel = new Intl.DateTimeFormat(LOCALE[t.lang], { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${month}-01T00:00:00Z`));
 
   return (
     <div className="space-y-4">

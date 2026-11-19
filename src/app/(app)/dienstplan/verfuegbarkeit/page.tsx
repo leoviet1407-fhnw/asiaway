@@ -16,10 +16,10 @@ import { getT } from '@/i18n/server';
 
 export async function generateMetadata() {
   const t = await getT();
-  return { title: t('Verfügbarkeit & Ferien') };
+  return { title: t('Ferien') };
 }
 
-const monthName = (m: string, lang: 'de' | 'en') => monthLabel(m, lang);
+const monthName = (m: string, lang: import('@/i18n/translate').Lang) => monthLabel(m, lang);
 
 export default async function AvailabilityPage({ searchParams }: { searchParams: Promise<{ monat?: string; person?: string }> }) {
   const t = await getT();
@@ -39,7 +39,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   if (!profile) {
     return (
       <div className="mx-auto max-w-md space-y-3">
-        <h1 className="text-2xl">{t('Verfügbarkeit & Ferien')}</h1>
+        <h1 className="text-2xl">{t('Ferien')}</h1>
         <p className="card">{t('Sie sind noch keinem Team zugeordnet. Bitte bei der Leitung melden.')}</p>
       </div>
     );
@@ -63,7 +63,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
     <div className="mx-auto max-w-2xl space-y-5 pb-8">
       <div>
         <Link href="/dienstplan" className="text-sm text-charcoal-muted hover:text-navy">{t('← Dienstplan')}</Link>
-        <h1 className="mt-1 text-2xl">{t('Verfügbarkeit & Ferien')}</h1>
+        <h1 className="mt-1 text-2xl">{t('Ferien')}</h1>
         {!own && <p className="text-charcoal-muted">{t('für')} {person?.name}</p>}
       </div>
 

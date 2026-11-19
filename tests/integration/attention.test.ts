@@ -44,7 +44,7 @@ describe('what the Leitung still has to do', () => {
     const todos = await getPlannerTodos(db, planner, now);
     const by = (key: string) => todos.filter((x) => x.key === key);
     expect(by('HOLIDAY')[0]).toMatchObject({ count: 1 });
-    expect(by('REPORTS').some((x) => x.detail.includes('Aushilfe Muster'))).toBe(true); // the casual person has not reported
+    expect(by('REPORTS')).toEqual([]); // nobody reports times any more: the Leitung plans, staff only request holidays
     expect(by('UNPLANNED')[0]!.count).toBe(4); // four weeks ahead, nothing planned yet
     await saveShift(db, planner, { site: 'winterthur', date: '2026-11-17', userId: staff.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
     const after = await getPlannerTodos(db, planner, now);

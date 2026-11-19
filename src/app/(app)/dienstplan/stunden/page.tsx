@@ -16,7 +16,7 @@ export async function generateMetadata() {
   return { title: t('Meine Stunden') };
 }
 
-const monthName = (m: string, lang: 'de' | 'en') => monthLabel(m, lang);
+const monthName = (m: string, lang: import('@/i18n/translate').Lang) => monthLabel(m, lang);
 
 export default async function HoursPage({ searchParams }: { searchParams: Promise<{ monat?: string; person?: string }> }) {
   const t = await getT();

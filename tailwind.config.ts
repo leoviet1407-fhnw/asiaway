@@ -19,7 +19,7 @@ export default {
         info: { 500: '#1d4f7a', 50: '#eaf2f9' },
       },
       fontFamily: {
-        sans: ['var(--font-plex-sans)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-plex-sans)', 'var(--font-plex-thai)', 'system-ui', 'sans-serif'],
       },
       borderRadius: { btn: '10px' },
       minHeight: { tap: '48px' },

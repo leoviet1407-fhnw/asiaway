@@ -97,7 +97,8 @@ describe('season: pattern, special days, vacation limits, suggestion', () => {
     await saveProfile(db, planner, casual.userId, { site: 'winterthur', employmentType: 'ON_CALL', pensumPercent: null, active: true });
     const week = '2027-03-01';
     await saveShift(db, planner, { site: 'winterthur', date: '2027-03-02', userId: casual.userId, startMin: t('17:30'), endMin: t('22:00'), breakMin: 0, station: 'EG Thai', roleLabel: null }, now);
-    expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'NO_OFFER' && v.userId === casual.userId)).toBe(true);
+    // nobody reports times any more: no note for the casual person either way
+    expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'NO_OFFER' && v.userId === casual.userId)).toBe(false);
     const pat = (await getPattern(db, casual, casual.userId)).map((d) => (d.weekday === 2 ? { ...d, kind: 'AVAILABLE' as const, fromMin: null, toMin: null } : d));
     await savePattern(db, casual, casual.userId, pat);
     expect((await getWeekView(db, planner, 'winterthur', week)).violations.some((v) => v.code === 'NO_OFFER' && v.userId === casual.userId)).toBe(false);

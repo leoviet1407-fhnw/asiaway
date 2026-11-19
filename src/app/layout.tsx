@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { IBM_Plex_Sans } from 'next/font/google';
+import { IBM_Plex_Sans, IBM_Plex_Sans_Thai } from 'next/font/google';
 import { ServiceWorker } from '@/components/ServiceWorker';
 import { LangProvider } from '@/i18n/client';
 import { getLang } from '@/i18n/server';
@@ -10,6 +10,14 @@ const plex = IBM_Plex_Sans({
   subsets: ['latin', 'latin-ext', 'vietnamese'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-plex-sans',
+  display: 'swap',
+});
+
+// Thai letters come from the matching Plex Thai font (Plex Sans itself has no Thai)
+const plexThai = IBM_Plex_Sans_Thai({
+  subsets: ['thai'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plex-thai',
   display: 'swap',
 });
 
@@ -32,7 +40,7 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const lang = await getLang();
   return (
-    <html lang={lang} className={plex.variable}>
+    <html lang={lang} className={`${plex.variable} ${plexThai.variable}`}>
       <body className="min-h-screen">
         <LangProvider lang={lang}>
           {children}

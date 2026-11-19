@@ -10,7 +10,7 @@ import { parseTime } from '@/domain/roster';
 import { DINNER_WINDOW, LUNCH_WINDOW } from '@/domain/availability';
 import { messageFor } from '@/lib/messages';
 import { getT } from '@/i18n/server';
-import { LANG_COOKIE } from '@/i18n/translate';
+import { LANG_COOKIE, normalizeLang, type Lang } from '@/i18n/translate';
 import { requirePrincipal } from '@/server/auth/current';
 import { SESSION_COOKIE, SESSION_DAYS, changePassword, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
@@ -25,6 +25,8 @@ import {
   saveEntry,
   saveYearlyBalance,
 } from '@/server/services/hours-service';
+import { saveMyOnboarding } from '@/server/services/onboarding-service';
+import { type OnboardingErrors, type OnboardingInput } from '@/domain/onboarding';
 import { deriveNeedsFromWeek, saveNeeds } from '@/server/services/coverage-service';
 import { applyPattern, fillMissingFromPatterns, savePattern, saveSiteDays } from '@/server/services/pattern-service';
 import { deleteSpecialDay, deleteVacationRule, saveSpecialDay, saveVacationRule } from '@/server/services/season-service';
@@ -556,6 +558,30 @@ export async function changePasswordAction(_prev: { error?: string; saved?: bool
   }
 }
 
+// --- Personal details (onboarding) ----------------------------------------------------------
+
+export type OnboardingState = { errors?: OnboardingErrors; values?: OnboardingInput; error?: string; saved?: boolean };
+
+const ONBOARDING_FIELDS = ['privateEmail', 'mobile', 'birthDate', 'street', 'zip', 'city', 'nationality', 'iban', 'ahvNumber', 'emergencyName', 'emergencyPhone'] as const;
+
+export async function saveOnboardingAction(_prev: OnboardingState | undefined, form: FormData): Promise<OnboardingState> {
+  try {
+    const p = await requirePrincipal();
+    const values = Object.fromEntries(ONBOARDING_FIELDS.map((k) => [k, String(form.get(k) ?? '')])) as unknown as OnboardingInput;
+    const errors = await saveMyOnboarding(await db(), p, values);
+    if (errors) {
+      const t = await getT();
+      return { values, errors: Object.fromEntries(Object.entries(errors).map(([k, v]) => [k, t(v)])) };
+    }
+    revalidatePath('/', 'layout');
+    if (form.get('first') === '1') redirect('/');
+    return { values, saved: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: (await fail(error)).error };
+  }
+}
+
 // --- Hours, overtime, vacation balance ------------------------------------------------------
 
 type TimesInput = { start: string; end: string; breakMin: number; note: string };
@@ -645,8 +671,8 @@ export async function saveBalanceAction(_prev: { error?: string; saved?: boolean
   }
 }
 
-export async function setLanguageAction(lang: 'de' | 'en'): Promise<void> {
-  (await cookies()).set(LANG_COOKIE, lang === 'en' ? 'en' : 'de', { path: '/', maxAge: 365 * 24 * 3600, sameSite: 'lax' });
+export async function setLanguageAction(lang: Lang): Promise<void> {
+  (await cookies()).set(LANG_COOKIE, normalizeLang(lang), { path: '/', maxAge: 365 * 24 * 3600, sameSite: 'lax' });
   revalidatePath('/', 'layout');
 }
 

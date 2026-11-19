@@ -7,6 +7,7 @@ import { formatTime, weekdayShort, type Shift } from '@/domain/roster';
 import { formatWorked } from '@/domain/hours';
 import { correctShiftAction, deleteEntryAction, monthStepAction, requestChangeAction, saveEntryAction } from '../../../actions';
 import { useT } from '@/i18n/client';
+import { TimeField } from '@/components/TimeField';
 
 interface Entry {
   id: string;
@@ -30,7 +31,7 @@ interface Props {
   isSelf: boolean;
 }
 
-const dm = (iso: string, lang: 'de' | 'en') => `${weekdayShort(iso, lang)} ${iso.slice(8)}.${iso.slice(5, 7)}.`;
+const dm = (iso: string, lang: import('@/i18n/translate').Lang) => `${weekdayShort(iso, lang)} ${iso.slice(8)}.${iso.slice(5, 7)}.`;
 
 /** Confirm the planned shifts, correct them, and add extra hours. */
 export function HoursEditor(props: Props) {
@@ -110,12 +111,12 @@ export function HoursEditor(props: Props) {
                     )}
                   </div>
                   {editing === s.id && (
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      <div><label className="label" htmlFor={`s-${s.id}`}>{t('Beginn')}</label><input id={`s-${s.id}`} inputMode="numeric" className="w-full" value={form.start} onChange={(ev) => setForm({ ...form, start: ev.target.value })} /></div>
-                      <div><label className="label" htmlFor={`e-${s.id}`}>{t('Ende')}</label><input id={`e-${s.id}`} inputMode="numeric" className="w-full" value={form.end} onChange={(ev) => setForm({ ...form, end: ev.target.value })} /></div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <TimeField id={`s-${s.id}`} label={t('Beginn')} value={form.start} onChange={(v) => setForm({ ...form, start: v })} />
+                      <TimeField id={`e-${s.id}`} label={t('Ende')} value={form.end} onChange={(v) => setForm({ ...form, end: v })} />
                       <div><label className="label" htmlFor={`b-${s.id}`}>{t('Pause (Min.)')}</label><input id={`b-${s.id}`} inputMode="numeric" className="w-full" value={form.breakMin} onChange={(ev) => setForm({ ...form, breakMin: ev.target.value })} /></div>
-                      <div className="col-span-3"><input aria-label={t('Notiz')} className="w-full" placeholder={props.isPlanner ? t('Notiz (z. B. Gäste blieben länger)') : t('Grund (z. B. Gäste blieben länger)')} value={form.note} onChange={(ev) => setForm({ ...form, note: ev.target.value })} /></div>
-                      <div className="col-span-3 flex gap-2">
+                      <div className="sm:col-span-3"><input aria-label={t('Notiz')} className="w-full" placeholder={props.isPlanner ? t('Notiz (z. B. Gäste blieben länger)') : t('Grund (z. B. Gäste blieben länger)')} value={form.note} onChange={(ev) => setForm({ ...form, note: ev.target.value })} /></div>
+                      <div className="flex gap-2 sm:col-span-3">
                         <button className="btn-primary" disabled={pending} onClick={() => run(() => (props.isPlanner ? correctShiftAction(s.id, { start: form.start, end: form.end, breakMin: Number(form.breakMin), note: form.note }) : requestChangeAction({ kind: 'WORKED_TIME', shiftId: s.id, start: form.start, end: form.end, breakMin: Number(form.breakMin), reason: form.note })), () => { setEditing(null); if (!props.isPlanner) setNotice(t('Angefragt. Die Leitung entscheidet.')); })}>{props.isPlanner ? t('Speichern') : t('Änderung anfragen')}</button>
                         <button className="btn-secondary" onClick={() => setEditing(null)}>{t('Abbrechen')}</button>
                         {e && props.isPlanner && <button className="btn-danger ml-auto" disabled={pending} onClick={() => run(() => deleteEntryAction(e.id), () => setEditing(null))}>{t('Eintrag löschen')}</button>}
@@ -151,8 +152,8 @@ export function HoursEditor(props: Props) {
         {!locked && (
           <div className="card grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className="col-span-2 sm:col-span-1"><label className="label" htmlFor="x-date">{t('Tag')}</label><input id="x-date" type="date" className="w-full" value={extra.date} max={props.today} min={`${props.month}-01`} onChange={(ev) => setExtra({ ...extra, date: ev.target.value })} /></div>
-            <div><label className="label" htmlFor="x-start">{t('Beginn')}</label><input id="x-start" inputMode="numeric" className="w-full" placeholder="08:00" value={extra.start} onChange={(ev) => setExtra({ ...extra, start: ev.target.value })} /></div>
-            <div><label className="label" htmlFor="x-end">{t('Ende')}</label><input id="x-end" inputMode="numeric" className="w-full" placeholder="11:00" value={extra.end} onChange={(ev) => setExtra({ ...extra, end: ev.target.value })} /></div>
+            <div className="col-span-2 sm:col-span-1"><TimeField id="x-start" label={t('Beginn')} value={extra.start} onChange={(v) => setExtra({ ...extra, start: v })} /></div>
+            <div className="col-span-2 sm:col-span-1"><TimeField id="x-end" label={t('Ende')} value={extra.end} onChange={(v) => setExtra({ ...extra, end: v })} /></div>
             <div><label className="label" htmlFor="x-break">{t('Pause (Min.)')}</label><input id="x-break" inputMode="numeric" className="w-full" value={extra.breakMin} onChange={(ev) => setExtra({ ...extra, breakMin: ev.target.value })} /></div>
             <div className="col-span-2 sm:col-span-5"><input aria-label={t('Notiz')} className="w-full" placeholder={props.isPlanner ? t('Wofür? (z. B. Inventur, Event)') : t('Grund (Pflicht, z. B. Inventur, Event)')} value={extra.note} onChange={(ev) => setExtra({ ...extra, note: ev.target.value })} /></div>
             <div className="col-span-2 sm:col-span-5">

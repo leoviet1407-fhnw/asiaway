@@ -1,3 +1,5 @@
+import { WEEKDAY_SHORT, type Lang } from '../i18n/translate';
+
 /**
  * Dienstplan (staff roster) rules. Pure functions, no database.
  *
@@ -72,7 +74,12 @@ export const weekdayNo = (iso: string): number => ((new Date(`${iso}T00:00:00Z`)
  */
 export const worksAtSiteOn = (allowed: readonly number[] | undefined, date: string): boolean => !allowed || allowed.length === 0 || allowed.includes(weekdayNo(date));
 
-export const mustReportTimes = (type: EmploymentType): boolean => type === 'ON_CALL';
+/**
+ * Whether a person has to report the times they can work. Since 19 Nov 2026 nobody does:
+ * the Leitung (Belle, Xuan) makes the whole plan, staff only request holidays and changes.
+ * The planner can still enter a standard week for casual staff on their page.
+ */
+export const mustReportTimes = (_type: EmploymentType): boolean => false;
 export const worksByPlan = (p: { employmentType: EmploymentType; pensumPercent: number | null }): boolean => (p.employmentType === 'FULL_TIME' || p.employmentType === 'PART_TIME') && p.pensumPercent !== null;
 
 export const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
@@ -373,9 +380,11 @@ export function validateRoster(input: RosterInput): Violation[] {
       }
       const av = input.availability.find((a) => a.userId === person.userId && a.date === date);
       const list = byDate.get(date)!;
+      // Casual staff no longer report times (the Leitung plans), so a day without an entry is fine;
+      // only what the planner entered for them (standard week, a day off) is checked.
       if (person.employmentType === 'ON_CALL') {
         if (!av) {
-          out.push({ severity: 'warn', code: 'NO_OFFER', userId: person.userId, date, message: `${person.name} (Aushilfe), ${dm(date)}: noch nicht bestätigt (keine Verfügbarkeit gemeldet).` });
+          // nothing entered: no check
         } else if (av.kind === 'UNAVAILABLE') {
           out.push({ severity: 'error', code: 'UNAVAILABLE', userId: person.userId, date, message: `${person.name} (Aushilfe), ${dm(date)}: hat sich als nicht verfügbar gemeldet.` });
         } else if (av.fromMin !== null && av.toMin !== null && list.some((s) => s.startMin < av.fromMin! || s.endMin > av.toMin!)) {
@@ -439,9 +448,8 @@ export function shiftMonth(month: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 7);
 }
 
-export function weekdayShort(iso: string, lang: 'de' | 'en' = 'de'): string {
-  const names = lang === 'en' ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-  return names[new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
+export function weekdayShort(iso: string, lang: Lang = 'de'): string {
+  return WEEKDAY_SHORT[lang][new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
 }
 
 export type AbsenceStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED';

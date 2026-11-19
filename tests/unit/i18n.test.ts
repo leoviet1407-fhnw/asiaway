@@ -1,5 +1,8 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { EN } from '@/i18n/en';
+import { TH } from '@/i18n/th';
 import { makeT, normalizeLang, translate } from '@/i18n/translate';
 import { formatDay, monthLabel } from '@/lib/dates';
 import { ORDER_STATUS_LABEL } from '@/domain/order';
@@ -14,6 +17,7 @@ describe('translation', () => {
     expect(normalizeLang(undefined)).toBe('de');
     expect(normalizeLang('fr')).toBe('de');
     expect(normalizeLang('en')).toBe('en');
+    expect(normalizeLang('th')).toBe('th');
     expect(makeT('de')('Neue Bestellung')).toBe('Neue Bestellung');
     expect(makeT('de')('Hallo {name}', { name: 'Anna' })).toBe('Hallo Anna');
   });
@@ -46,5 +50,39 @@ describe('translation', () => {
     expect(formatDay('2026-11-14', 'en')).toBe('Sat, 14.11.2026');
     expect(monthLabel('2026-12', 'de')).toBe('Dezember 2026');
     expect(monthLabel('2026-12', 'en')).toBe('December 2026');
+    expect(formatDay('2026-11-14', 'th')).toBe('ส., 14.11.2026');
+    expect(monthLabel('2026-12', 'th')).toBe('ธันวาคม 2026'); // Western year, not the Buddhist 2569
+  });
+
+  it('Thai from its dictionary, falling back to English, then German', () => {
+    const t = makeT('th');
+    expect(t('Neue Bestellung')).toBe('ใบสั่งซื้อใหม่');
+    expect(t('Hallo {name}', { name: 'Pui' })).toBe('สวัสดี Pui');
+    expect(t('Text ohne Eintrag')).toBe('Text ohne Eintrag');
+    expect(translate('th', 'Anna, Mo 12.11.: zwei Schichten überschneiden sich.')).toBe('Anna, จ. 12.11.: กะงานสองกะซ้อนกัน');
+    expect(translate('th', 'Anna, Mo 23.11.: eingeteilt, obwohl Ferien.')).toBe('Anna, จ. 23.11.: ถูกจัดเข้างานทั้งที่ลาพักร้อน');
+    expect(translate('en', 'Anna, Mo 23.11.: eingeteilt, obwohl Krank.')).toBe('Anna, Mon 23.11.: scheduled although sick.');
+  });
+
+  it('every English entry has a Thai one with the same {placeholders}', () => {
+    const ph = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join();
+    expect(Object.keys(EN).filter((k) => !(k in TH))).toEqual([]);
+    expect(Object.keys(TH).filter((k) => ph(TH[k]!) !== ph(EN[k]!))).toEqual([]);
+  });
+
+  it('every screen text t("…") in the app has an English entry', () => {
+    const files = (dir: string): string[] =>
+      readdirSync(dir).flatMap((f) => {
+        const p = join(dir, f);
+        return statSync(p).isDirectory() ? files(p) : /\.tsx?$/.test(f) && !p.includes('/i18n/') ? [p] : [];
+      });
+    const missing = new Set<string>();
+    for (const f of files('src')) {
+      for (const m of readFileSync(f, 'utf8').matchAll(/\bt\(\s*'((?:[^'\\]|\\.)*)'/g)) {
+        const key = m[1]!.replace(/\\'/g, "'");
+        if (!(key in EN)) missing.add(`${key}  (${f})`);
+      }
+    }
+    expect([...missing]).toEqual([]);
   });
 });

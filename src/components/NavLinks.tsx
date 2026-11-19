@@ -9,12 +9,12 @@ export function NavLinks({ links, variant }: { links: { href: string; label: str
   const active = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
   if (variant === 'top') {
     return (
-      <ul className="flex gap-1">
+      <ul className="flex flex-wrap gap-1">
         {links.map((l) => (
           <li key={l.href}>
             <Link
               href={l.href}
-              className={`rounded-btn px-3 py-1.5 text-sm font-medium ${active(l.href) ? 'bg-white/15 text-white' : 'text-white/75 hover:text-white'}`}
+              className={`block whitespace-nowrap rounded-btn px-3 py-1.5 text-sm font-medium ${active(l.href) ? 'bg-white/15 text-white' : 'text-white/75 hover:text-white'}`}
             >
               {l.label}
             </Link>

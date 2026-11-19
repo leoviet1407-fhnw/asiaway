@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { isAdmin, isOrderer, roleLabel } from '@/domain/roles';
+import { redirect } from 'next/navigation';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
+import { needsOnboarding } from '@/server/services/onboarding-service';
 import { listLocations } from '@/server/services/catalog-service';
 import { logoutAction } from '../actions';
 import { Logo } from '@/components/Logo';
@@ -14,6 +16,8 @@ export const dynamic = 'force-dynamic';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const t = await getT();
   const p = await requirePrincipal();
+  // Everyone on the roster fills in their personal details once before using the app
+  if (await needsOnboarding(await db(), p.userId)) redirect('/willkommen');
   const locations = await listLocations(await db());
   const scope = p.grants
     .map((g) => `${t(roleLabel(g.role))}${g.locationId ? ` · ${locations.find((l) => l.id === g.locationId)?.shortName ?? g.locationId}` : ''}`)
@@ -33,21 +37,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen pb-20 md:pb-0">
       <header className="sticky top-0 z-30 bg-navy text-white">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2">
-          <Link href="/" className="flex items-center gap-2" aria-label={t('AsiaWay Staff – Start')}>
+          <Link href="/" className="flex shrink-0 items-center gap-2" aria-label={t('AsiaWay Staff – Start')}>
             <Logo variant="white" className="h-6" />
-            <span className="text-sm text-white/70">{t('Staff')}</span>
+            <span className="hidden text-sm text-white/70 sm:inline">{t('Staff')}</span>
           </Link>
           <nav className="ml-6 hidden md:block">
             <NavLinks links={[...links, ...more]} variant="top" />
           </nav>
-          <div className="ml-auto flex items-center gap-2 text-right">
+          <div className="ml-auto flex items-center gap-1 text-right sm:gap-2">
             <div className="hidden leading-tight sm:block">
               <div className="text-sm font-semibold">{p.name}</div>
               <div className="text-xs text-white/60">{scope}</div>
             </div>
             <LanguageSwitch dark />
             <form action={logoutAction}>
-              <button className="btn min-h-0 px-3 py-1.5 text-sm text-white hover:bg-white/10" title={t('Abmelden')}>
+              <button className="btn min-h-0 whitespace-nowrap px-2 py-1.5 text-sm text-white hover:bg-white/10 sm:px-3" title={t('Abmelden')}>
                 {t('Abmelden')}
               </button>
             </form>

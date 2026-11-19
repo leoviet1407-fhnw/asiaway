@@ -65,7 +65,7 @@ describe('staffing need and coverage', () => {
     expect(c.totals.offeredHours).toBeCloseTo(8.5 + 4.5 + 8.5, 5);
     expect(c.totals.needHours).toBe(7 * (2 * 4 + 1 * 4.5));
     expect(c.totals.contractHours).toBeCloseTo(42.5 + 34 + 0 + 0, 1); // VN 100 %, TH 80 %, casual and management none
-    expect(c.silent).toContain('Aushilfe Muster');
+    expect(c.silent).toEqual([]); // nobody has to report times any more
   });
 
   it('takes the need from a planned week', async () => {

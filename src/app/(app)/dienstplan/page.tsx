@@ -75,7 +75,7 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
         <div className="flex flex-wrap gap-2">
           {profile && (
             <Link href="/dienstplan/verfuegbarkeit" className="btn-secondary min-h-0 px-3 py-1.5 text-sm">
-              {t('Verfügbarkeit & Ferien')}
+              {t('Ferien')}
             </Link>
           )}
           {profile && (

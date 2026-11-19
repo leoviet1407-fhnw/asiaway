@@ -18,7 +18,7 @@ export interface RowData {
   status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
 }
 
-const dm = (iso: string, lang: 'de' | 'en') => `${weekdayShort(iso, lang)} ${iso.slice(8)}.${iso.slice(5, 7)}.`;
+const dm = (iso: string, lang: import('@/i18n/translate').Lang) => `${weekdayShort(iso, lang)} ${iso.slice(8)}.${iso.slice(5, 7)}.`;
 
 export function ChangeForm({ shiftId, date, startMin, endMin, breakMin, label, planLabel }: { shiftId: string; date: string; startMin: number; endMin: number; breakMin: number; label: string; planLabel: string }) {
   const t = useT();

@@ -17,6 +17,7 @@
     "seed:catalog": "tsx scripts/seed-catalog.ts",
     "user:add": "tsx scripts/add-user.ts",
     "user:rename": "tsx scripts/rename-user.ts",
+    "user:password": "tsx scripts/set-password.ts",
     "items:import": "tsx scripts/import-items.ts",
     "icons": "tsx scripts/make-icons.ts"
   },

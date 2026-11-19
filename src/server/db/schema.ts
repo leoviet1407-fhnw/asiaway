@@ -275,6 +275,23 @@ export const staffProfiles = pgTable('staff_profiles', {
   sort: integer('sort').notNull().default(0),
 });
 
+export const staffOnboarding = pgTable('staff_onboarding', {
+  userId: uuid('user_id').primaryKey(),
+  privateEmail: text('private_email').notNull(),
+  mobile: text('mobile').notNull(),
+  birthDate: date('birth_date').notNull(),
+  street: text('street').notNull(),
+  zip: text('zip').notNull(),
+  city: text('city').notNull(),
+  nationality: text('nationality'),
+  iban: text('iban').notNull(),
+  ahvNumber: text('ahv_number'),
+  emergencyName: text('emergency_name'),
+  emergencyPhone: text('emergency_phone'),
+  completedAt: timestamp('completed_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const rosterWeeks = pgTable('roster_weeks', {
   site: text('site').notNull(),
   weekStart: date('week_start').notNull(),
