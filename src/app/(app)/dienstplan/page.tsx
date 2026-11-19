@@ -11,6 +11,8 @@ import { listGaps } from '@/server/services/suggest-service';
 import { whatsappLink, whatsappNumber } from '@/lib/whatsapp';
 import { weekdayShort } from '@/domain/roster';
 import { GapPanel } from './GapPanel';
+import { CalendarConnect } from './CalendarConnect';
+import { getCalendarToken } from '@/server/services/calendar-service';
 import { WeekPlanner } from './WeekPlanner';
 import { getT } from '@/i18n/server';
 
@@ -66,6 +68,14 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
     };
   }
   const href = (w: string, s = site.id) => `/dienstplan?site=${s}&woche=${w}`;
+  // Private calendar link (Apple / Google Calendar) for people on the roster
+  let calendarUrl: string | null = null;
+  if (profile) {
+    const h = await headers();
+    const host = h.get('host');
+    const proto = h.get('x-forwarded-proto') ?? (host?.startsWith('localhost') ? 'http' : 'https');
+    if (host) calendarUrl = `${proto}://${host}${withBase(`/kalender/${await getCalendarToken(database, p.userId)}.ics`)}`;
+  }
   const station = (s: string) => stationsOf(site.id).find((x) => x.name === s);
 
   return (
@@ -116,6 +126,8 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
           </ul>
         </section>
       )}
+
+      {calendarUrl && <CalendarConnect httpsUrl={calendarUrl} />}
 
       {planner && ROSTER_SITES.length > 1 && (
         <div className="flex gap-2">

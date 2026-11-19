@@ -15,6 +15,7 @@ import { canAccessLocation, isOrderer, type Principal } from '../../domain/roles
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import {
+  auditEvents,
   emailLog,
   items,
   locations,
@@ -233,6 +234,8 @@ export async function setLineQty(
   const order = await editableOrder(db, p, orderId);
   if (!Number.isFinite(qty) || qty < 0 || qty > 100_000) throw domainError('VALIDATION_FAILED', 'Invalid quantity');
   const value = roundQty(qty);
+  const [before] = await db.select({ qty: purchaseOrderLines.qty }).from(purchaseOrderLines).where(and(eq(purchaseOrderLines.orderId, orderId), eq(purchaseOrderLines.itemId, itemId)));
+  const previous = before ? Number(before.qty) : 0;
 
   if (value === 0) {
     await db.delete(purchaseOrderLines).where(and(eq(purchaseOrderLines.orderId, orderId), eq(purchaseOrderLines.itemId, itemId)));
@@ -263,6 +266,8 @@ export async function setLineQty(
       });
   }
   await db.update(purchaseOrders).set({ updatedAt: new Date() }).where(eq(purchaseOrders.id, orderId));
+  // The order history: who added or changed which item, so the review on Thursday shows who ordered what
+  if (previous !== value) await audit(db, p.userId, 'order.line', 'purchase_order', orderId, { itemId, from: previous, to: value });
 }
 
 export async function updateOrderDetails(
@@ -488,4 +493,61 @@ export async function orderPdf(db: AppDatabase, p: Principal, orderId: string): 
   const doc = await buildOrderDocument(db, p, orderId);
   if (order.sentPdf) return { filename: orderPdfFilename(doc), data: order.sentPdf };
   return { filename: orderPdfFilename(doc).replace('.pdf', '-Vorschau.pdf'), data: await renderOrderPdf(doc) };
+}
+
+
+export interface OrderHistoryEntry {
+  at: Date;
+  /** Until (for several quick changes of one item by one person, merged into one entry). */
+  until: Date;
+  who: string;
+  kind: 'line' | 'create' | 'submit' | 'return_to_draft' | 'cancel' | 'send';
+  itemName?: string;
+  from?: number;
+  to?: number;
+  unit?: string | null;
+}
+
+/**
+ * Who did what on an order, oldest first. Several changes of the same item by the same person
+ * within 15 minutes (typing 1, then 12) show as one entry from the first to the last quantity.
+ */
+export async function getOrderHistory(db: AppDatabase, p: Principal, orderId: string): Promise<OrderHistoryEntry[]> {
+  const order = await loadOrderRow(db, orderId);
+  if (!canSeeOrder(p, order)) throw domainError('FORBIDDEN', 'Not your location');
+  const events = await db
+    .select({ at: auditEvents.at, action: auditEvents.action, userId: auditEvents.userId, details: auditEvents.details, who: users.name })
+    .from(auditEvents)
+    .leftJoin(users, eq(users.id, auditEvents.userId))
+    .where(and(eq(auditEvents.entity, 'purchase_order'), eq(auditEvents.entityId, orderId)))
+    .orderBy(asc(auditEvents.at), asc(auditEvents.id));
+  const itemIds = [...new Set(events.map((e) => (e.details as { itemId?: string }).itemId).filter((x): x is string => Boolean(x)))];
+  const names = itemIds.length ? await db.select({ id: items.id, nameDe: items.nameDe }).from(items).where(inArray(items.id, itemIds)) : [];
+  const units = itemIds.length
+    ? await db.select({ itemId: supplierItems.itemId, unit: supplierItems.quantityUnit, orderUnit: supplierItems.orderUnit }).from(supplierItems).where(and(eq(supplierItems.supplierId, order.supplierId), inArray(supplierItems.itemId, itemIds)))
+    : [];
+  const out: (OrderHistoryEntry & { userId: string | null; itemId?: string })[] = [];
+  const kinds: Record<string, OrderHistoryEntry['kind']> = { 'order.create': 'create', 'order.submit': 'submit', 'order.return_to_draft': 'return_to_draft', 'order.cancel': 'cancel', 'order.send': 'send', 'order.line': 'line' };
+  for (const e of events) {
+    const kind = kinds[e.action];
+    if (!kind) continue;
+    const d = e.details as { itemId?: string; from?: number; to?: number };
+    const prev = out[out.length - 1];
+    if (kind === 'line' && prev?.kind === 'line' && prev.userId === e.userId && prev.itemId === d.itemId && e.at.getTime() - prev.until.getTime() < 15 * 60_000) {
+      prev.to = d.to;
+      prev.until = e.at;
+      continue;
+    }
+    const u = units.find((x) => x.itemId === d.itemId);
+    out.push({
+      at: e.at,
+      until: e.at,
+      who: e.who ?? '–',
+      userId: e.userId,
+      kind,
+      ...(kind === 'line' ? { itemId: d.itemId, itemName: names.find((n) => n.id === d.itemId)?.nameDe ?? '?', from: d.from ?? 0, to: d.to ?? 0, unit: u?.unit ?? u?.orderUnit ?? null } : {}),
+    });
+  }
+  // A merged change that ends where it started (2 → 5 → 2) is no change
+  return out.filter((x) => !(x.kind === 'line' && x.from === x.to)).map(({ userId: _u, itemId: _i, ...rest }) => rest);
 }

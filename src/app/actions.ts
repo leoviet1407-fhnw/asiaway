@@ -12,6 +12,7 @@ import { messageFor } from '@/lib/messages';
 import { getT } from '@/i18n/server';
 import { LANG_COOKIE, normalizeLang, type Lang } from '@/i18n/translate';
 import { requirePrincipal } from '@/server/auth/current';
+import { resetCalendarToken } from '@/server/services/calendar-service';
 import { SESSION_COOKIE, SESSION_DAYS, changePassword, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { locationSender, mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
@@ -901,4 +902,13 @@ export async function fillGapAction(siteId: string, date: string, service: 'LUNC
     if (isRedirect(error)) throw error;
     return await fail(error);
   }
+}
+
+// --- Calendar subscription ----------------------------------------------------------------
+
+/** A new private calendar link for the signed-in person (the old one stops working). */
+export async function resetCalendarAction(): Promise<void> {
+  const p = await requirePrincipal();
+  await resetCalendarToken(await db(), p.userId);
+  revalidatePath('/dienstplan');
 }

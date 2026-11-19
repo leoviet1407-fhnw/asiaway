@@ -2,14 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DomainError } from '@/domain/errors';
 import { belowMinimum, canCancelOrder, canEditOrder, canReceiveOrder, canSendOrder, canSubmitOrder } from '@/domain/order';
-import { formatAmount, formatChf } from '@/domain/qty';
+import { formatAmount, formatChf, formatQty } from '@/domain/qty';
 import { isOrderer } from '@/domain/roles';
 import { formatDateTime, formatDay } from '@/lib/dates';
 import { withBase } from '@/lib/base-path';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { STORAGE_AREA_LABEL, listItems, type StorageArea } from '@/server/services/catalog-service';
-import { getOrder, previewSend } from '@/server/services/order-service';
+import { getOrder, getOrderHistory, previewSend, type OrderHistoryEntry } from '@/server/services/order-service';
 import { listReceiptsForOrder } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
 import { startReceiptAction } from '../../../actions';
@@ -40,6 +40,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const preview = canSendOrder(p, order) ? await previewSend(database, p, order.id) : null;
   const receipts = await listReceiptsForOrder(database, order.id);
   const openReceipt = receipts.find((r) => r.status === 'OPEN');
+  const history = await getOrderHistory(database, p, order.id);
 
   return (
     <div className="space-y-4 pb-28">
@@ -94,6 +95,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       ) : (
         <ReadOnlyLines lines={lines} totalCents={totalCents} minOrderCents={supplier.minOrderCents} deliveryDate={order.deliveryDate} note={order.note} />
       )}
+
+      <OrderHistory history={history} open={order.status === 'SUBMITTED' || order.status === 'DRAFT'} />
 
       {preview && (
         <section className="card space-y-2 border-brand-600">
@@ -229,5 +232,56 @@ async function ReadOnlyLines({
         <p className="rounded-btn bg-warn-50 p-2 text-sm text-warn-500">{t('Unter dem Mindestbestellwert von')} {formatChf(minOrderCents)}.</p>
       )}
     </section>
+  );
+}
+
+/** Who added or changed what, so the review on Thursday shows who ordered which item. */
+async function OrderHistory({ history, open }: { history: OrderHistoryEntry[]; open: boolean }) {
+  const t = await getT();
+  if (history.length === 0) return null;
+  const lines = history.filter((h) => h.kind === 'line');
+  // Per item the last person who set it (items now on the order only)
+  const lastBy = new Map<string, { who: string; to: number }>();
+  for (const h of lines) lastBy.set(h.itemName ?? '', { who: h.who, to: h.to ?? 0 });
+  const perPerson = new Map<string, number>();
+  for (const v of lastBy.values()) if (v.to > 0) perPerson.set(v.who, (perPerson.get(v.who) ?? 0) + 1);
+  const when = (d: Date) => new Intl.DateTimeFormat(t.lang === 'th' ? 'th-TH-u-ca-gregory' : t.lang === 'en' ? 'en-GB' : 'de-CH', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' }).format(d);
+  const event: Record<Exclude<OrderHistoryEntry['kind'], 'line'>, string> = {
+    create: t('hat die Bestellung angelegt'),
+    submit: t('hat zur Prüfung eingereicht'),
+    return_to_draft: t('hat zurück in den Entwurf gesetzt'),
+    cancel: t('hat die Bestellung storniert'),
+    send: t('hat an den Lieferanten gesendet'),
+  };
+  return (
+    <details className="card" open={open}>
+      <summary className="cursor-pointer text-lg font-semibold text-navy">{t('Verlauf: wer hat was eingetragen')}</summary>
+      {perPerson.size > 0 && (
+        <p className="mt-2 text-sm text-charcoal-muted">
+          {t('Artikel pro Person')}: {[...perPerson.entries()].map(([who, n]) => `${who} (${n})`).join(', ')}
+        </p>
+      )}
+      <ol className="mt-3 divide-y divide-surface-line text-sm">
+        {[...history].reverse().map((h, i) => (
+          <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-1.5">
+            <span>
+              <strong className="text-navy">{h.who}</strong>{' '}
+              {h.kind === 'line' ? (
+                <>
+                  {h.from === 0 ? t('hat hinzugefügt') : h.to === 0 ? t('hat entfernt') : t('hat geändert')}: <span className="text-navy">{h.itemName}</span>{' '}
+                  <span className="whitespace-nowrap font-semibold">
+                    {h.from === 0 ? `${formatQty(h.to ?? 0)}` : h.to === 0 ? `(${formatQty(h.from ?? 0)})` : `${formatQty(h.from ?? 0)} → ${formatQty(h.to ?? 0)}`}
+                    {h.unit && h.to !== 0 ? ` ${h.unit}` : ''}
+                  </span>
+                </>
+              ) : (
+                event[h.kind]
+              )}
+            </span>
+            <span className="text-xs text-charcoal-muted">{when(h.at)}</span>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }

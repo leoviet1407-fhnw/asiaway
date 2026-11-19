@@ -11,6 +11,7 @@ import {
   cancelOrder,
   copyLastOrder,
   getOrder,
+  getOrderHistory,
   listOrders,
   openDraft,
   orderPdf,
@@ -87,6 +88,24 @@ describe('draft orders', () => {
 });
 
 describe('review and send', () => {
+  it('keeps a history of who added or changed which item', async () => {
+    const { id } = await openDraft(db, staffWvn, 'winterthur', asiaId);
+    await setLineQty(db, staffWvn, id, itemId['A-1001']!, 1);
+    await setLineQty(db, staffWvn, id, itemId['A-1001']!, 12); // typing "12": merged with the 1 before
+    await setLineQty(db, orderer, id, itemId['A-1005']!, 3);
+    await setLineQty(db, orderer, id, itemId['A-1001']!, 10);
+    await setLineQty(db, orderer, id, itemId['A-1005']!, 0);
+    const h = (await getOrderHistory(db, staffWvn, id)).filter((x) => x.kind === 'line');
+    expect(h.map((x) => [x.who, x.from, x.to])).toEqual([
+      [staffWvn.name, 0, 12],
+      [orderer.name, 0, 3],
+      [orderer.name, 12, 10],
+      [orderer.name, 3, 0],
+    ]);
+    await expect(getOrderHistory(db, staffOer, id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await cancelOrder(db, orderer, id);
+  });
+
   it('sends from the restaurant\'s own mailbox, copies it in CC and sends replies there', async () => {
     await db.update(locations).set({ contactEmail: 'rewt@asiaway.ch' }).where(eq(locations.id, 'winterthur'));
     const { id } = await openDraft(db, staffWvn, 'winterthur', asiaId);

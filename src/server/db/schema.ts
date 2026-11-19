@@ -56,6 +56,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Private link for subscribing to one's own shifts in a calendar app. */
+  calendarToken: text('calendar_token').unique(),
 });
 
 export const userRoles = pgTable('user_roles', {
