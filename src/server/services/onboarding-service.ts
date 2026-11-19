@@ -1,11 +1,11 @@
-import { and, asc, eq, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { domainError } from '../../domain/errors';
 import { isAdmin, type Principal } from '../../domain/roles';
 import { cleanOnboarding, validateOnboarding, type OnboardingInput } from '../../domain/onboarding';
 import { todayIso } from '../../lib/dates';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
-import { staffOnboarding, staffProfiles, users } from '../db/schema';
+import { staffOnboarding, staffProfiles, userRoles, users } from '../db/schema';
 
 export interface OnboardingRecord extends OnboardingInput {
   completedAt: Date;
@@ -35,12 +35,22 @@ export async function getMyOnboarding(db: AppDatabase, p: Principal): Promise<On
 }
 
 /**
- * Whether this person still has to fill in their details: everyone on the roster
- * (an active staff profile) must; the owner or an orderer without a profile is not asked.
+ * Whether this person is employed and so gives their personal details: everyone on the roster
+ * (an active staff profile) and every staff login without one (e.g. kitchen staff who only
+ * order). The owner/admin or an orderer without a staff role is not asked.
  */
-export async function needsOnboarding(db: AppDatabase, userId: string): Promise<boolean> {
+async function isEmployee(db: AppDatabase, userId: string): Promise<boolean> {
   const [profile] = await db.select({ active: staffProfiles.active }).from(staffProfiles).where(eq(staffProfiles.userId, userId));
-  if (!profile?.active) return false;
+  if (profile) return profile.active;
+  const [user] = await db.select({ active: users.active }).from(users).where(eq(users.id, userId));
+  if (!user?.active) return false;
+  const [staffRole] = await db.select({ role: userRoles.role }).from(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, 'STAFF'))).limit(1);
+  return Boolean(staffRole);
+}
+
+/** Whether this person still has to fill in their details (shown as an open task on the home page). */
+export async function needsOnboarding(db: AppDatabase, userId: string): Promise<boolean> {
+  if (!(await isEmployee(db, userId))) return false;
   const [done] = await db.select({ userId: staffOnboarding.userId }).from(staffOnboarding).where(eq(staffOnboarding.userId, userId));
   return !done;
 }
@@ -89,13 +99,18 @@ export interface OnboardingOverviewRow {
 /** Admin only: every active person on the roster with their details (or none yet). */
 export async function listOnboarding(db: AppDatabase, p: Principal): Promise<OnboardingOverviewRow[]> {
   if (!isAdmin(p)) throw domainError('FORBIDDEN', 'Nur Admins sehen die persönlichen Angaben.');
-  const rows = await db
-    .select({ user: users, profile: staffProfiles, onboarding: staffOnboarding })
-    .from(staffProfiles)
-    .innerJoin(users, eq(users.id, staffProfiles.userId))
-    .leftJoin(staffOnboarding, eq(staffOnboarding.userId, staffProfiles.userId))
-    .where(eq(staffProfiles.active, true))
-    .orderBy(asc(users.name));
+  // Everyone on the roster, plus staff logins without a roster profile (e.g. kitchen staff)
+  const profiles = await db.select({ userId: staffProfiles.userId, active: staffProfiles.active }).from(staffProfiles);
+  const staffLogins = await db.selectDistinct({ userId: userRoles.userId }).from(userRoles).where(eq(userRoles.role, 'STAFF'));
+  const ids = [...new Set([...profiles.filter((x) => x.active).map((x) => x.userId), ...staffLogins.map((x) => x.userId).filter((id) => !profiles.some((x) => x.userId === id))])];
+  const rows = ids.length
+    ? await db
+        .select({ user: users, onboarding: staffOnboarding })
+        .from(users)
+        .leftJoin(staffOnboarding, eq(staffOnboarding.userId, users.id))
+        .where(and(inArray(users.id, ids), eq(users.active, true)))
+        .orderBy(asc(users.name))
+    : [];
   await audit(db, p.userId, 'onboarding.list', 'user', p.userId, { count: rows.length });
   return rows.map((r) => ({ userId: r.user.id, name: r.user.name, email: r.user.email, details: r.onboarding ? toRecord(r.onboarding) : null }));
 }

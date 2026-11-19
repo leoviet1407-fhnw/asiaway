@@ -45,10 +45,15 @@ describe('onboarding (personal details)', () => {
   }, 60_000);
   afterAll(async () => close());
 
-  it('asks people on the roster, not people without a staff profile', async () => {
+  it('asks people on the roster and staff logins without a roster profile, not the admin', async () => {
     expect(await needsOnboarding(db, staff.userId)).toBe(true);
-    const [owner] = await db.select().from(users).where(eq(users.email, 'chef@asiaway.test'));
-    if (owner) expect(await needsOnboarding(db, owner.id)).toBe(false);
+    // a kitchen login: STAFF role, no roster profile (like Sakuna and Phen)
+    const kitchen = await principal('oerlikon@asiaway.test');
+    await db.delete(staffProfiles).where(eq(staffProfiles.userId, kitchen.userId));
+    expect(await needsOnboarding(db, kitchen.userId)).toBe(true);
+    const [adminUser] = await db.select().from(users).where(eq(users.email, 'admin@asiaway.test'));
+    expect(await needsOnboarding(db, adminUser!.id)).toBe(false);
+    expect((await listOnboarding(db, admin)).some((r) => r.userId === kitchen.userId)).toBe(true);
   });
 
   it('rejects a wrong form without saving anything', async () => {
