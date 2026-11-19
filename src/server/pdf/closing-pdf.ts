@@ -3,10 +3,13 @@ import { CLOSING_STATUS_LABEL, DIFFERENCE_LABEL, differenceTone } from '../../do
 import type { ClosingView } from '../services/closing-service';
 import { LOGO_PNG_BASE64 } from './logo-data';
 
-/** The daily closing on one A4 page, like the paper form: print it, sign it, file it. */
-const W = 595.28;
-const H = 841.89;
-const M = 44;
+/** The daily closing on one A5 page (portrait), like the paper form: print it, sign it, file it. */
+const W = 419.53;
+const H = 595.28;
+const M = 30;
+const COL2 = M + (W - 2 * M) * 0.36;
+const COL3 = M + (W - 2 * M) * 0.64;
+const SIGN_W = (W - 2 * M) / 2 - 12;
 const NAVY = rgb(0.035, 0.078, 0.114);
 const RED = rgb(0xac / 255, 0x20 / 255, 0x25 / 255);
 const GREY = rgb(0.55, 0.55, 0.55);
@@ -45,31 +48,31 @@ export async function renderClosingPdf(c: ClosingView, generatedAt = new Date())
   const rule = (y: number, color = LINE) => page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.7, color });
 
   let y = H - M;
-  const lw = (30 * logo.width) / logo.height;
-  page.drawImage(logo, { x: W - M - lw, y: y - 26, width: lw, height: 30 });
-  text('Tagesabschluss', M, y - 12, 20, bold, RED);
-  text(`${c.locationName} · ${c.station}`, M, y - 32, 11);
-  y -= 62;
+  const lw = (24 * logo.width) / logo.height;
+  page.drawImage(logo, { x: W - M - lw, y: y - 20, width: lw, height: 24 });
+  text('Tagesabschluss', M, y - 10, 16, bold, RED);
+  text(`${c.locationName} · ${c.station}`, M, y - 26, 10);
+  y -= 46;
   rule(y);
-  y -= 22;
-  text('Geschäftstag', M, y, 9, regular, GREY);
-  text(dmy(c.businessDate), M, y - 14, 13, bold);
-  text('Status', 230, y, 9, regular, GREY);
-  text(CLOSING_STATUS_LABEL[c.status], 230, y - 14, 13, bold);
-  text('Abgeschlossen von', 360, y, 9, regular, GREY);
-  text(c.closedByName ?? '-', 360, y - 14, 11, bold);
-  text(stamp(c.createdAt), 360, y - 27, 8.5, regular, GREY);
-  y -= 50;
+  y -= 18;
+  text('Geschäftstag', M, y, 8, regular, GREY);
+  text(dmy(c.businessDate), M, y - 13, 11, bold);
+  text('Status', COL2, y, 8, regular, GREY);
+  text(CLOSING_STATUS_LABEL[c.status], COL2, y - 13, 11, bold);
+  text('Abgeschlossen von', COL3, y, 8, regular, GREY);
+  text(c.closedByName ?? '-', COL3, y - 13, 10, bold);
+  text(stamp(c.createdAt), COL3, y - 25, 7.5, regular, GREY);
+  y -= 40;
   rule(y);
-  y -= 26;
+  y -= 20;
 
   const row = (label: string, value: number, opts: { strong?: boolean; sign?: string } = {}) => {
     const font = opts.strong ? bold : regular;
-    text(label, M, y, opts.strong ? 11.5 : 10.5, font);
-    right(`CHF ${chf(value)}`, W - M, y, opts.strong ? 11.5 : 10.5, font);
-    y -= 7;
+    text(label, M, y, opts.strong ? 10.5 : 9.5, font);
+    right(`CHF ${chf(value)}`, W - M, y, opts.strong ? 10.5 : 9.5, font);
+    y -= 6;
     rule(y);
-    y -= 17;
+    y -= 15;
   };
   const r = c.result;
   row('Cashbestand (Kassa)', c.cashCountedCents);
@@ -82,36 +85,38 @@ export async function renderClosingPdf(c: ClosingView, generatedAt = new Date())
   row(`Differenz - ${DIFFERENCE_LABEL[differenceTone(r.differenceCents)]}`, r.differenceCents, { strong: true });
 
   // The amount that goes to the bank, highlighted
-  y -= 4;
-  page.drawRectangle({ x: M, y: y - 26, width: W - 2 * M, height: 34, color: rgb(0.97, 0.93, 0.93), borderColor: RED, borderWidth: 1 });
-  text('BANK EINZAHLEN', M + 12, y - 12, 12, bold, RED);
-  right(`CHF ${chf(r.bankDepositCents)}`, W - M - 12, y - 12, 14, bold, RED);
-  y -= 58;
+  y -= 2;
+  page.drawRectangle({ x: M, y: y - 22, width: W - 2 * M, height: 30, color: rgb(0.97, 0.93, 0.93), borderColor: RED, borderWidth: 1 });
+  text('BANK EINZAHLEN', M + 10, y - 10, 11, bold, RED);
+  right(`CHF ${chf(r.bankDepositCents)}`, W - M - 10, y - 10, 13, bold, RED);
+  y -= 46;
 
   if (c.note) {
-    text('Notiz', M, y, 9, regular, GREY);
-    y -= 14;
+    text('Notiz', M, y, 8, regular, GREY);
+    y -= 12;
     let line = '';
+    let lines = 0;
     for (const word of safe(regular, c.note).split(/\s+/)) {
-      if (regular.widthOfTextAtSize(`${line} ${word}`, 10) > W - 2 * M) {
-        text(line, M, y);
-        y -= 13;
+      if (regular.widthOfTextAtSize(`${line} ${word}`, 9) > W - 2 * M) {
+        if (lines < 4) text(line, M, y, 9);
+        lines += 1;
+        y -= 11;
         line = word;
       } else line = line ? `${line} ${word}` : word;
     }
-    if (line) text(line, M, y);
-    y -= 26;
+    if (line && lines < 5) text(line, M, y, 9);
+    y -= 18;
   }
 
-  // Signatures
-  const sy = Math.min(y, 190);
-  page.drawLine({ start: { x: M, y: sy - 40 }, end: { x: M + 200, y: sy - 40 }, thickness: 0.8, color: NAVY });
-  text('Kassiert / abgeschlossen (Unterschrift)', M, sy - 53, 8.5, regular, GREY);
-  text(c.closedByName ?? '', M, sy - 33, 9);
-  page.drawLine({ start: { x: W - M - 200, y: sy - 40 }, end: { x: W - M, y: sy - 40 }, thickness: 0.8, color: NAVY });
-  text('Kontrolliert / freigegeben (Unterschrift)', W - M - 200, sy - 53, 8.5, regular, GREY);
-  if (c.status === 'APPROVED') text(`${c.approvedByName ?? '-'} · ${c.approvedAt ? stamp(c.approvedAt) : ''}`, W - M - 200, sy - 33, 9);
+  // Signatures (always above the footer, even with a long note)
+  const sy = Math.max(Math.min(y, 120), 95);
+  page.drawLine({ start: { x: M, y: sy - 32 }, end: { x: M + SIGN_W, y: sy - 32 }, thickness: 0.8, color: NAVY });
+  text('Kassiert / abgeschlossen (Unterschrift)', M, sy - 43, 7, regular, GREY);
+  text(c.closedByName ?? '', M, sy - 26, 8.5);
+  page.drawLine({ start: { x: W - M - SIGN_W, y: sy - 32 }, end: { x: W - M, y: sy - 32 }, thickness: 0.8, color: NAVY });
+  text('Kontrolliert / freigegeben (Unterschrift)', W - M - SIGN_W, sy - 43, 7, regular, GREY);
+  if (c.status === 'APPROVED') text(`${c.approvedByName ?? '-'} · ${c.approvedAt ? stamp(c.approvedAt) : ''}`, W - M - SIGN_W, sy - 26, 8.5);
 
-  text(`asiaway - Gastro App · gedruckt ${stamp(generatedAt)}`, M, 30, 8, regular, GREY);
+  text(`asiaway - Gastro App · gedruckt ${stamp(generatedAt)}`, M, 22, 7, regular, GREY);
   return pdf.save();
 }

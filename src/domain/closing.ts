@@ -23,7 +23,7 @@ export const DEFAULT_FLOAT_CENTS = 30_000;
  * first one is the default; edit the lists to match the restaurants.
  */
 export const STATIONS: Record<string, readonly string[]> = {
-  oerlikon: ['Restaurant', 'Bar'],
+  oerlikon: ['Restaurant', 'Buffet', 'Bar'],
   'winti-vn': ['1. OG', 'Buffet', 'Glacé'],
   'winti-th': ['EG', 'Buffet', 'Glacé'],
 };

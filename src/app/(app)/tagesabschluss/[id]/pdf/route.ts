@@ -7,7 +7,7 @@ import { getClosing } from '@/server/services/closing-service';
 
 export const dynamic = 'force-dynamic';
 
-/** The closing as a printable A4 PDF: /tagesabschluss/<id>/pdf */
+/** The closing as a printable A5 PDF: /tagesabschluss/<id>/pdf */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const p = await currentPrincipal();
   if (!p) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
