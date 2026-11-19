@@ -5,6 +5,12 @@
 import { PATTERNS } from './en';
 
 export const TH: Record<string, string> = {
+  "Bitte ergänzen Sie einmalig Ihre persönlichen Angaben. Wir brauchen sie für den Vertrag und die Lohnzahlung.": "กรุณากรอกข้อมูลส่วนตัวหนึ่งครั้ง เราต้องใช้สำหรับสัญญาจ้างและการจ่ายเงินเดือน",
+  "← Start": "← หน้าแรก",
+  "Jetzt ausfüllen": "กรอกตอนนี้",
+  "Adresse, Handy, IBAN und Notfallkontakt – einmalig, für Vertrag und Lohn. Dauert etwa 3 Minuten.": "ที่อยู่ มือถือ IBAN และผู้ติดต่อฉุกเฉิน – กรอกครั้งเดียว สำหรับสัญญาจ้างและเงินเดือน ใช้เวลาประมาณ 3 นาที",
+  "Meine Angaben ausfüllen": "กรอกข้อมูลของฉัน",
+  "Offene Aufgabe": "งานที่ต้องทำ",
   "Barcode": "บาร์โค้ด",
   "Bemerkung:": "หมายเหตุ:",
   "angefragt": "ขอแล้ว",

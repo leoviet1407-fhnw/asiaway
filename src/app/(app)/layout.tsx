@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { isAdmin, isOrderer, roleLabel } from '@/domain/roles';
-import { redirect } from 'next/navigation';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { needsOnboarding } from '@/server/services/onboarding-service';
 import { listLocations } from '@/server/services/catalog-service';
 import { logoutAction } from '../actions';
 import { Logo } from '@/components/Logo';
@@ -16,8 +14,6 @@ export const dynamic = 'force-dynamic';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const t = await getT();
   const p = await requirePrincipal();
-  // Everyone on the roster fills in their personal details once before using the app
-  if (await needsOnboarding(await db(), p.userId)) redirect('/willkommen');
   const locations = await listLocations(await db());
   const scope = p.grants
     .map((g) => `${t(roleLabel(g.role))}${g.locationId ? ` · ${locations.find((l) => l.id === g.locationId)?.shortName ?? g.locationId}` : ''}`)

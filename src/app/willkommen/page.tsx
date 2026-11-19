@@ -6,7 +6,6 @@ import type { OnboardingInput } from '@/domain/onboarding';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getMyOnboarding } from '@/server/services/onboarding-service';
-import { logoutAction } from '../actions';
 import { OnboardingForm } from './OnboardingForm';
 
 export const dynamic = 'force-dynamic';
@@ -19,8 +18,8 @@ export async function generateMetadata() {
 const EMPTY: OnboardingInput = { privateEmail: '', mobile: '', birthDate: '', street: '', zip: '', city: '', nationality: '', iban: '', ahvNumber: '', emergencyName: '', emergencyPhone: '' };
 
 /**
- * Personal details. Shown on its own (no menu) until a person has filled it in for the
- * first time; afterwards reachable from "Mehr" to change them.
+ * Personal details. Until a person has filled them in, the home page shows an open task
+ * that leads here (not blocking); afterwards reachable from "Mehr" to change them.
  */
 export default async function WelcomePage() {
   const t = await getT();
@@ -35,8 +34,10 @@ export default async function WelcomePage() {
       </div>
       {first ? (
         <div>
-          <h1 className="text-2xl">{t('Hallo {name}', { name: p.name })}</h1>
-          <p className="mt-1 text-charcoal-muted">{t('Bevor es losgeht: Bitte ergänzen Sie einmalig Ihre persönlichen Angaben. Wir brauchen sie für den Vertrag und die Lohnzahlung.')}</p>
+          <Link href="/" className="text-sm text-charcoal-muted hover:text-navy">{t('← Start')}</Link>
+          <h1 className="mt-1 text-2xl">{t('Meine Angaben')}</h1>
+          <h2 className="text-lg">{t('Hallo {name}', { name: p.name })}</h2>
+          <p className="mt-1 text-charcoal-muted">{t('Bitte ergänzen Sie einmalig Ihre persönlichen Angaben. Wir brauchen sie für den Vertrag und die Lohnzahlung.')}</p>
         </div>
       ) : (
         <div>
@@ -45,11 +46,6 @@ export default async function WelcomePage() {
         </div>
       )}
       <OnboardingForm initial={existing ?? EMPTY} first={first} />
-      {first && (
-        <form action={logoutAction}>
-          <button className="btn-secondary w-full">{t('Abmelden')}</button>
-        </form>
-      )}
     </main>
   );
 }

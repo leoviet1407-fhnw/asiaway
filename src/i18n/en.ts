@@ -5,6 +5,12 @@
  */
 export const EN: Record<string, string> = {
   // --- Roster: planner-only plan, time picker, copy & paste ---
+  "Bitte ergänzen Sie einmalig Ihre persönlichen Angaben. Wir brauchen sie für den Vertrag und die Lohnzahlung.": "Please fill in your personal details once. We need them for your contract and salary payment.",
+  "← Start": "← Home",
+  "Jetzt ausfüllen": "Fill in now",
+  "Adresse, Handy, IBAN und Notfallkontakt – einmalig, für Vertrag und Lohn. Dauert etwa 3 Minuten.": "Address, mobile, IBAN and emergency contact – once, for your contract and salary. Takes about 3 minutes.",
+  "Meine Angaben ausfüllen": "Fill in my details",
+  "Offene Aufgabe": "Open task",
   Barcode: 'Barcode',
   'Bemerkung:': 'Note:',
   angefragt: 'requested',

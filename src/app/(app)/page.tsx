@@ -10,6 +10,7 @@ import { getVacationBalance } from '@/server/services/hours-service';
 import { getPattern } from '@/server/services/pattern-service';
 import { countOpenRequests } from '@/server/services/change-request-service';
 import { getPlannerTodos } from '@/server/services/attention-service';
+import { needsOnboarding } from '@/server/services/onboarding-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -34,6 +35,8 @@ export default async function HomePage() {
   const profile = await getProfile(database, p.userId);
   const today = todayIso();
   const month = dueMonth(today);
+  // Open task for everyone on the roster until they have filled in their personal details (not blocking)
+  const detailsMissing = await needsOnboarding(database, p.userId);
 
   // For people on the roster: their next shifts and what they still have to do
   let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
@@ -67,6 +70,15 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl">{t('Hallo')} {p.name.split(' ')[0]}</h1>
+
+      {detailsMissing && (
+        <Link href="/willkommen" className="block rounded-btn bg-brand-600 p-4 text-white">
+          <div className="text-xs font-bold uppercase tracking-wide text-white/80">{t('Offene Aufgabe')}</div>
+          <div className="text-lg font-semibold">{t('Meine Angaben ausfüllen')}</div>
+          <div className="text-sm text-white/90">{t('Adresse, Handy, IBAN und Notfallkontakt – einmalig, für Vertrag und Lohn. Dauert etwa 3 Minuten.')}</div>
+          <div className="mt-2 inline-block rounded-btn bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide text-brand-600">{t('Jetzt ausfüllen')} →</div>
+        </Link>
+      )}
 
       {planner && (
         <section className="space-y-2">
