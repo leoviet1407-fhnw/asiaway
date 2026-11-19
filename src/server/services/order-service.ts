@@ -375,7 +375,7 @@ export async function buildOrderDocument(db: AppDatabase, p: Principal, orderId:
     deliveryDate: view.order.deliveryDate,
     note: view.order.note,
     location: { name: view.location.name, address: view.location.address, deliveryNote: view.location.deliveryNote, phone: view.location.phone, contactEmail: view.location.contactEmail },
-    supplier: { name: view.supplier.name, customerNumber: view.supplier.customerNumber, orderEmail: view.supplier.orderEmail, ccEmail: recipients(view.supplier).cc },
+    supplier: { name: view.supplier.name, customerNumber: view.supplier.customerNumber, orderEmail: view.supplier.orderEmail, ccEmail: recipients(view.supplier, view.location.contactEmail).cc },
     orderedBy: { name: sender.name, email: sender.email },
     lines: [...view.lines]
       .sort((a, b) => (a.department ?? '~').localeCompare(b.department ?? '~', 'de') || (a.itemGroup ?? '~').localeCompare(b.itemGroup ?? '~', 'de') || a.nameDe.localeCompare(b.nameDe, 'de'))
@@ -391,16 +391,31 @@ export interface SendPreview {
   text: string;
 }
 
-export function recipients(supplier: { orderEmail: string; ccEmail: string | null }, env: NodeJS.ProcessEnv = process.env) {
-  const cc = [supplier.ccEmail, env.ORDER_CC_EMAIL].filter((x): x is string => Boolean(x && x.trim())).join(', ');
+/**
+ * Who gets the order: the supplier, in CC the supplier's CC address, the restaurant's own
+ * order mailbox (so every sent order is archived there) and ORDER_CC_EMAIL if set.
+ */
+export function recipients(supplier: { orderEmail: string; ccEmail: string | null }, restaurantEmail: string | null = null, env: NodeJS.ProcessEnv = process.env) {
+  const all = [supplier.ccEmail, restaurantEmail, env.ORDER_CC_EMAIL].flatMap((x) => (x ?? '').split(',')).map((x) => x.trim()).filter(Boolean);
+  const cc = [...new Set(all.map((x) => x.toLowerCase()))].filter((x) => x !== supplier.orderEmail.trim().toLowerCase()).join(', ');
   return { to: supplier.orderEmail, cc: cc || null };
 }
+
+/** The restaurant that orders, for choosing the sending mailbox. */
+export interface OrderingLocation {
+  id: string;
+  name: string;
+  contactEmail: string | null;
+}
+/** Picks the mailbox an order is sent from (e.g. rewt@asiaway.ch for Winterthur); null = the default sender. */
+export type SenderPicker = (location: OrderingLocation) => { mailer: Mailer; from: string } | null;
 
 export async function previewSend(db: AppDatabase, p: Principal, orderId: string): Promise<SendPreview> {
   const view = await getOrder(db, p, orderId);
   const doc = await buildOrderDocument(db, p, orderId);
-  const { to, cc } = recipients(view.supplier);
-  return { to, cc, replyTo: p.email, subject: orderSubject(doc), text: orderEmailText(doc) };
+  const { to, cc } = recipients(view.supplier, view.location.contactEmail);
+  // Replies from the supplier go to the restaurant's mailbox (logins are not always real mailboxes)
+  return { to, cc, replyTo: view.location.contactEmail ?? p.email, subject: orderSubject(doc), text: orderEmailText(doc) };
 }
 
 /**
@@ -416,6 +431,7 @@ export async function sendOrder(
   mailer: Mailer,
   from: string,
   now = new Date(),
+  pickSender?: SenderPicker,
 ): Promise<{ messageId: string | null }> {
   const pre = await loadOrderRow(db, orderId);
   if (pre.status === 'SENT' || pre.status === 'PARTIALLY_RECEIVED' || pre.status === 'RECEIVED') {
@@ -436,15 +452,17 @@ export async function sendOrder(
     const pdf = await renderOrderPdf(doc);
     const subject = orderSubject(doc);
     const text = orderEmailText(doc);
-    const { to, cc } = recipients(supplier!);
+    const restaurantEmail = doc.location.contactEmail;
+    const { to, cc } = recipients(supplier!, restaurantEmail);
+    const sender = pickSender?.({ id: locked.locationId, name: doc.location.name, contactEmail: restaurantEmail }) ?? { mailer, from };
 
     let result: { messageId: string | null };
     try {
-      result = await mailer.send({
-        from,
+      result = await sender.mailer.send({
+        from: sender.from,
         to,
         cc: cc ?? undefined,
-        replyTo: p.email,
+        replyTo: restaurantEmail ?? p.email,
         subject,
         text,
         attachments: [{ filename: orderPdfFilename(doc), content: pdf, contentType: 'application/pdf' }],

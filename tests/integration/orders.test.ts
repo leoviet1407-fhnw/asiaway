@@ -3,9 +3,9 @@ import { eq } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
 import type { Principal } from '@/domain/roles';
 import type { AppDatabase } from '@/server/db/client';
-import { emailLog, items, purchaseOrders, suppliers, users } from '@/server/db/schema';
+import { emailLog, items, locations, purchaseOrders, suppliers, users } from '@/server/db/schema';
 import { loadPrincipalForUser } from '@/server/auth/session';
-import { MemoryMailer } from '@/server/mail/mailer';
+import { MemoryMailer, locationSender, locationSmtpVar, mailerFromEnv } from '@/server/mail/mailer';
 import { seedSampleData } from '@/server/seed/sample-data';
 import {
   cancelOrder,
@@ -87,6 +87,40 @@ describe('draft orders', () => {
 });
 
 describe('review and send', () => {
+  it('sends from the restaurant\'s own mailbox, copies it in CC and sends replies there', async () => {
+    await db.update(locations).set({ contactEmail: 'rewt@asiaway.ch' }).where(eq(locations.id, 'winterthur'));
+    const { id } = await openDraft(db, staffWvn, 'winterthur', asiaId);
+    await setLineQty(db, staffWvn, id, itemId['A-1001']!, 2);
+    await submitOrder(db, staffWvn, id);
+    const preview = await previewSend(db, orderer, id);
+    expect(preview.cc).toContain('rewt@asiaway.ch');
+    expect(preview.replyTo).toBe('rewt@asiaway.ch');
+
+    const fallback = new MemoryMailer();
+    const own = new MemoryMailer();
+    await sendOrder(db, orderer, id, fallback, 'AsiaWay <bestellung@asiaway.ch>', new Date(), (loc) =>
+      loc.id === 'winterthur' && loc.contactEmail ? { mailer: own, from: `AsiaWay ${loc.name} <${loc.contactEmail}>` } : null,
+    );
+    expect(fallback.sent).toHaveLength(0);
+    const msg = own.sent[0]!;
+    expect(msg.from).toBe('AsiaWay Winterthur <rewt@asiaway.ch>');
+    expect(msg.cc).toContain('rewt@asiaway.ch');
+    expect(msg.replyTo).toBe('rewt@asiaway.ch');
+    await db.update(locations).set({ contactEmail: null }).where(eq(locations.id, 'winterthur'));
+  });
+
+  it('picks the restaurant mailbox from SMTP_URL_<LOCATION>', () => {
+    expect(locationSmtpVar('winterthur')).toBe('SMTP_URL_WINTERTHUR');
+    const env = { MAIL_TRANSPORT: 'smtp', SMTP_URL_WINTERTHUR: 'smtps://u:p@asmtp.mail.hostpoint.ch:465' } as unknown as NodeJS.ProcessEnv;
+    const pick = locationSender(env);
+    expect(pick({ id: 'winterthur', name: 'Winterthur', contactEmail: 'rewt@asiaway.ch' })?.from).toBe('AsiaWay Winterthur <rewt@asiaway.ch>');
+    expect(pick({ id: 'oerlikon', name: 'Oerlikon', contactEmail: 'x@asiaway.ch' })).toBeNull(); // no mailbox set up
+    expect(pick({ id: 'winterthur', name: 'Winterthur', contactEmail: null })).toBeNull();
+    expect(locationSender({ MAIL_TRANSPORT: 'console' } as unknown as NodeJS.ProcessEnv)({ id: 'winterthur', name: 'W', contactEmail: 'a@b.ch' })).toBeNull();
+    // SMTP on without a shared SMTP_URL no longer breaks the app; only sending without a mailbox fails
+    expect(mailerFromEnv(env).transport).toBe('smtp');
+  });
+
   it('runs draft → submitted → sent, emailing a PDF exactly once', async () => {
     const { id } = await openDraft(db, staffOer, 'oerlikon', asiaId);
     await submitOrder(db, staffOer, id);

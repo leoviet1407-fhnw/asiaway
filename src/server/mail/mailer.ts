@@ -6,6 +6,8 @@ import { join } from 'node:path';
  *
  *   MAIL_TRANSPORT=console (default)  log it and write it to .outbox/
  *   MAIL_TRANSPORT=smtp + SMTP_URL    send it for real (nodemailer)
+ *   SMTP_URL_<LOCATION>               e.g. SMTP_URL_WINTERTHUR: that restaurant sends from its own
+ *                                     mailbox (its order e-mail under Standorte), else SMTP_URL is used
  *
  * Tests use the MemoryMailer.
  */
@@ -96,16 +98,36 @@ export class SmtpMailer implements Mailer {
   }
 }
 
+/** Used when SMTP is on but there is no shared SMTP_URL: only restaurants with their own mailbox can send. */
+class NoDefaultSmtpMailer implements Mailer {
+  readonly transport = 'smtp';
+  async send(): Promise<{ messageId: string | null }> {
+    throw new Error('No SMTP_URL and no mailbox (SMTP_URL_<LOCATION>) for this restaurant');
+  }
+}
+
 export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer {
   const transport = (env.MAIL_TRANSPORT ?? 'console').toLowerCase();
-  if (transport === 'smtp') {
-    if (!env.SMTP_URL) throw new Error('MAIL_TRANSPORT=smtp needs SMTP_URL');
-    return new SmtpMailer(env.SMTP_URL);
-  }
+  if (transport === 'smtp') return env.SMTP_URL ? new SmtpMailer(env.SMTP_URL) : new NoDefaultSmtpMailer();
   if (env.NODE_ENV === 'production' && transport === 'console') {
     console.warn('[mail] MAIL_TRANSPORT=console in production: orders are NOT emailed to suppliers');
   }
   return new ConsoleMailer();
+}
+
+/** The env name of a restaurant's own mailbox: winterthur → SMTP_URL_WINTERTHUR. */
+export const locationSmtpVar = (locationId: string) => `SMTP_URL_${locationId.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+
+/**
+ * Each restaurant sends from its own mailbox when SMTP_URL_<LOCATION> is set and the restaurant
+ * has an order e-mail: From "AsiaWay Winterthur <rewt@asiaway.ch>". Otherwise the default sender.
+ */
+export function locationSender(env: NodeJS.ProcessEnv = process.env) {
+  return (loc: { id: string; name: string; contactEmail: string | null }): { mailer: Mailer; from: string } | null => {
+    if ((env.MAIL_TRANSPORT ?? 'console').toLowerCase() !== 'smtp' || !loc.contactEmail) return null;
+    const url = env[locationSmtpVar(loc.id)];
+    return url ? { mailer: new SmtpMailer(url), from: `AsiaWay ${loc.name} <${loc.contactEmail}>` } : null;
+  };
 }
 
 export function orderFromAddress(env: NodeJS.ProcessEnv = process.env): string {

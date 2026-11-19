@@ -14,7 +14,7 @@ import { LANG_COOKIE, normalizeLang, type Lang } from '@/i18n/translate';
 import { requirePrincipal } from '@/server/auth/current';
 import { SESSION_COOKIE, SESSION_DAYS, changePassword, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
-import { mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
+import { locationSender, mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
 import { updateItem, updateSupplier, type StorageArea } from '@/server/services/catalog-service';
 import {
   approveMonth,
@@ -180,7 +180,7 @@ export async function orderStepAction(orderId: string, step: OrderStep): Promise
     if (step === 'submit') await submitOrder(database, p, orderId);
     if (step === 'return') await returnToDraft(database, p, orderId);
     if (step === 'cancel') await cancelOrder(database, p, orderId);
-    if (step === 'send') await sendOrder(database, p, orderId, mailerFromEnv(), orderFromAddress());
+    if (step === 'send') await sendOrder(database, p, orderId, mailerFromEnv(), orderFromAddress(), undefined, locationSender());
     revalidatePath('/', 'layout');
     return { ok: true };
   } catch (error) {
