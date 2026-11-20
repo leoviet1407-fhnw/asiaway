@@ -5,6 +5,7 @@ import { DIFFERENCE_LABEL, closingWarnings, computeClosing, differenceTone } fro
 import { formatChf, parseChfToCents } from '@/domain/qty';
 import { saveClosingAction } from '../../actions';
 import { useT } from '@/i18n/client';
+import { addDaysIso, formatDay } from '@/lib/dates';
 
 interface Values {
   id?: string;
@@ -36,6 +37,8 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
   const [v, setV] = useState(values);
   const set = (key: keyof Values) => (e: { target: { value: string } }) => setV((cur) => ({ ...cur, [key]: e.target.value }));
   const stations = locations.find((l) => l.id === v.locationId)?.stations ?? [];
+  // Never past today: a closing is for a day that has already happened
+  const setDate = (iso: string) => setV((cur) => ({ ...cur, businessDate: iso > maxDate ? maxDate : iso }));
 
   const input = useMemo(
     () => ({
@@ -79,7 +82,42 @@ export function ClosingForm({ values, locations, locked, maxDate }: Props) {
         </div>
         <div>
           <label className="label" htmlFor="businessDate">{t('Datum')}</label>
-          <input id="businessDate" name="businessDate" type="date" className="w-full" value={v.businessDate} max={maxDate} onChange={set('businessDate')} readOnly={locked} required />
+          {locked ? (
+            <input id="businessDate" name="businessDate" type="date" className="w-full" value={v.businessDate} max={maxDate} readOnly required />
+          ) : (
+            <>
+              <div className="flex items-stretch gap-1">
+                <button type="button" className="btn-secondary min-h-0 shrink-0 px-2.5" aria-label={t('Vortag')} title={t('Vortag')} onClick={() => setDate(addDaysIso(v.businessDate || maxDate, -1))}>←</button>
+                <input id="businessDate" name="businessDate" type="date" className="min-w-0 flex-1" value={v.businessDate} max={maxDate} onChange={set('businessDate')} required />
+                <button
+                  type="button"
+                  className="btn-secondary min-h-0 shrink-0 px-2.5 disabled:opacity-40"
+                  aria-label={t('Folgetag')}
+                  title={t('Folgetag')}
+                  disabled={!v.businessDate || v.businessDate >= maxDate}
+                  onClick={() => setDate(addDaysIso(v.businessDate, 1))}
+                >
+                  →
+                </button>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-medium text-navy">{formatDay(v.businessDate, t.lang)}</span>
+                {[
+                  { label: t('Heute'), iso: maxDate },
+                  { label: t('Gestern'), iso: addDaysIso(maxDate, -1) },
+                ].map((q) => (
+                  <button
+                    key={q.iso}
+                    type="button"
+                    onClick={() => setDate(q.iso)}
+                    className={`chip px-2 py-0.5 ${v.businessDate === q.iso ? 'bg-brand-600 text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div>
           <label className="label" htmlFor="station">{t('Station')}</label>
