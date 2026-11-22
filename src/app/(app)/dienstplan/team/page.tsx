@@ -101,7 +101,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                   <div className="font-semibold text-navy">{a.name}</div>
                   <div className="text-sm">{formatDay(a.startDate, t.lang)}{a.endDate !== a.startDate && ` – ${formatDay(a.endDate, t.lang)}`} · {t(ABSENCE_LABEL[a.type])}</div>
                 </div>
-                <AbsenceDecision id={a.id} />
+                <AbsenceDecision id={a.id} startDate={a.startDate} endDate={a.endDate} />
               </li>
             ))}
           </ul>

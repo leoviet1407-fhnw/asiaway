@@ -137,15 +137,53 @@ export function NewMemberForm({ site }: { site: string }) {
   );
 }
 
-export function AbsenceDecision({ id }: { id: string }) {
+export function AbsenceDecision({ id, startDate, endDate }: { id: string; startDate?: string; endDate?: string }) {
   const t = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
-  const go = (step: 'approve' | 'reject') => start(async () => { await absenceStepAction(id, step); router.refresh(); });
+  const [rejecting, setRejecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const go = (step: 'approve' | 'reject') =>
+    start(async () => {
+      setError(null);
+      const r = await absenceStepAction(id, step, step === 'reject' ? { note, suggestedStart: from, suggestedEnd: to || from } : undefined);
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  if (!rejecting) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex gap-2">
+          <button className="btn-primary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => go('approve')}>{t('Genehmigen')}</button>
+          <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => setRejecting(true)}>{t('Ablehnen …')}</button>
+        </div>
+        {error && <p className="text-sm text-danger-500">{error}</p>}
+      </div>
+    );
+  }
   return (
-    <div className="flex gap-2">
-      <button className="btn-primary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => go('approve')}>{t('Genehmigen')}</button>
-      <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => go('reject')}>{t('Ablehnen')}</button>
+    <div className="w-full space-y-2 rounded-btn border border-surface-line bg-surface-sunken p-3 sm:max-w-md">
+      <div>
+        <label className="label" htmlFor={`rn-${id}`}>{t('Grund (sieht die Person)')}</label>
+        <input id={`rn-${id}`} className="w-full" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('z. B. Schon 2 Personen in den Ferien')} maxLength={300} />
+      </div>
+      <fieldset>
+        <legend className="label">{t('Andere Tage vorschlagen (optional)')}</legend>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" className="min-w-0 flex-1" value={from} onChange={(e) => setFrom(e.target.value)} aria-label={t('Von')} />
+          <span className="text-sm">–</span>
+          <input type="date" className="min-w-0 flex-1" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label={t('Bis')} />
+        </div>
+        {startDate && endDate && <p className="mt-1 text-xs text-charcoal-muted">{t('Die Person kann den Vorschlag annehmen, selbst andere Tage wählen oder auf die Ferien verzichten.')}</p>}
+      </fieldset>
+      {error && <p className="text-sm text-danger-500">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-primary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => go('reject')}>{from ? t('Ablehnen mit Vorschlag') : t('Ablehnen')}</button>
+        <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => setRejecting(false)}>{t('Abbrechen')}</button>
+      </div>
     </div>
   );
 }

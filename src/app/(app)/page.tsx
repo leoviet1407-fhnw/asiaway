@@ -12,6 +12,8 @@ import { countOpenRequests } from '@/server/services/change-request-service';
 import { getPlannerTodos } from '@/server/services/attention-service';
 import { needsOnboarding } from '@/server/services/onboarding-service';
 import { canEditItems, itemsWithoutBarcode } from '@/server/services/catalog-service';
+import { absences } from '@/server/db/schema';
+import { and, eq, gte } from 'drizzle-orm';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -40,6 +42,8 @@ export default async function HomePage() {
   const detailsMissing = await needsOnboarding(database, p.userId);
   // Open task for the Leitung (Belle, Xuan) and orderers: barcodes still missing on packaged products
   const barcodeTodo = canEditItems(p) ? (await itemsWithoutBarcode(database)).length : 0;
+  // A holiday request the Leitung said no to: the person chooses other days, takes the suggestion or drops it
+  const rejected = await database.select({ id: absences.id, suggestedStart: absences.suggestedStart }).from(absences).where(and(eq(absences.userId, p.userId), eq(absences.status, 'REJECTED'), gte(absences.endDate, todayIso())));
 
   // For people on the roster: their next shifts and what they still have to do
   let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
@@ -80,6 +84,15 @@ export default async function HomePage() {
           <div className="text-lg font-semibold">{t('Meine Angaben ausfüllen')}</div>
           <div className="text-sm text-white/90">{t('Adresse, Handy, IBAN und Notfallkontakt – einmalig, für Vertrag und Lohn. Dauert etwa 3 Minuten.')}</div>
           <div className="mt-2 inline-block rounded-btn bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide text-brand-600">{t('Jetzt ausfüllen')} →</div>
+        </Link>
+      )}
+
+      {rejected.length > 0 && (
+        <Link href="/dienstplan/verfuegbarkeit" className="block rounded-btn bg-brand-600 p-4 text-white">
+          <div className="text-xs font-bold uppercase tracking-wide text-white/80">{t('Offene Aufgabe')}</div>
+          <div className="text-lg font-semibold">{t('Ferienanfrage nicht bewilligt')}</div>
+          <div className="text-sm text-white/90">{rejected.some((r) => r.suggestedStart) ? t('Die Leitung schlägt andere Tage vor. Annehmen, andere Tage wählen oder verzichten.') : t('Andere Tage wählen oder verzichten.')}</div>
+          <div className="mt-2 inline-block rounded-btn bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide text-brand-600">{t('Ansehen')} →</div>
         </Link>
       )}
 

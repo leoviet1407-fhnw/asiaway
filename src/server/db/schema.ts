@@ -346,6 +346,10 @@ export const absences = pgTable('absences', {
   createdBy: uuid('created_by').notNull(),
   decidedBy: uuid('decided_by'),
   decidedAt: timestamp('decided_at', { withTimezone: true }),
+  /** When rejected: why, and other days the Leitung suggests instead. */
+  decisionNote: text('decision_note'),
+  suggestedStart: date('suggested_start'),
+  suggestedEnd: date('suggested_end'),
 });
 
 

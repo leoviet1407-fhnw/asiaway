@@ -37,6 +37,7 @@ import { fillGap, publishMonth, suggestMonth, suggestWeek } from '@/server/servi
 import { decideChangeRequest, requestChange, withdrawChangeRequest, type ChangeKind } from '@/server/services/change-request-service';
 import {
   cancelAbsence,
+  answerRejectedAbsence,
   copyWeek,
   createStaffUser,
   decideAbsence,
@@ -610,13 +611,38 @@ export async function requestAbsenceAction(_prev: { error?: string; saved?: bool
   }
 }
 
-export async function absenceStepAction(absenceId: string, step: 'approve' | 'reject' | 'cancel'): Promise<ActionResult> {
+export async function absenceStepAction(
+  absenceId: string,
+  step: 'approve' | 'reject' | 'cancel',
+  decision?: { note?: string; suggestedStart?: string; suggestedEnd?: string },
+): Promise<ActionResult> {
   try {
     const p = await requirePrincipal();
     const database = await db();
     if (step === 'cancel') await cancelAbsence(database, p, absenceId);
-    else await decideAbsence(database, p, absenceId, step === 'approve');
-    revalidatePath('/dienstplan', 'layout');
+    else
+      await decideAbsence(database, p, absenceId, step === 'approve', new Date(), {
+        note: decision?.note?.trim() || null,
+        suggestedStart: decision?.suggestedStart || null,
+        suggestedEnd: decision?.suggestedEnd || null,
+      });
+    revalidatePath('/', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
+  }
+}
+
+/** The employee's answer to a "no": take the suggested days, ask for other days, or drop it. */
+export async function answerAbsenceAction(
+  absenceId: string,
+  answer: { kind: 'accept' } | { kind: 'other'; startDate: string; endDate: string } | { kind: 'drop' },
+): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await answerRejectedAbsence(await db(), p, absenceId, answer);
+    revalidatePath('/', 'layout');
     return { ok: true };
   } catch (error) {
     if (isRedirect(error)) throw error;

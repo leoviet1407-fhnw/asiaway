@@ -595,22 +595,88 @@ export async function requestAbsence(db: AppDatabase, p: Principal, input: Absen
   return row!.id;
 }
 
-export async function decideAbsence(db: AppDatabase, p: Principal, absenceId: string, approve: boolean, now = new Date()): Promise<void> {
+export interface AbsenceDecisionInput {
+  /** Why not, shown to the employee. */
+  note?: string | null;
+  /** Other days the Leitung suggests instead (both or none). */
+  suggestedStart?: string | null;
+  suggestedEnd?: string | null;
+}
+
+export async function decideAbsence(db: AppDatabase, p: Principal, absenceId: string, approve: boolean, now = new Date(), decision: AbsenceDecisionInput = {}): Promise<void> {
   requirePlanner(p);
   if (!/^[0-9a-f-]{36}$/i.test(absenceId)) throw domainError('NOT_FOUND', 'Absence not found');
   const [own] = await db.select({ userId: absences.userId }).from(absences).where(eq(absences.id, absenceId)).limit(1);
   if (own && own.userId === p.userId && !isAdmin(p)) throw domainError('FORBIDDEN', 'Eigene Ferien bestätigt eine andere Person der Leitung.');
-  const [row] = await db.update(absences).set({ status: approve ? 'APPROVED' : 'REJECTED', decidedBy: p.userId, decidedAt: now }).where(eq(absences.id, absenceId)).returning({ id: absences.id });
+  let suggestion: { suggestedStart: string | null; suggestedEnd: string | null } = { suggestedStart: null, suggestedEnd: null };
+  if (!approve && (decision.suggestedStart || decision.suggestedEnd)) {
+    const start = decision.suggestedStart || decision.suggestedEnd!;
+    const end = decision.suggestedEnd || start;
+    if (!isoDate(start) || !isoDate(end) || end < start) throw domainError('VALIDATION_FAILED', 'Der Vorschlag hat ein ungültiges Datum.');
+    if (start < todayIso(now)) throw domainError('VALIDATION_FAILED', 'Der Vorschlag liegt in der Vergangenheit.');
+    suggestion = { suggestedStart: start, suggestedEnd: end };
+  }
+  const [row] = await db
+    .update(absences)
+    .set({
+      status: approve ? 'APPROVED' : 'REJECTED',
+      decidedBy: p.userId,
+      decidedAt: now,
+      decisionNote: approve ? null : decision.note?.trim() || null,
+      ...(approve ? { suggestedStart: null, suggestedEnd: null } : suggestion),
+    })
+    .where(eq(absences.id, absenceId))
+    .returning({ id: absences.id });
   if (!row) throw domainError('NOT_FOUND', 'Absence not found');
-  await audit(db, p.userId, approve ? 'absence.approve' : 'absence.reject', 'absence', absenceId);
+  await audit(db, p.userId, approve ? 'absence.approve' : 'absence.reject', 'absence', absenceId, approve ? {} : { suggested: suggestion.suggestedStart ? `${suggestion.suggestedStart}..${suggestion.suggestedEnd}` : null });
 }
 
-/** Staff withdraw their own pending request; the planner can delete any. */
+/**
+ * After a "no": the employee takes the suggested days (approved at once, the Leitung offered them),
+ * asks for other days (a new request), or drops the holiday. The rejected request is then removed.
+ */
+export async function answerRejectedAbsence(
+  db: AppDatabase,
+  p: Principal,
+  absenceId: string,
+  answer: { kind: 'accept' } | { kind: 'other'; startDate: string; endDate: string; note?: string | null } | { kind: 'drop' },
+  now = new Date(),
+): Promise<string | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(absenceId)) throw domainError('NOT_FOUND', 'Absence not found');
+  const [row] = await db.select().from(absences).where(eq(absences.id, absenceId)).limit(1);
+  if (!row || row.userId !== p.userId) throw domainError('NOT_FOUND', 'Absence not found');
+  if (row.status !== 'REJECTED') throw domainError('VALIDATION_FAILED', 'Diese Anfrage ist nicht abgelehnt.');
+  if (answer.kind === 'drop') {
+    await db.delete(absences).where(eq(absences.id, absenceId));
+    await audit(db, p.userId, 'absence.drop', 'absence', absenceId);
+    return null;
+  }
+  if (answer.kind === 'accept') {
+    if (!row.suggestedStart || !row.suggestedEnd) throw domainError('VALIDATION_FAILED', 'Es gibt keinen Vorschlag.');
+    if (row.suggestedStart < todayIso(now)) throw domainError('VALIDATION_FAILED', 'Der Vorschlag liegt in der Vergangenheit.');
+    const id = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(absences)
+        .values({ userId: row.userId, startDate: row.suggestedStart!, endDate: row.suggestedEnd!, type: row.type, status: 'APPROVED', note: row.note, requestedAt: now, createdBy: p.userId, decidedBy: row.decidedBy, decidedAt: now })
+        .returning({ id: absences.id });
+      await tx.delete(absences).where(eq(absences.id, absenceId));
+      return created!.id;
+    });
+    await audit(db, p.userId, 'absence.accept_suggestion', 'absence', id, { from: absenceId });
+    return id;
+  }
+  // Other days: a normal new request (same checks as any request), then the old "no" goes away
+  const id = await requestAbsence(db, p, { userId: p.userId, startDate: answer.startDate, endDate: answer.endDate || answer.startDate, type: 'VACATION', note: answer.note ?? row.note }, now);
+  await db.delete(absences).where(eq(absences.id, absenceId));
+  return id;
+}
+
+/** Staff withdraw their own pending request or remove a rejected one; the planner can delete any. */
 export async function cancelAbsence(db: AppDatabase, p: Principal, absenceId: string): Promise<void> {
   if (!/^[0-9a-f-]{36}$/i.test(absenceId)) throw domainError('NOT_FOUND', 'Absence not found');
   const [row] = await db.select().from(absences).where(eq(absences.id, absenceId)).limit(1);
   if (!row) throw domainError('NOT_FOUND', 'Absence not found');
-  if (!isPlanner(p) && !(row.userId === p.userId && row.status === 'REQUESTED')) throw domainError('FORBIDDEN', 'Not allowed');
+  if (!isPlanner(p) && !(row.userId === p.userId && (row.status === 'REQUESTED' || row.status === 'REJECTED'))) throw domainError('FORBIDDEN', 'Not allowed');
   await db.delete(absences).where(eq(absences.id, absenceId));
   await audit(db, p.userId, 'absence.cancel', 'absence', absenceId);
 }

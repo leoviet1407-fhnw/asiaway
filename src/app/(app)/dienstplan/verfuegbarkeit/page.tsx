@@ -123,8 +123,12 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
       <VacationPanel
         userId={userId}
         isPlanner={planner}
+        own={own}
         today={today}
-        items={(reports ? data.absences : yearAbsences).map((a) => ({ id: a.id, startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status, note: a.note }))}
+        items={(reports ? data.absences : yearAbsences).map((a) => {
+          const x = a as typeof a & { decisionNote?: string | null; suggestedStart?: string | null; suggestedEnd?: string | null };
+          return { id: a.id, startDate: a.startDate, endDate: a.endDate, type: a.type, status: a.status, note: a.note, decisionNote: x.decisionNote ?? null, suggestedStart: x.suggestedStart ?? null, suggestedEnd: x.suggestedEnd ?? null };
+        })}
       />
     </div>
   );
