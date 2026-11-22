@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DomainError } from '@/domain/errors';
-import { requireAdmin } from '@/server/auth/current';
+import { requireOrderer } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { getSupplier } from '@/server/services/catalog-service';
 import { SupplierForm } from './SupplierForm';
@@ -12,10 +12,11 @@ export async function generateMetadata() {
   return { title: t('Lieferant bearbeiten') };
 }
 
-export default async function SupplierEditPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SupplierEditPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ neu?: string }> }) {
   const t = await getT();
-  await requireAdmin();
+  await requireOrderer();
   const { id } = await params;
+  const { neu } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   try {
     const s = await getSupplier(await db(), id);
@@ -24,7 +25,11 @@ export default async function SupplierEditPage({ params }: { params: Promise<{ i
         <Link href="/lieferanten" className="text-sm text-charcoal-muted hover:text-navy">
           {t('← Lieferanten')}
         </Link>
-        <h1 className="text-2xl">{s.name}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-2xl">{s.name}</h1>
+          <Link href={`/artikel/neu?lieferant=${s.id}`} className="btn-secondary min-h-0 px-3 py-1.5 text-sm">{t('+ Artikel für diesen Lieferanten')}</Link>
+        </div>
+        {neu && <p className="rounded-btn bg-ok-50 p-3 text-ok-500">{t('Lieferant angelegt. Jetzt die Artikel hinzufügen.')}</p>}
         <SupplierForm
           supplier={{
             id: s.id,

@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { ItemSubtitle } from '@/components/ItemSubtitle';
 import { formatChf } from '@/domain/qty';
-import { isAdmin } from '@/domain/roles';
+
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { STORAGE_AREA_LABEL, STORAGE_AREA_ORDER, listItems } from '@/server/services/catalog-service';
+import { STORAGE_AREA_LABEL, STORAGE_AREA_ORDER, canEditCatalog, listItems } from '@/server/services/catalog-service';
 import { getT } from '@/i18n/server';
 
 export async function generateMetadata() {
@@ -16,7 +16,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const t = await getT();
   const p = await requirePrincipal();
   const { q = '' } = await searchParams;
-  const all = await listItems(await db(), { includeInactive: isAdmin(p) });
+  const editor = canEditCatalog(p);
+  const all = await listItems(await db(), { includeInactive: editor });
   const query = q.trim().toLowerCase();
   const items = query
     ? all.filter((i) => [i.nameDe, i.nameVi ?? '', i.nameEn ?? '', i.sku, ...i.barcodes.map((b) => b.code)].some((s) => s.toLowerCase().includes(query)))
@@ -24,9 +25,12 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl">{t('Artikel')}</h1>
-        <p className="text-sm text-charcoal-muted">{all.length} {t('Artikel · Musterdaten bis die echten Listen importiert sind')}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl">{t('Artikel')}</h1>
+          <p className="text-sm text-charcoal-muted">{all.length} {t('Artikel')}{editor ? ` · ${t('Antippen zum Ändern')}` : ''}</p>
+        </div>
+        {editor && <Link href="/artikel/neu" className="btn-primary shrink-0">{t('+ Neuer Artikel')}</Link>}
       </div>
       <form>
         <input type="search" name="q" defaultValue={q} placeholder={t('Name, Art.-Nr. oder Barcode …')} className="w-full" />
@@ -53,7 +57,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                       </div>
                     </div>
                     <div className="text-right text-xs">
-                      {i.offers.map((o) => (
+                      {i.offers.filter((o) => o.active).map((o) => (
                         <div key={o.supplierItemId}>
                           <div className="font-semibold text-navy">{formatChf(o.priceCents)}</div>
                           <div className="text-charcoal-muted">{o.orderUnit}</div>
@@ -65,7 +69,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                 );
                 return (
                   <li key={i.id}>
-                    {isAdmin(p) ? (
+                    {editor ? (
                       <Link href={`/artikel/${i.id}`} className="flex gap-3 px-3 py-2 hover:bg-surface-sunken">
                         {body}
                       </Link>

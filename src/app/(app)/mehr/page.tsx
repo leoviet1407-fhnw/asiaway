@@ -19,6 +19,7 @@ export default async function MorePage() {
     { href: '/artikel', label: t('Artikel'), text: t('Artikelliste, Barcodes, Preise'), icon: 'box' },
     ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: t('Lieferanten'), text: t('Kontakte, Liefertage, Mindestbestellung'), icon: 'truck' as const }] : []),
     { href: '/willkommen', label: t('Meine Angaben'), text: t('Adresse, Handy, IBAN, Notfallkontakt'), icon: 'file' as const },
+    ...(isAdmin(p) ? [{ href: '/konten', label: t('Mitarbeiter & Konten'), text: t('Logins anlegen, Rechte, Passwort, abschalten (nur Admin)'), icon: 'users' as const }] : []),
     ...(isAdmin(p) ? [{ href: '/dienstplan/angaben', label: t('Angaben des Teams'), text: t('Persönliche Angaben aller Mitarbeiter (nur Admin)'), icon: 'users' as const }] : []),
     { href: '/dienstplan/stunden', label: t('Meine Stunden'), text: t('Arbeitszeit, Überstunden, Ferien-Rest'), icon: 'clock' as const },
     { href: '/dienstplan/verfuegbarkeit', label: t('Ferien'), text: t('Ferien anfragen und sehen'), icon: 'sun' as const },

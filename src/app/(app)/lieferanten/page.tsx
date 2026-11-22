@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { formatChf } from '@/domain/qty';
-import { isAdmin } from '@/domain/roles';
+import { isOrderer } from '@/domain/roles';
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listItems, listSuppliers } from '@/server/services/catalog-service';
@@ -17,11 +17,14 @@ export default async function SuppliersPage() {
   const t = await getT();
   const p = await requirePrincipal();
   const database = await db();
-  const suppliers = await listSuppliers(database, { includeInactive: isAdmin(p) });
+  const suppliers = await listSuppliers(database, { includeInactive: isOrderer(p) });
   const items = await listItems(database);
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl">{t('Lieferanten')}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl">{t('Lieferanten')}</h1>
+        {isOrderer(p) && <Link href="/lieferanten/neu" className="btn-primary shrink-0">{t('+ Neuer Lieferant')}</Link>}
+      </div>
       <ul className="grid gap-3 sm:grid-cols-2">
         {suppliers.map((s) => {
           const count = items.filter((i) => i.offers.some((o) => o.supplierId === s.id)).length;
@@ -54,7 +57,7 @@ export default async function SuppliersPage() {
           );
           return (
             <li key={s.id}>
-              {isAdmin(p) ? (
+              {isOrderer(p) ? (
                 <Link href={`/lieferanten/${s.id}`} className="card block hover:border-brand-600">
                   {body}
                 </Link>

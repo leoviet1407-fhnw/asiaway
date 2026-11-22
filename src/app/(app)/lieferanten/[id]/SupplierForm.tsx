@@ -24,7 +24,7 @@ export function SupplierForm({ supplier: s }: { supplier: SupplierValues }) {
   const [state, action, pending] = useActionState(updateSupplierAction, undefined);
   return (
     <form action={action} className="card grid gap-3 sm:grid-cols-2">
-      <input type="hidden" name="id" value={s.id} />
+      {s.id && <input type="hidden" name="id" value={s.id} />}
       <F label={t('Name')} name="name" v={s.name} required />
       <F label={t('Bestell-E-Mail')} name="orderEmail" v={s.orderEmail} type="email" required />
       <F label={t('CC-E-Mail')} name="ccEmail" v={s.ccEmail} type="email" />
@@ -44,14 +44,16 @@ export function SupplierForm({ supplier: s }: { supplier: SupplierValues }) {
       <F label={t('Mindestbestellwert CHF')} name="minOrder" v={s.minOrder} />
       <F label={t('Unsere Kundennummer')} name="customerNumber" v={s.customerNumber} />
       <F label={t('Notizen')} name="notes" v={s.notes} />
-      <label className="flex items-center gap-2 text-sm sm:col-span-2">
-        <input type="checkbox" name="active" defaultChecked={s.active} className="min-h-0 accent-brand-600" /> {t('Aktiv')}
-      </label>
+      {s.id && (
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" name="active" defaultChecked={s.active} className="min-h-0 accent-brand-600" /> {t('Aktiv')}
+        </label>
+      )}
       {state?.error && <p className="rounded-btn bg-danger-50 p-3 text-danger-500 sm:col-span-2">{state.error}</p>}
       {state?.saved && <p className="rounded-btn bg-ok-50 p-3 text-ok-500 sm:col-span-2">{t('Gespeichert.')}</p>}
       <div className="sm:col-span-2">
         <button className="btn-primary" disabled={pending}>
-          {pending ? t('Speichert …') : t('Speichern')}
+          {pending ? t('Speichert …') : s.id ? t('Speichern') : t('Lieferant anlegen')}
         </button>
       </div>
     </form>

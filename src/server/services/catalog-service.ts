@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { isValidGtin, normalizeCode } from '../../domain/ean';
 import { domainError } from '../../domain/errors';
-import { isAdmin, isRestaurant, type Principal } from '../../domain/roles';
+import { isOrderer, isRestaurant, type Principal } from '../../domain/roles';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import { itemBarcodes, items, locations, supplierItems, suppliers } from '../db/schema';
@@ -64,6 +64,8 @@ export interface CatalogItem {
     quantityUnit: string | null;
     packSize: number;
     priceCents: number;
+    /** false = removed from this item (kept for past orders) */
+    active: boolean;
   }[];
 }
 
@@ -116,6 +118,7 @@ export async function listItems(db: AppDatabase, { supplierId, includeInactive =
           quantityUnit: o.quantityUnit,
           packSize: Number(o.packSize),
           priceCents: o.priceCents,
+          active: o.active,
         })),
     }));
   return supplierId ? result.filter((i) => i.offers.some((o) => o.supplierId === supplierId)) : result;
@@ -128,8 +131,110 @@ export async function getItem(db: AppDatabase, id: string): Promise<CatalogItem>
   return item;
 }
 
+/** Products and suppliers are kept by the people who approve orders (orderers) and admins. */
+export const canEditCatalog = (p: Principal) => isOrderer(p);
+
 function requireAdmin(p: Principal) {
-  if (!isAdmin(p)) throw domainError('FORBIDDEN', 'Admins only');
+  if (!canEditCatalog(p)) throw domainError('FORBIDDEN', 'Nur Besteller und Admins');
+}
+
+/** Cleans and checks barcodes; a code may not belong to another item. */
+async function checkBarcodes(db: AppDatabase, barcodes: { code: string; unitsPerScan: number }[], itemId: string | null) {
+  const codes = barcodes.map((b) => ({ ...b, code: normalizeCode(b.code) })).filter((b) => b.code);
+  for (const b of codes) {
+    if (/^\d+$/.test(b.code) && !isValidGtin(b.code)) {
+      throw domainError('VALIDATION_FAILED', `Ungültiger Barcode ${b.code} (Prüfziffer)`, { code: b.code });
+    }
+    if (!(b.unitsPerScan > 0)) throw domainError('VALIDATION_FAILED', 'Menge pro Scan muss > 0 sein');
+  }
+  if (new Set(codes.map((c) => c.code)).size !== codes.length) throw domainError('VALIDATION_FAILED', 'Ein Barcode ist doppelt eingetragen');
+  if (codes.length > 0) {
+    const taken = await db
+      .select({ code: itemBarcodes.code, itemId: itemBarcodes.itemId })
+      .from(itemBarcodes)
+      .where(inArray(itemBarcodes.code, codes.map((c) => c.code)));
+    const clash = taken.find((t) => t.itemId !== itemId);
+    if (clash) throw domainError('VALIDATION_FAILED', `Barcode ${clash.code} gehört schon zu einem anderen Artikel`);
+  }
+  return codes;
+}
+
+/** A supplier offer for an item: who sells it, in which unit, at what price. */
+export interface NewOffer {
+  supplierId: string;
+  supplierSku: string | null;
+  orderUnit: string;
+  quantityUnit: string | null;
+  packSize: number;
+  priceCents: number;
+}
+
+async function checkOffer(db: AppDatabase, offer: NewOffer) {
+  const [s] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.id, offer.supplierId));
+  if (!s) throw domainError('VALIDATION_FAILED', 'Lieferant fehlt');
+  if (!offer.orderUnit.trim()) throw domainError('VALIDATION_FAILED', 'Bestelleinheit fehlt');
+  if (!(offer.packSize > 0)) throw domainError('VALIDATION_FAILED', 'Packungsgrösse muss > 0 sein');
+  if (!(offer.priceCents >= 0)) throw domainError('VALIDATION_FAILED', 'Preis ist ungültig');
+}
+
+const offerValues = (o: NewOffer) => ({
+  supplierSku: o.supplierSku?.trim() || null,
+  orderUnit: o.orderUnit.trim(),
+  quantityUnit: o.quantityUnit?.trim() || null,
+  packSize: String(o.packSize),
+  priceCents: o.priceCents,
+  active: true,
+});
+
+/** Next free internal number "N-1001", "N-1002", … for items made in the app. */
+async function nextSku(db: AppDatabase): Promise<string> {
+  const rows = await db.select({ sku: items.sku }).from(items);
+  const max = rows.reduce((m, r) => {
+    const n = /^N-(\d+)$/.exec(r.sku);
+    return n ? Math.max(m, Number(n[1])) : m;
+  }, 1000);
+  return `N-${max + 1}`;
+}
+
+export interface ItemCreate extends Omit<ItemUpdate, 'offers' | 'active'> {
+  /** Optional own number; empty = the next "N-…" number. */
+  sku: string | null;
+  offer: NewOffer;
+}
+
+/** A new product with its first supplier. Returns the new item's id. */
+export async function createItem(db: AppDatabase, p: Principal, input: ItemCreate): Promise<string> {
+  requireAdmin(p);
+  if (!input.nameDe.trim()) throw domainError('VALIDATION_FAILED', 'Name fehlt');
+  const sku = input.sku?.trim() || (await nextSku(db));
+  const [dup] = await db.select({ id: items.id }).from(items).where(eq(items.sku, sku));
+  if (dup) throw domainError('VALIDATION_FAILED', `Art.-Nr. ${sku} gibt es schon`);
+  const codes = await checkBarcodes(db, input.barcodes, null);
+  await checkOffer(db, input.offer);
+  const id = await db.transaction(async (tx) => {
+    const [it] = await tx
+      .insert(items)
+      .values({
+        sku,
+        nameDe: input.nameDe.trim(),
+        nameVi: input.nameVi?.trim() || null,
+        nameEn: input.nameEn?.trim() || null,
+        storageArea: input.storageArea,
+        stockUnit: input.stockUnit.trim() || 'Stk',
+        isFresh: input.isFresh,
+        isKeyItem: input.isKeyItem,
+        department: input.department?.trim() || null,
+        itemGroup: input.itemGroup?.trim() || null,
+        active: true,
+      })
+      .returning({ id: items.id });
+    const itemId = it!.id;
+    if (codes.length > 0) await tx.insert(itemBarcodes).values(codes.map((c) => ({ code: c.code, itemId, unitsPerScan: String(c.unitsPerScan) })));
+    await tx.insert(supplierItems).values({ supplierId: input.offer.supplierId, itemId, ...offerValues(input.offer) });
+    return itemId;
+  });
+  await audit(db, p.userId, 'item.create', 'item', id, { sku, supplierId: input.offer.supplierId });
+  return id;
 }
 
 export interface ItemUpdate {
@@ -147,26 +252,21 @@ export interface ItemUpdate {
   barcodes: { code: string; unitsPerScan: number }[];
   /** Price per order unit for each existing offer. */
   offers: { supplierItemId: string; priceCents: number; orderUnit: string; quantityUnit: string | null; supplierSku: string | null }[];
+  /** Offers to take off this item (the supplier no longer sells it). */
+  removeOfferIds?: string[];
+  /** Another supplier for this item. */
+  newOffer?: NewOffer | null;
 }
 
 export async function updateItem(db: AppDatabase, p: Principal, id: string, update: ItemUpdate): Promise<void> {
   requireAdmin(p);
   if (!update.nameDe.trim()) throw domainError('VALIDATION_FAILED', 'Name fehlt');
-  const codes = update.barcodes.map((b) => ({ ...b, code: normalizeCode(b.code) })).filter((b) => b.code);
-  for (const b of codes) {
-    if (/^\d+$/.test(b.code) && !isValidGtin(b.code)) {
-      throw domainError('VALIDATION_FAILED', `Ungültiger Barcode ${b.code} (Prüfziffer)`, { code: b.code });
-    }
-    if (!(b.unitsPerScan > 0)) throw domainError('VALIDATION_FAILED', 'Menge pro Scan muss > 0 sein');
-  }
-  if (codes.length > 0) {
-    const taken = await db
-      .select({ code: itemBarcodes.code, itemId: itemBarcodes.itemId })
-      .from(itemBarcodes)
-      .where(inArray(itemBarcodes.code, codes.map((c) => c.code)));
-    const clash = taken.find((t) => t.itemId !== id);
-    if (clash) throw domainError('VALIDATION_FAILED', `Barcode ${clash.code} gehört schon zu einem anderen Artikel`);
-  }
+  const codes = await checkBarcodes(db, update.barcodes, id);
+  const remove = new Set(update.removeOfferIds ?? []);
+  if (update.newOffer) await checkOffer(db, update.newOffer);
+  const current = await db.select().from(supplierItems).where(eq(supplierItems.itemId, id));
+  const staying = current.filter((o) => o.active && !remove.has(o.id));
+  if (update.active && staying.length === 0 && !update.newOffer) throw domainError('VALIDATION_FAILED', 'Ein aktiver Artikel braucht mindestens einen Lieferanten');
 
   await db.transaction(async (tx) => {
     await tx
@@ -194,8 +294,19 @@ export async function updateItem(db: AppDatabase, p: Principal, id: string, upda
         .set({ priceCents: offer.priceCents, orderUnit: offer.orderUnit.trim(), quantityUnit: offer.quantityUnit?.trim() || null, supplierSku: offer.supplierSku?.trim() || null })
         .where(and(eq(supplierItems.id, offer.supplierItemId), eq(supplierItems.itemId, id)));
     }
+    // Removed offers are switched off, not deleted: past orders still point at them
+    for (const offerId of remove) {
+      await tx.update(supplierItems).set({ active: false }).where(and(eq(supplierItems.id, offerId), eq(supplierItems.itemId, id)));
+    }
+    if (update.newOffer) {
+      const values = offerValues(update.newOffer);
+      await tx
+        .insert(supplierItems)
+        .values({ supplierId: update.newOffer.supplierId, itemId: id, ...values })
+        .onConflictDoUpdate({ target: [supplierItems.supplierId, supplierItems.itemId], set: values });
+    }
   });
-  await audit(db, p.userId, 'item.update', 'item', id, { barcodes: codes.map((c) => c.code) });
+  await audit(db, p.userId, 'item.update', 'item', id, { barcodes: codes.map((c) => c.code), removed: [...remove], added: update.newOffer?.supplierId ?? null });
 }
 
 export interface SupplierUpdate {
@@ -229,4 +340,20 @@ export async function updateSupplier(db: AppDatabase, p: Principal, id: string, 
     })
     .where(eq(suppliers.id, id));
   await audit(db, p.userId, 'supplier.update', 'supplier', id, {});
+}
+
+/** A new supplier; returns its id. Its products are added under Artikel. */
+export async function createSupplier(db: AppDatabase, p: Principal, input: Omit<SupplierUpdate, 'active'>): Promise<string> {
+  requireAdmin(p);
+  if (!input.name.trim()) throw domainError('VALIDATION_FAILED', 'Name fehlt');
+  if (!EMAIL_RE.test(input.orderEmail.trim())) throw domainError('VALIDATION_FAILED', 'Bestell-E-Mail ist ungültig');
+  if (input.ccEmail && !EMAIL_RE.test(input.ccEmail.trim())) throw domainError('VALIDATION_FAILED', 'CC-E-Mail ist ungültig');
+  const all = await db.select({ name: suppliers.name }).from(suppliers);
+  if (all.some((s) => s.name.trim().toLowerCase() === input.name.trim().toLowerCase())) throw domainError('VALIDATION_FAILED', 'Diesen Lieferanten gibt es schon');
+  const [row] = await db
+    .insert(suppliers)
+    .values({ ...input, name: input.name.trim(), orderEmail: input.orderEmail.trim(), ccEmail: input.ccEmail?.trim() || null, active: true })
+    .returning({ id: suppliers.id });
+  await audit(db, p.userId, 'supplier.create', 'supplier', row!.id, { name: input.name.trim() });
+  return row!.id;
 }

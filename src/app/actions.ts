@@ -16,7 +16,8 @@ import { resetCalendarToken } from '@/server/services/calendar-service';
 import { SESSION_COOKIE, SESSION_DAYS, changePassword, login, logout } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { locationSender, mailerFromEnv, orderFromAddress } from '@/server/mail/mailer';
-import { updateItem, updateSupplier, type StorageArea } from '@/server/services/catalog-service';
+import { createItem, createSupplier, updateItem, updateSupplier, type NewOffer, type StorageArea } from '@/server/services/catalog-service';
+import { createAccount, resetAccountPassword, setAccountActive, updateAccount, type AccountRights } from '@/server/services/account-service';
 import {
   approveMonth,
   confirmShift,
@@ -243,16 +244,61 @@ export async function completeReceiptAction(_prev: { error?: string } | undefine
 
 const AREAS: StorageArea[] = ['COLD', 'FREEZER', 'DRY', 'BAR'];
 
+/** Item fields shared by the new-item and edit forms. */
+function itemFields(form: FormData) {
+  const area = String(form.get('storageArea')) as StorageArea;
+  const codes = form.getAll('barcode').map(String);
+  const units = form.getAll('unitsPerScan').map(String);
+  return {
+    nameDe: String(form.get('nameDe') ?? ''),
+    nameVi: String(form.get('nameVi') ?? '') || null,
+    nameEn: String(form.get('nameEn') ?? '') || null,
+    storageArea: AREAS.includes(area) ? area : ('DRY' as StorageArea),
+    stockUnit: String(form.get('stockUnit') ?? ''),
+    isFresh: form.get('isFresh') === 'on',
+    isKeyItem: form.get('isKeyItem') === 'on',
+    department: String(form.get('department') ?? '') || null,
+    itemGroup: String(form.get('itemGroup') ?? '') || null,
+    barcodes: codes.map((code, i) => ({ code: code.trim(), unitsPerScan: parseQty(units[i] ?? '1') ?? 0 })).filter((b) => b.code !== ''),
+  };
+}
+
+/** The "new supplier" block (fields new*); null when no supplier is picked. */
+function newOfferFrom(form: FormData): NewOffer | null {
+  const supplierId = String(form.get('newSupplierId') ?? '');
+  if (!supplierId) return null;
+  const cents = parseChfToCents(String(form.get('newPrice') ?? '') || '0');
+  if (cents === null) throw new DomainError('VALIDATION_FAILED', 'Preis ist ungültig');
+  return {
+    supplierId,
+    supplierSku: String(form.get('newSupplierSku') ?? '') || null,
+    orderUnit: String(form.get('newOrderUnit') ?? ''),
+    quantityUnit: String(form.get('newQuantityUnit') ?? '') || null,
+    packSize: parseQty(String(form.get('newPackSize') ?? '1') || '1') ?? 0,
+    priceCents: cents,
+  };
+}
+
+export async function createItemAction(_prev: { error?: string } | undefined, form: FormData): Promise<{ error?: string }> {
+  let id: string;
+  try {
+    const p = await requirePrincipal();
+    const offer = newOfferFrom(form);
+    if (!offer) return { error: (await getT())('Bitte einen Lieferanten wählen.') };
+    id = await createItem(await db(), p, { ...itemFields(form), sku: String(form.get('sku') ?? '') || null, offer });
+    revalidatePath('/artikel', 'layout');
+    revalidatePath('/bestellungen', 'layout');
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: (await fail(error)).error };
+  }
+  redirect(`/artikel/${id}?neu=1`);
+}
+
 export async function updateItemAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
   try {
     const p = await requirePrincipal();
     const id = String(form.get('id'));
-    const area = String(form.get('storageArea')) as StorageArea;
-    const codes = form.getAll('barcode').map(String);
-    const units = form.getAll('unitsPerScan').map(String);
-    const barcodes = codes
-      .map((code, i) => ({ code: code.trim(), unitsPerScan: parseQty(units[i] ?? '1') ?? 0 }))
-      .filter((b) => b.code !== '');
     const offerIds = form.getAll('offerId').map(String);
     const offers = offerIds.map((supplierItemId, i) => {
       const cents = parseChfToCents(String(form.getAll('price')[i] ?? ''));
@@ -266,20 +312,14 @@ export async function updateItemAction(_prev: { error?: string; saved?: boolean 
       };
     });
     await updateItem(await db(), p, id, {
-      nameDe: String(form.get('nameDe') ?? ''),
-      nameVi: String(form.get('nameVi') ?? '') || null,
-      nameEn: String(form.get('nameEn') ?? '') || null,
-      storageArea: AREAS.includes(area) ? area : 'DRY',
-      stockUnit: String(form.get('stockUnit') ?? ''),
-      isFresh: form.get('isFresh') === 'on',
-      isKeyItem: form.get('isKeyItem') === 'on',
-      department: String(form.get('department') ?? '') || null,
-      itemGroup: String(form.get('itemGroup') ?? '') || null,
+      ...itemFields(form),
       active: form.get('active') === 'on',
-      barcodes,
       offers,
+      removeOfferIds: form.getAll('removeOffer').map(String),
+      newOffer: newOfferFrom(form),
     });
     revalidatePath('/artikel', 'layout');
+    revalidatePath('/bestellungen', 'layout');
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -287,30 +327,110 @@ export async function updateItemAction(_prev: { error?: string; saved?: boolean 
   }
 }
 
+function supplierFields(form: FormData, minOrderCents: number) {
+  const channel = String(form.get('orderChannel'));
+  return {
+    name: String(form.get('name') ?? ''),
+    orderEmail: String(form.get('orderEmail') ?? ''),
+    ccEmail: String(form.get('ccEmail') ?? '') || null,
+    phone: String(form.get('phone') ?? '') || null,
+    orderChannel: (channel === 'WHATSAPP' || channel === 'PORTAL' ? channel : 'EMAIL') as 'EMAIL' | 'WHATSAPP' | 'PORTAL',
+    deliveryDays: String(form.get('deliveryDays') ?? ''),
+    cutoffNote: String(form.get('cutoffNote') ?? '') || null,
+    minOrderCents,
+    customerNumber: String(form.get('customerNumber') ?? '') || null,
+    notes: String(form.get('notes') ?? '') || null,
+  };
+}
+
 export async function updateSupplierAction(_prev: { error?: string; saved?: boolean } | undefined, form: FormData): Promise<{ error?: string; saved?: boolean }> {
   try {
     const p = await requirePrincipal();
     const minOrder = parseChfToCents(String(form.get('minOrder') ?? '0') || '0');
     if (minOrder === null) return { error: (await getT())('Mindestbestellwert ist ungültig.') };
-    const channel = String(form.get('orderChannel'));
-    await updateSupplier(await db(), p, String(form.get('id')), {
-      name: String(form.get('name') ?? ''),
-      orderEmail: String(form.get('orderEmail') ?? ''),
-      ccEmail: String(form.get('ccEmail') ?? '') || null,
-      phone: String(form.get('phone') ?? '') || null,
-      orderChannel: channel === 'WHATSAPP' || channel === 'PORTAL' ? channel : 'EMAIL',
-      deliveryDays: String(form.get('deliveryDays') ?? ''),
-      cutoffNote: String(form.get('cutoffNote') ?? '') || null,
-      minOrderCents: minOrder,
-      customerNumber: String(form.get('customerNumber') ?? '') || null,
-      notes: String(form.get('notes') ?? '') || null,
-      active: form.get('active') === 'on',
-    });
+    const id = String(form.get('id') ?? '');
+    if (!id) {
+      const newId = await createSupplier(await db(), p, supplierFields(form, minOrder));
+      revalidatePath('/lieferanten', 'layout');
+      redirect(`/lieferanten/${newId}?neu=1`);
+    }
+    await updateSupplier(await db(), p, id, { ...supplierFields(form, minOrder), active: form.get('active') === 'on' });
     revalidatePath('/lieferanten', 'layout');
     return { saved: true };
   } catch (error) {
     if (isRedirect(error)) throw error;
     return { error: (await fail(error)).error };
+  }
+}
+
+// --- Accounts (admin) -----------------------------------------------------------------
+
+function rightsFrom(form: FormData): AccountRights {
+  return {
+    locationIds: form.getAll('location').map(String),
+    orderer: form.get('orderer') === 'on',
+    planner: form.get('planner') === 'on',
+    admin: form.get('admin') === 'on',
+  };
+}
+
+export type AccountState = { error?: string; saved?: boolean; password?: string; email?: string };
+
+export async function createAccountAction(_prev: AccountState | undefined, form: FormData): Promise<AccountState> {
+  try {
+    const p = await requirePrincipal();
+    const email = String(form.get('email') ?? '').trim();
+    const site = String(form.get('rosterSite') ?? '');
+    const type = String(form.get('employmentType') ?? 'PART_TIME');
+    const employmentType = (['FULL_TIME', 'PART_TIME', 'ON_CALL', 'MANAGEMENT'].includes(type) ? type : 'PART_TIME') as 'FULL_TIME' | 'PART_TIME' | 'ON_CALL' | 'MANAGEMENT';
+    const pensum = Number(String(form.get('pensum') ?? '').trim());
+    const { password } = await createAccount(await db(), p, {
+      ...rightsFrom(form),
+      name: String(form.get('name') ?? ''),
+      email,
+      roster: site ? { site, employmentType, pensumPercent: Number.isFinite(pensum) && pensum > 0 ? Math.round(pensum) : null } : null,
+    });
+    revalidatePath('/konten');
+    revalidatePath('/dienstplan', 'layout');
+    return { password, email };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: (await fail(error)).error };
+  }
+}
+
+export async function updateAccountAction(_prev: AccountState | undefined, form: FormData): Promise<AccountState> {
+  try {
+    const p = await requirePrincipal();
+    await updateAccount(await db(), p, String(form.get('id')), { ...rightsFrom(form), name: String(form.get('name') ?? ''), email: String(form.get('email') ?? '') });
+    revalidatePath('/konten');
+    return { saved: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { error: (await fail(error)).error };
+  }
+}
+
+export async function resetAccountPasswordAction(id: string): Promise<ActionResult<string>> {
+  try {
+    const p = await requirePrincipal();
+    return { ok: true, value: await resetAccountPassword(await db(), p, id) };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
+  }
+}
+
+export async function setAccountActiveAction(id: string, active: boolean): Promise<ActionResult> {
+  try {
+    const p = await requirePrincipal();
+    await setAccountActive(await db(), p, id, active);
+    revalidatePath('/konten');
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return fail(error);
   }
 }
 
