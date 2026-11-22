@@ -197,7 +197,7 @@ export default async function HomePage() {
             <Action href="/dienstplan" icon="users" label={t('Dienstplan')} primary />
             <Action href="/dienstplan/stunden" icon="clock" label={t('Meine Stunden')} />
             <Action href="/dienstplan/anfragen" icon="swap" label={t('Änderungsanfragen')} badge={openRequests} />
-            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="sun" label={availability ? t('Verfügbarkeit & Ferien') : t('Ferien')} />
+            <Action href={`/dienstplan/verfuegbarkeit?monat=${month}`} icon="sun" label={availability ? t('Verfügbarkeit & Ferien') : t('Standardwoche & Ferien')} />
             <Action href="/wareneingang" icon="scan" label={t('Wareneingang')} badge={deliveries.length} />
             <Action href="/tagesabschluss/neu" icon="receipt" label={t('Tagesabschluss')} />
             <Action href="/bestellungen/neu" icon="cart" label={t('Neue Bestellung')} />

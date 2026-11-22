@@ -42,6 +42,8 @@ export const EN: Record<string, string> = {
   Barcode: 'Barcode',
   'Bemerkung:': 'Note:',
   angefragt: 'requested',
+  'Standardwoche & Ferien': 'Standard week & holidays',
+  'Wann Sie normalerweise arbeiten, Ferien anfragen': 'When you normally work, request holidays',
   'Ferien anfragen und sehen': 'Request and see holidays',
   Kopieren: 'Copy',
   Einfügen: 'Paste',
@@ -813,6 +815,7 @@ export const EN: Record<string, string> = {
 
   // --- Standard week as the main thing ---
   'Standardwoche gespeichert. Sie gilt ab jetzt für jede Woche.': 'Standard week saved. It now applies to every week.',
+  'Wann arbeiten Sie normalerweise? Einmal einstellen, dann gilt es für jede Woche. Die Leitung plant Sie an diesen Tagen und Zeiten ein, an Tagen mit „Nicht verfügbar“ nicht. Leer lassen = kein Wunsch.': 'When do you normally work? Set it once and it applies to every week. The management plans you on these days and times, and not on days marked “Not available”. Leave empty = no preference.',
   'Wann können Sie normalerweise arbeiten? Einmal einstellen, dann gilt es für jede Woche. Nur Ausnahmen tragen Sie weiter unten ein.': 'When can you normally work? Set it once and it applies to every week. You only enter exceptions further down.',
   'Ausnahmen und bestimmte Wochen': 'Exceptions and specific weeks',
   'Nur wenn eine Woche anders ist als Ihre Standardwoche: hier ändern und abschicken.': 'Only when a week differs from your standard week: change it here and submit.',

@@ -22,7 +22,7 @@ export default async function MorePage() {
     ...(isAdmin(p) ? [{ href: '/konten', label: t('Mitarbeiter & Konten'), text: t('Logins anlegen, Rechte, Passwort, abschalten (nur Admin)'), icon: 'users' as const }] : []),
     ...(isAdmin(p) ? [{ href: '/dienstplan/angaben', label: t('Angaben des Teams'), text: t('Persönliche Angaben aller Mitarbeiter (nur Admin)'), icon: 'users' as const }] : []),
     { href: '/dienstplan/stunden', label: t('Meine Stunden'), text: t('Arbeitszeit, Überstunden, Ferien-Rest'), icon: 'clock' as const },
-    { href: '/dienstplan/verfuegbarkeit', label: t('Ferien'), text: t('Ferien anfragen und sehen'), icon: 'sun' as const },
+    { href: '/dienstplan/verfuegbarkeit', label: t('Standardwoche & Ferien'), text: t('Wann Sie normalerweise arbeiten, Ferien anfragen'), icon: 'sun' as const },
     ...(isPlanner(p) ? [{ href: '/dienstplan/bedarf', label: t('Bedarf & Abdeckung'), text: t('Wie viele Personen gebraucht werden und wie viele gemeldet haben'), icon: 'chart' as const }] : []),
     ...(isPlanner(p) ? [{ href: '/dienstplan/saison', label: t('Feiertage & Ferienzeit'), text: t('Besondere Tage, Ferien-Limiten'), icon: 'sun' as const }] : []),
     ...(isPlanner(p) ? [{ href: '/dienstplan/uebersicht', label: t('Übersicht'), text: t('Alle Mitarbeiter, Diagramme zu Stunden, Ferien und Umsatz'), icon: 'chart' as const }] : []),

@@ -16,7 +16,7 @@ import { getT } from '@/i18n/server';
 
 export async function generateMetadata() {
   const t = await getT();
-  return { title: t('Ferien') };
+  return { title: t('Standardwoche & Ferien') };
 }
 
 const monthName = (m: string, lang: import('@/i18n/translate').Lang) => monthLabel(m, lang);
@@ -63,18 +63,20 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
     <div className="mx-auto max-w-2xl space-y-5 pb-8">
       <div>
         <Link href="/dienstplan" className="text-sm text-charcoal-muted hover:text-navy">{t('← Dienstplan')}</Link>
-        <h1 className="mt-1 text-2xl">{t('Ferien')}</h1>
+        <h1 className="mt-1 text-2xl">{t('Standardwoche & Ferien')}</h1>
         {!own && <p className="text-charcoal-muted">{t('für')} {person?.name}</p>}
       </div>
 
-      {!reports && (
+      {!reports && !own && (
         <div className="rounded-btn bg-navy p-4 text-white">
           <div className="font-semibold">{t('Sie müssen keine Zeiten melden.')}</div>
           <p className="text-sm text-white/80">{t('Sie arbeiten nach dem Dienstplan. Hier tragen Sie nur Ihre Ferien ein. Eine Schicht ändern: über „Ändern“ bei der Schicht.')}</p>
         </div>
       )}
 
-      {!reports && planner && <PatternPanel key={`pattern-${userId}`} userId={userId} rows={patternRows} fixedDays />}
+      {/* Everybody sets their own Standardwoche; the Leitung sets the fixed days of a colleague */}
+      {!reports && own && <PatternPanel key={`pattern-${userId}`} userId={userId} rows={patternRows} standalone />}
+      {!reports && !own && planner && <PatternPanel key={`pattern-${userId}`} userId={userId} rows={patternRows} fixedDays />}
 
       {reports && (
       <>

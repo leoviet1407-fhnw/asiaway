@@ -18,7 +18,7 @@ const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samsta
  * The Standardwoche: when you can usually work. It applies to every week by itself;
  * the week-by-week list below is only for exceptions.
  */
-export function PatternPanel({ userId, rows, fixedDays = false }: { userId: string; rows: PatternRow[]; fixedDays?: boolean }) {
+export function PatternPanel({ userId, rows, fixedDays = false, standalone = false }: { userId: string; rows: PatternRow[]; fixedDays?: boolean; /** No week-by-week list below it (staff who work by the plan). */ standalone?: boolean }) {
   const t = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -42,7 +42,13 @@ export function PatternPanel({ userId, rows, fixedDays = false }: { userId: stri
   return (
     <section className="card">
       <h2 className="text-lg font-semibold text-navy">{fixedDays ? t('Feste Arbeitstage') : t('Meine Standardwoche')}</h2>
-      <p className="mt-1 text-sm text-charcoal-muted">{fixedDays ? t('An welchen Tagen arbeitet diese Person? Nur an diesen Tagen wird sie eingeteilt, an den anderen nicht. Leer lassen = jeden Tag.') : t('Wann können Sie normalerweise arbeiten? Einmal einstellen, dann gilt es für jede Woche. Nur Ausnahmen tragen Sie weiter unten ein.')}</p>
+      <p className="mt-1 text-sm text-charcoal-muted">
+        {fixedDays
+          ? t('An welchen Tagen arbeitet diese Person? Nur an diesen Tagen wird sie eingeteilt, an den anderen nicht. Leer lassen = jeden Tag.')
+          : standalone
+            ? t('Wann arbeiten Sie normalerweise? Einmal einstellen, dann gilt es für jede Woche. Die Leitung plant Sie an diesen Tagen und Zeiten ein, an Tagen mit „Nicht verfügbar“ nicht. Leer lassen = kein Wunsch.')
+            : t('Wann können Sie normalerweise arbeiten? Einmal einstellen, dann gilt es für jede Woche. Nur Ausnahmen tragen Sie weiter unten ein.')}
+      </p>
       <ul className="mt-3 divide-y divide-surface-line">
         {list.map((r, i) => (
           <li key={r.weekday} className="flex flex-wrap items-center gap-2 py-2">
