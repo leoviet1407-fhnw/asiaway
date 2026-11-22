@@ -1,7 +1,8 @@
 'use server';
 
 import { randomBytes } from 'node:crypto';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { withBase } from '@/lib/base-path';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { DomainError } from '@/domain/errors';
@@ -62,6 +63,8 @@ import {
   sendOrder,
   setLineQty,
   submitOrder,
+  notifyReview,
+  reviewRecipients,
   updateOrderDetails,
 } from '@/server/services/order-service';
 import {
@@ -179,7 +182,14 @@ export async function orderStepAction(orderId: string, step: OrderStep): Promise
   try {
     const p = await requirePrincipal();
     const database = await db();
-    if (step === 'submit') await submitOrder(database, p, orderId);
+    if (step === 'submit') {
+      await submitOrder(database, p, orderId);
+      // Tell the reviewer by e-mail (never blocks the submit)
+      const h = await headers();
+      const host = h.get('host');
+      const proto = h.get('x-forwarded-proto') ?? 'https';
+      await notifyReview(database, p, orderId, { recipients: reviewRecipients(), appUrl: host ? `${proto}://${host}${withBase('')}` : '', pickSender: locationSender(), mailer: mailerFromEnv(), from: orderFromAddress() });
+    }
     if (step === 'return') await returnToDraft(database, p, orderId);
     if (step === 'cancel') await cancelOrder(database, p, orderId);
     if (step === 'send') await sendOrder(database, p, orderId, mailerFromEnv(), orderFromAddress(), undefined, locationSender());

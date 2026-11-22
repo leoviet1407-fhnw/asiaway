@@ -11,6 +11,7 @@ import { getPattern } from '@/server/services/pattern-service';
 import { countOpenRequests } from '@/server/services/change-request-service';
 import { getPlannerTodos } from '@/server/services/attention-service';
 import { needsOnboarding } from '@/server/services/onboarding-service';
+import { canEditItems, itemsWithoutBarcode } from '@/server/services/catalog-service';
 import { listOrders } from '@/server/services/order-service';
 import { listReceivable } from '@/server/services/receiving-service';
 import { OrderStatusChip } from '@/components/StatusChip';
@@ -37,6 +38,8 @@ export default async function HomePage() {
   const month = dueMonth(today);
   // Open task for everyone on the roster until they have filled in their personal details (not blocking)
   const detailsMissing = await needsOnboarding(database, p.userId);
+  // Open task for the Leitung (Belle, Xuan) and orderers: barcodes still missing on packaged products
+  const barcodeTodo = canEditItems(p) ? (await itemsWithoutBarcode(database)).length : 0;
 
   // For people on the roster: their next shifts and what they still have to do
   let myShifts: Awaited<ReturnType<typeof listMyShifts>> = [];
@@ -77,6 +80,15 @@ export default async function HomePage() {
           <div className="text-lg font-semibold">{t('Meine Angaben ausfüllen')}</div>
           <div className="text-sm text-white/90">{t('Adresse, Handy, IBAN und Notfallkontakt – einmalig, für Vertrag und Lohn. Dauert etwa 3 Minuten.')}</div>
           <div className="mt-2 inline-block rounded-btn bg-white px-4 py-2 text-sm font-bold uppercase tracking-wide text-brand-600">{t('Jetzt ausfüllen')} →</div>
+        </Link>
+      )}
+
+      {barcodeTodo > 0 && (
+        <Link href="/artikel?ohne=barcode" className="block rounded-btn border-2 border-brand-600 bg-white p-4">
+          <div className="text-xs font-bold uppercase tracking-wide text-brand-600">{t('Offene Aufgabe')}</div>
+          <div className="text-lg font-semibold text-navy">{t('Barcodes erfassen: {n} Artikel ohne Barcode', { n: barcodeTodo })}</div>
+          <div className="text-sm text-charcoal-muted">{t('Artikel öffnen, Barcode mit der Kamera scannen, speichern – dann zum nächsten. So klappt der Wareneingang mit dem Scanner.')}</div>
+          <div className="mt-2 inline-block rounded-btn bg-brand-600 px-4 py-2 text-sm font-bold uppercase tracking-wide text-white">{t('Loslegen')} →</div>
         </Link>
       )}
 

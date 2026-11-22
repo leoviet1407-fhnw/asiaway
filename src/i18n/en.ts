@@ -1000,6 +1000,17 @@ export const EN: Record<string, string> = {
   'Ja, abschalten': 'Yes, switch off',
   'Ja, neues Passwort': 'Yes, new password',
   'Keine Verbindung oder die Seite ist veraltet. Bitte Seite neu laden und nochmals versuchen.': 'No connection or the page is out of date. Please reload the page and try again.',
+  'Konten': 'Accounts',
+  'Ohne Barcode ({n})': 'Without barcode ({n})',
+  'Alle': 'All',
+  'Artikel antippen, dann „📷 Barcode scannen“ und speichern. Danach geht es mit „Nächster Artikel ohne Barcode“ weiter. Frischware braucht keinen Barcode.': 'Tap an item, then “📷 Scan barcode” and save. Then continue with “Next item without barcode”. Fresh goods need no barcode.',
+  'Aufgabe Barcodes: noch {n} Artikel ohne Barcode.': 'Barcode task: {n} items still without barcode.',
+  'Nächster Artikel ohne Barcode →': 'Next item without barcode →',
+  'Fertig – zur Liste': 'Done – back to the list',
+  'Barcodes erfassen: {n} Artikel ohne Barcode': 'Add barcodes: {n} items without barcode',
+  'Artikel öffnen, Barcode mit der Kamera scannen, speichern – dann zum nächsten. So klappt der Wareneingang mit dem Scanner.': 'Open an item, scan the barcode with the camera, save – then the next one. This makes goods-in with the scanner work.',
+  'Loslegen': 'Start',
+  'Nur Leitung, Besteller und Admins': 'Management, orderers and admins only',
 };
 
 /** Sentences with fixed words and variable numbers/names ($1, $2 … are the captured parts). */

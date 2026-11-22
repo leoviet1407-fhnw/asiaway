@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { isValidGtin, normalizeCode } from '../../domain/ean';
 import { domainError } from '../../domain/errors';
-import { isOrderer, isRestaurant, type Principal } from '../../domain/roles';
+import { isOrderer, isPlanner, isRestaurant, type Principal } from '../../domain/roles';
 import { audit } from '../audit';
 import type { AppDatabase } from '../db/client';
 import { itemBarcodes, items, locations, supplierItems, suppliers } from '../db/schema';
@@ -133,6 +133,18 @@ export async function getItem(db: AppDatabase, id: string): Promise<CatalogItem>
 
 /** Products and suppliers are kept by the people who approve orders (orderers) and admins. */
 export const canEditCatalog = (p: Principal) => isOrderer(p);
+/** Products (names, barcodes, prices) are also kept by the Leitung (planners), e.g. Belle filling in barcodes. */
+export const canEditItems = (p: Principal) => isOrderer(p) || isPlanner(p);
+
+function requireItemEditor(p: Principal) {
+  if (!canEditItems(p)) throw domainError('FORBIDDEN', 'Nur Leitung, Besteller und Admins');
+}
+
+/** Active packaged items (not fresh goods) that are ordered from someone but have no barcode yet. */
+export async function itemsWithoutBarcode(db: AppDatabase): Promise<{ id: string; nameDe: string }[]> {
+  const all = await listItems(db);
+  return all.filter((i) => !i.isFresh && i.offers.length > 0 && i.barcodes.length === 0).map((i) => ({ id: i.id, nameDe: i.nameDe }));
+}
 
 function requireAdmin(p: Principal) {
   if (!canEditCatalog(p)) throw domainError('FORBIDDEN', 'Nur Besteller und Admins');
@@ -204,7 +216,7 @@ export interface ItemCreate extends Omit<ItemUpdate, 'offers' | 'active'> {
 
 /** A new product with its first supplier. Returns the new item's id. */
 export async function createItem(db: AppDatabase, p: Principal, input: ItemCreate): Promise<string> {
-  requireAdmin(p);
+  requireItemEditor(p);
   if (!input.nameDe.trim()) throw domainError('VALIDATION_FAILED', 'Name fehlt');
   const sku = input.sku?.trim() || (await nextSku(db));
   const [dup] = await db.select({ id: items.id }).from(items).where(eq(items.sku, sku));
@@ -259,7 +271,7 @@ export interface ItemUpdate {
 }
 
 export async function updateItem(db: AppDatabase, p: Principal, id: string, update: ItemUpdate): Promise<void> {
-  requireAdmin(p);
+  requireItemEditor(p);
   if (!update.nameDe.trim()) throw domainError('VALIDATION_FAILED', 'Name fehlt');
   const codes = await checkBarcodes(db, update.barcodes, id);
   const remove = new Set(update.removeOfferIds ?? []);

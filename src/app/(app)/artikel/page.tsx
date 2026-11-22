@@ -4,7 +4,7 @@ import { formatChf } from '@/domain/qty';
 
 import { requirePrincipal } from '@/server/auth/current';
 import { db } from '@/server/db';
-import { STORAGE_AREA_LABEL, STORAGE_AREA_ORDER, canEditCatalog, listItems } from '@/server/services/catalog-service';
+import { STORAGE_AREA_LABEL, STORAGE_AREA_ORDER, canEditItems, listItems } from '@/server/services/catalog-service';
 import { getT } from '@/i18n/server';
 
 export async function generateMetadata() {
@@ -12,16 +12,19 @@ export async function generateMetadata() {
   return { title: t('Artikel') };
 }
 
-export default async function ItemsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function ItemsPage({ searchParams }: { searchParams: Promise<{ q?: string; ohne?: string }> }) {
   const t = await getT();
   const p = await requirePrincipal();
-  const { q = '' } = await searchParams;
-  const editor = canEditCatalog(p);
+  const { q = '', ohne } = await searchParams;
+  const missingOnly = ohne === 'barcode';
+  const editor = canEditItems(p);
   const all = await listItems(await db(), { includeInactive: editor });
   const query = q.trim().toLowerCase();
-  const items = query
-    ? all.filter((i) => [i.nameDe, i.nameVi ?? '', i.nameEn ?? '', i.sku, ...i.barcodes.map((b) => b.code)].some((s) => s.toLowerCase().includes(query)))
-    : all;
+  const noCode = (i: (typeof all)[number]) => i.active && !i.isFresh && i.offers.some((o) => o.active) && i.barcodes.length === 0;
+  const missingCount = all.filter(noCode).length;
+  const items = (missingOnly ? all.filter(noCode) : all).filter((i) =>
+    query ? [i.nameDe, i.nameVi ?? '', i.nameEn ?? '', i.sku, ...i.barcodes.map((b) => b.code)].some((s) => s.toLowerCase().includes(query)) : true,
+  );
 
   return (
     <div className="space-y-4">
@@ -32,7 +35,15 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
         </div>
         {editor && <Link href="/artikel/neu" className="btn-primary shrink-0">{t('+ Neuer Artikel')}</Link>}
       </div>
+      {editor && missingCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/artikel" className={`chip px-3 py-1 ${!missingOnly ? 'bg-brand-600 text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}>{t('Alle')}</Link>
+          <Link href="/artikel?ohne=barcode" className={`chip px-3 py-1 ${missingOnly ? 'bg-brand-600 text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}>{t('Ohne Barcode ({n})', { n: missingCount })}</Link>
+        </div>
+      )}
+      {missingOnly && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Artikel antippen, dann „📷 Barcode scannen“ und speichern. Danach geht es mit „Nächster Artikel ohne Barcode“ weiter. Frischware braucht keinen Barcode.')}</p>}
       <form>
+        {missingOnly && <input type="hidden" name="ohne" value="barcode" />}
         <input type="search" name="q" defaultValue={q} placeholder={t('Name, Art.-Nr. oder Barcode …')} className="w-full" />
       </form>
       {STORAGE_AREA_ORDER.map((area) => {
@@ -70,7 +81,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                 return (
                   <li key={i.id}>
                     {editor ? (
-                      <Link href={`/artikel/${i.id}`} className="flex gap-3 px-3 py-2 hover:bg-surface-sunken">
+                      <Link href={`/artikel/${i.id}${missingOnly ? '?aufgabe=barcode' : ''}`} className="flex gap-3 px-3 py-2 hover:bg-surface-sunken">
                         {body}
                       </Link>
                     ) : (

@@ -28,6 +28,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const more = [
     { href: '/artikel', label: t('Artikel'), icon: 'box' as const },
     ...(isOrderer(p) || isAdmin(p) ? [{ href: '/lieferanten', label: t('Lieferanten'), icon: 'truck' as const }] : []),
+    ...(isAdmin(p) ? [{ href: '/konten', label: t('Konten'), icon: 'users' as const }] : []),
+    { href: '/mehr', label: t('Mehr'), icon: 'more' as const },
   ];
   return (
     <div className="min-h-screen pb-20 md:pb-0">

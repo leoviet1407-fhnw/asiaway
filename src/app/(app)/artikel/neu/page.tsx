@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireOrderer } from '@/server/auth/current';
+import { requireItemEditor } from '@/server/auth/current';
 import { db } from '@/server/db';
 import { listSuppliers } from '@/server/services/catalog-service';
 import { ItemForm } from '../[id]/ItemForm';
@@ -12,7 +12,7 @@ export async function generateMetadata() {
 
 export default async function NewItemPage({ searchParams }: { searchParams: Promise<{ lieferant?: string }> }) {
   const t = await getT();
-  await requireOrderer();
+  await requireItemEditor();
   const { lieferant } = await searchParams;
   const suppliers = (await listSuppliers(await db())).map((s) => ({ id: s.id, name: s.name }));
   return (

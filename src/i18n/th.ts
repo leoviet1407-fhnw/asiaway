@@ -943,6 +943,17 @@ export const TH: Record<string, string> = {
   "Ja, abschalten": "ใช่ ปิดบัญชี",
   "Ja, neues Passwort": "ใช่ สร้างรหัสผ่านใหม่",
   "Keine Verbindung oder die Seite ist veraltet. Bitte Seite neu laden und nochmals versuchen.": "ไม่มีการเชื่อมต่อหรือหน้าเก่าแล้ว กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง",
+  "Konten": "บัญชี",
+  "Ohne Barcode ({n})": "ไม่มีบาร์โค้ด ({n})",
+  "Alle": "ทั้งหมด",
+  "Artikel antippen, dann „📷 Barcode scannen“ und speichern. Danach geht es mit „Nächster Artikel ohne Barcode“ weiter. Frischware braucht keinen Barcode.": "แตะสินค้า แล้วกด “📷 สแกนบาร์โค้ด” และบันทึก จากนั้นไปต่อที่ “สินค้าถัดไปที่ไม่มีบาร์โค้ด” ของสดไม่ต้องมีบาร์โค้ด",
+  "Aufgabe Barcodes: noch {n} Artikel ohne Barcode.": "งานบาร์โค้ด: ยังเหลือ {n} รายการที่ไม่มีบาร์โค้ด",
+  "Nächster Artikel ohne Barcode →": "สินค้าถัดไปที่ไม่มีบาร์โค้ด →",
+  "Fertig – zur Liste": "เสร็จแล้ว – กลับไปที่รายการ",
+  "Barcodes erfassen: {n} Artikel ohne Barcode": "เพิ่มบาร์โค้ด: {n} รายการที่ไม่มีบาร์โค้ด",
+  "Artikel öffnen, Barcode mit der Kamera scannen, speichern – dann zum nächsten. So klappt der Wareneingang mit dem Scanner.": "เปิดสินค้า สแกนบาร์โค้ดด้วยกล้อง บันทึก แล้วไปรายการถัดไป เพื่อให้การรับสินค้าด้วยเครื่องสแกนใช้งานได้",
+  "Loslegen": "เริ่มเลย",
+  "Nur Leitung, Besteller und Admins": "เฉพาะผู้จัดการ ผู้สั่งซื้อ และผู้ดูแลระบบ",
 };
 
 /** Thai output for each English pattern, by the pattern's regex source (same captured parts $1, $2 …). */

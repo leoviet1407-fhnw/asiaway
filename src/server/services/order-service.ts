@@ -551,3 +551,54 @@ export async function getOrderHistory(db: AppDatabase, p: Principal, orderId: st
   // A merged change that ends where it started (2 → 5 → 2) is no change
   return out.filter((x) => !(x.kind === 'line' && x.from === x.to)).map(({ userId: _u, itemId: _i, ...rest }) => rest);
 }
+
+/** Who is told by e-mail that an order waits for review: REVIEW_NOTIFY_EMAILS (comma separated). */
+export function reviewRecipients(env: NodeJS.ProcessEnv = process.env): string[] {
+  return (env.REVIEW_NOTIFY_EMAILS ?? '')
+    .split(/[,;\s]+/)
+    .map((x) => x.trim())
+    .filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+}
+
+/** The short e-mail "order waits for review" (no PDF; the link opens the order in the app). */
+export async function reviewNotice(db: AppDatabase, p: Principal, orderId: string, appUrl: string) {
+  const v = await getOrder(db, p, orderId);
+  const n = v.lines.filter((l) => l.qty > 0).length;
+  const who = v.submittedBy?.name ?? p.name;
+  const subject = `Zur Prüfung: ${v.order.number} · ${v.location.name} · ${v.supplier.name} (${n} Positionen)`;
+  const text = [
+    `Neue Bestellung zur Prüfung`,
+    ``,
+    `Bestellung: ${v.order.number}`,
+    `Restaurant: ${v.location.name}`,
+    `Lieferant: ${v.supplier.name}`,
+    `Positionen: ${n}`,
+    `Eingereicht von: ${who}`,
+    ``,
+    `Öffnen, prüfen und senden: ${appUrl.replace(/\/$/, '')}/bestellungen/${v.order.id}`,
+  ].join('\n');
+  return { subject, text, location: v.location };
+}
+
+/**
+ * Sends "order waits for review" to the review addresses, from the restaurant's mailbox.
+ * Never fails the submit: problems are logged and reported back as false.
+ */
+export async function notifyReview(
+  db: AppDatabase,
+  p: Principal,
+  orderId: string,
+  opts: { recipients: string[]; appUrl: string; pickSender?: SenderPicker | undefined; mailer: Mailer; from: string },
+): Promise<boolean> {
+  if (opts.recipients.length === 0) return false;
+  try {
+    const notice = await reviewNotice(db, p, orderId, opts.appUrl);
+    const sender = opts.pickSender?.({ id: notice.location.id, name: notice.location.name, contactEmail: notice.location.contactEmail }) ?? { mailer: opts.mailer, from: opts.from };
+    await sender.mailer.send({ from: sender.from, to: opts.recipients.join(', '), subject: notice.subject, text: notice.text });
+    await audit(db, p.userId, 'order.review_notice', 'purchase_order', orderId, { to: opts.recipients.length });
+    return true;
+  } catch (error) {
+    console.error('[mail] review notice failed', error);
+    return false;
+  }
+}

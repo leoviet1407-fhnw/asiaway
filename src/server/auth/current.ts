@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Principal } from '../../domain/roles';
-import { isAdmin, isOrderer } from '../../domain/roles';
+import { isAdmin, isOrderer, isPlanner } from '../../domain/roles';
 import { db } from '../db';
 import { SESSION_COOKIE, principalFromToken } from './session';
 
@@ -21,6 +21,13 @@ export async function requirePrincipal(): Promise<Principal> {
 export async function requireOrderer(): Promise<Principal> {
   const p = await requirePrincipal();
   if (!isOrderer(p)) redirect('/');
+  return p;
+}
+
+/** Products: orderers, planners (Leitung) and admins. */
+export async function requireItemEditor(): Promise<Principal> {
+  const p = await requirePrincipal();
+  if (!isOrderer(p) && !isPlanner(p)) redirect('/');
   return p;
 }
 
