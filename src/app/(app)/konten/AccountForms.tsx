@@ -135,21 +135,30 @@ export function AccountRow({ account: a, restaurants, self }: { account: Account
     a.admin ? t('Admin') : null,
   ].filter(Boolean);
 
-  const reset = () => {
-    if (!confirm(t('Neues Passwort für {name} erstellen? Das alte gilt dann nicht mehr.', { name: a.name }))) return;
+  // Asked on the page itself: browser pop-ups (confirm) are blocked in some phone browsers and home-screen apps.
+  const [ask, setAsk] = useState<'off' | 'reset' | null>(null);
+  const run = (job: () => Promise<void>) =>
     start(async () => {
+      try {
+        await job();
+      } catch {
+        setMessage({ error: t('Keine Verbindung oder die Seite ist veraltet. Bitte Seite neu laden und nochmals versuchen.') });
+      }
+    });
+  const reset = () =>
+    run(async () => {
+      setAsk(null);
       const r = await resetAccountPasswordAction(a.id);
       setMessage(r.ok ? { password: r.value } : { error: r.error });
     });
-  };
-  const toggle = () => {
-    if (a.active && !confirm(t('{name} abschalten? Die Person kann sich nicht mehr anmelden und wird nicht mehr geplant. Bestellungen, Schichten und Abschlüsse bleiben erhalten.', { name: a.name }))) return;
-    start(async () => {
+  const toggle = () =>
+    run(async () => {
+      setAsk(null);
+      setMessage(null);
       const r = await setAccountActiveAction(a.id, !a.active);
       if (!r.ok) setMessage({ error: r.error });
       else router.refresh();
     });
-  };
 
   return (
     <li>
@@ -185,14 +194,30 @@ export function AccountRow({ account: a, restaurants, self }: { account: Account
           <div className="flex flex-wrap gap-2 sm:col-span-2">
             <button className="btn-primary" disabled={pending}>{pending ? t('Speichert …') : t('Speichern')}</button>
             {a.active && (
-              <button type="button" className="btn-secondary" onClick={reset} disabled={busy}>{t('Neues Passwort')}</button>
+              <button type="button" className="btn-secondary" onClick={() => setAsk('reset')} disabled={busy}>{t('Neues Passwort')}</button>
             )}
             {!self && (
-              <button type="button" className={a.active ? 'btn-secondary text-danger-500' : 'btn-secondary'} onClick={toggle} disabled={busy}>
-                {a.active ? t('Konto abschalten') : t('Wieder einschalten')}
+              <button type="button" className={a.active ? 'btn-secondary text-danger-500' : 'btn-secondary'} onClick={() => (a.active ? setAsk('off') : toggle())} disabled={busy}>
+                {busy ? t('Speichert …') : a.active ? t('Konto abschalten') : t('Wieder einschalten')}
               </button>
             )}
           </div>
+          {self && <p className="text-xs text-charcoal-muted sm:col-span-2">{t('Das eigene Konto kann man nicht abschalten.')}</p>}
+          {ask && (
+            <div role="alertdialog" className="rounded-btn border-2 border-brand-600 bg-danger-50 p-3 text-sm sm:col-span-2">
+              <p className="font-semibold text-navy">
+                {ask === 'off'
+                  ? t('{name} abschalten? Die Person kann sich nicht mehr anmelden und wird nicht mehr geplant. Bestellungen, Schichten und Abschlüsse bleiben erhalten.', { name: a.name })
+                  : t('Neues Passwort für {name} erstellen? Das alte gilt dann nicht mehr.', { name: a.name })}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className="btn-primary min-h-0 px-3 py-1.5" onClick={ask === 'off' ? toggle : reset} disabled={busy}>
+                  {ask === 'off' ? t('Ja, abschalten') : t('Ja, neues Passwort')}
+                </button>
+                <button type="button" className="btn-secondary min-h-0 px-3 py-1.5" onClick={() => setAsk(null)}>{t('Abbrechen')}</button>
+              </div>
+            </div>
+          )}
           {a.rosterSite && <p className="text-xs text-charcoal-muted sm:col-span-2">{t('Pensum, Vertrag und letzter Arbeitstag: unter Dienstplan → Team & Meldungen.')}</p>}
         </form>
       </details>

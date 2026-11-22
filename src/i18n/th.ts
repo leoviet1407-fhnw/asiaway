@@ -939,6 +939,10 @@ export const TH: Record<string, string> = {
   "Das eigene Admin-Recht kann man nicht entfernen.": "ไม่สามารถลบสิทธิ์ผู้ดูแลระบบของตัวเองได้",
   "Das eigene Konto kann man nicht abschalten.": "ไม่สามารถปิดบัญชีของตัวเองได้",
   "Der letzte Admin kann nicht abgeschaltet werden.": "ไม่สามารถปิดผู้ดูแลระบบคนสุดท้ายได้",
+
+  "Ja, abschalten": "ใช่ ปิดบัญชี",
+  "Ja, neues Passwort": "ใช่ สร้างรหัสผ่านใหม่",
+  "Keine Verbindung oder die Seite ist veraltet. Bitte Seite neu laden und nochmals versuchen.": "ไม่มีการเชื่อมต่อหรือหน้าเก่าแล้ว กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง",
 };
 
 /** Thai output for each English pattern, by the pattern's regex source (same captured parts $1, $2 …). */

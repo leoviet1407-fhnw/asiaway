@@ -996,6 +996,10 @@ export const EN: Record<string, string> = {
   'Das eigene Admin-Recht kann man nicht entfernen.': 'You cannot remove your own admin right.',
   'Das eigene Konto kann man nicht abschalten.': 'You cannot switch off your own account.',
   'Der letzte Admin kann nicht abgeschaltet werden.': 'The last admin cannot be switched off.',
+
+  'Ja, abschalten': 'Yes, switch off',
+  'Ja, neues Passwort': 'Yes, new password',
+  'Keine Verbindung oder die Seite ist veraltet. Bitte Seite neu laden und nochmals versuchen.': 'No connection or the page is out of date. Please reload the page and try again.',
 };
 
 /** Sentences with fixed words and variable numbers/names ($1, $2 … are the captured parts). */
