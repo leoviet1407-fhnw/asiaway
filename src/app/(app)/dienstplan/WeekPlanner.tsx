@@ -33,6 +33,10 @@ interface Props {
   absences: Absence[];
   violations: Violation[];
   editable: boolean;
+  /** The running week, already under way: only single shifts change, from today on. */
+  running?: boolean;
+  /** Days before this date are over and cannot be changed (YYYY-MM-DD). */
+  lockedBefore?: string;
 }
 
 interface Editing {
@@ -197,8 +201,10 @@ export function WeekPlanner(props: Props) {
       },
     );
   };
+  /** Whether a day can still be changed: not in a week that is closed, not a day that is over. */
+  const canEdit = (date: string) => props.editable && !(props.lockedBefore && date < props.lockedBefore);
   const cellClick = (userId: string | null, date: string, el: HTMLElement) => {
-    if (!props.editable) return;
+    if (!canEdit(date)) return;
     if (clip) paste(userId, date);
     else openAt(el, blank(userId, date));
   };
@@ -219,7 +225,7 @@ export function WeekPlanner(props: Props) {
       <div key={s.id} className="group relative">
       <button
         type="button"
-        disabled={!props.editable}
+        disabled={!canEdit(s.date)}
         onClick={(e) => {
           e.stopPropagation();
           if (clip) paste(s.userId, s.date);
@@ -232,7 +238,7 @@ export function WeekPlanner(props: Props) {
         {formatTime(s.startMin)}–{formatTime(s.endMin)}
         <span className="block font-normal opacity-80">{s.roleLabel ?? s.station}</span>
       </button>
-      {props.editable && !clip && (
+      {canEdit(s.date) && !clip && (
         // quick actions on hover (mouse); on a phone the same is in the details
         <div className="absolute right-0.5 top-0.5 hidden gap-0.5 md:group-hover:flex">
           <button type="button" className="rounded bg-white/90 p-0.5 text-navy shadow hover:bg-white" title={t('Kopieren')} aria-label={t('Kopieren')} onClick={(e) => { e.stopPropagation(); copyShift(s); }}>
@@ -252,6 +258,8 @@ export function WeekPlanner(props: Props) {
       {props.editable && (
         <div className="flex flex-wrap items-center gap-2">
           <span className={`chip ${props.status === 'PUBLISHED' ? 'bg-ok-50 text-ok-500' : 'bg-warn-50 text-warn-500'}`}>{props.status === 'PUBLISHED' ? t('Veröffentlicht') : t('Entwurf – Mitarbeiter sehen noch nichts')}</span>
+          {!props.running && (
+          <>
           <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending || props.shifts.length > 0} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'copy'), () => setNotice(t('Letzte Woche übernommen.')))}>
             {t('Letzte Woche kopieren')}
           </button>
@@ -304,6 +312,8 @@ export function WeekPlanner(props: Props) {
           >
             {t('Monat veröffentlichen')}
           </button>
+          </>
+          )}
           {props.status === 'PUBLISHED' ? (
             <button className="btn-secondary min-h-0 px-3 py-1.5 text-sm" disabled={pending} onClick={() => run(() => weekStepAction(props.site, props.weekStart, 'unpublish'))}>
               {t('Zurück zum Entwurf')}
@@ -359,7 +369,7 @@ export function WeekPlanner(props: Props) {
                       <td
                         key={d}
                         onClick={(e) => cellClick(person.userId, d, e.currentTarget)}
-                        className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? (clip ? 'cursor-copy hover:bg-ok-50' : 'cursor-pointer hover:bg-brand-50/40') : ''} ${absence ? 'bg-surface-line/70' : ''}`}
+                        className={`border-l border-t border-surface-line p-0.5 align-top ${canEdit(d) ? (clip ? 'cursor-copy hover:bg-ok-50' : 'cursor-pointer hover:bg-brand-50/40') : ''} ${absence ? 'bg-surface-line/70' : ''}`}
                       >
                         <div className="min-h-[34px] space-y-0.5">
                           {absence && <div className="rounded bg-navy/80 px-1 text-[10px] font-semibold text-white">{absence.type === 'VACATION' ? t('Ferien') : absence.type === 'SICK' ? t('Krank') : t('Abwesend')}</div>}
@@ -386,7 +396,7 @@ export function WeekPlanner(props: Props) {
                   <div className="text-[11px]">{t('ohne Person')}</div>
                 </td>
                 {dates.map((d) => (
-                  <td key={d} onClick={(e) => cellClick(null, d, e.currentTarget)} className={`border-l border-t border-surface-line p-0.5 align-top ${props.editable ? (clip ? 'cursor-copy hover:bg-ok-50' : 'cursor-pointer hover:bg-brand-50/40') : ''}`}>
+                  <td key={d} onClick={(e) => cellClick(null, d, e.currentTarget)} className={`border-l border-t border-surface-line p-0.5 align-top ${canEdit(d) ? (clip ? 'cursor-copy hover:bg-ok-50' : 'cursor-pointer hover:bg-brand-50/40') : ''}`}>
                     <div className="min-h-[34px] space-y-0.5">{(byDay.get(`open|${d}`) ?? []).map(chip)}</div>
                   </td>
                 ))}
@@ -474,7 +484,7 @@ export function WeekPlanner(props: Props) {
           <div>
             <div className="label">{t('Auch an diesen Tagen')}</div>
             <div className="flex flex-wrap gap-1">
-              {dates.filter((d) => d !== editing.date).map((d) => {
+              {dates.filter((d) => d !== editing.date && canEdit(d)).map((d) => {
                 const on = alsoDays.includes(d);
                 return (
                   <button key={d} type="button" aria-pressed={on} onClick={() => setAlsoDays(on ? alsoDays.filter((x) => x !== d) : [...alsoDays, d])} className={`chip px-2.5 py-1 ${on ? 'bg-navy text-white' : 'bg-white text-charcoal ring-1 ring-surface-line'}`}>

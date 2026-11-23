@@ -150,21 +150,38 @@ describe('everything is connected', () => {
     expect(weekDates('2026-12-07')).toHaveLength(7);
   });
 
-  it('9. the current week is frozen: planning starts with next week', async () => {
-    // today is Friday 13 Nov 2026: the week of 9 Nov is already planned and cannot be changed, 16 Nov can
+  it('9. after publishing the Leitung still changes the running week from today on; past days stay', async () => {
+    // today is Friday 13 Nov 2026: the week of 9 Nov is running
     const input = { site: 'winterthur', userId: full.userId, startMin: t('10:30'), endMin: t('14:30'), breakMin: 0, station: 'EG Thai', roleLabel: null };
-    await expect(saveShift(db, planner, { ...input, date: '2026-11-13' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', message: expect.stringContaining('gesperrt') });
-    await expect(saveShift(db, planner, { ...input, date: '2026-11-09' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    await expect(publishWeek(db, planner, 'winterthur', '2026-11-09', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    await expect(unpublishWeek(db, planner, 'winterthur', '2026-11-09', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    // today and later in the running week: add, change and delete a shift, also when the week is published
+    await publishWeek(db, planner, 'winterthur', '2026-11-09', now).catch((e: Error) => expect(e.message).not.toMatch(/vorbei/));
+    const today = await saveShift(db, planner, { ...input, date: '2026-11-13' }, now);
+    await saveShift(db, planner, { ...input, id: today, date: '2026-11-13', startMin: t('11:00') }, now);
+    const sat = await saveShift(db, planner, { ...input, date: '2026-11-14' }, now);
+    await deleteShift(db, planner, sat, now);
+    // staff still cannot change the plan
+    await expect(saveShift(db, full, { ...input, date: '2026-11-14' }, now)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    // a day that is over stays as it was: no new shift, no moving a shift into it
+    await expect(saveShift(db, planner, { ...input, date: '2026-11-09' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', message: expect.stringContaining('vorbei') });
+    await expect(saveShift(db, planner, { ...input, id: today, date: '2026-11-12' }, now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    // once the day is over, its shift cannot be changed or deleted either
+    const saturday = new Date('2026-11-14T09:00:00Z');
+    await expect(saveShift(db, planner, { ...input, id: today, date: '2026-11-13', startMin: t('12:00') }, saturday)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(deleteShift(db, planner, today, saturday)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    // the running week can be taken back and published again; a week that is over cannot
+    await unpublishWeek(db, planner, 'winterthur', '2026-11-09', now);
+    await expect(unpublishWeek(db, planner, 'winterthur', '2026-11-02', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(publishWeek(db, planner, 'winterthur', '2026-11-02', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    // copying and suggesting still start with next week
     await expect(copyWeek(db, planner, 'winterthur', '2026-11-09', now)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     const next = await saveShift(db, planner, { ...input, date: '2026-11-16' }, now);
     await deleteShift(db, planner, next, now);
-    // the month suggestion leaves the current week alone and starts with 16 Nov
     const r = await suggestMonth(db, planner, 'winterthur', '2026-11', now);
     expect(r.weeks.find((w) => w.weekStart === '2026-11-09')!.skipped).toBe('PAST');
     expect(r.weeks.find((w) => w.weekStart === '2026-11-16')!.skipped).toBeNull();
-    // planning is open again once that week has begun? No: from Monday 16 Nov that week is frozen too
-    await expect(saveShift(db, planner, { ...input, date: '2026-11-17' }, new Date('2026-11-16T08:00:00Z'))).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    // from Monday 16 Nov that week is running: later days stay open for the Leitung
+    const monday = new Date('2026-11-16T08:00:00Z');
+    const tue = await saveShift(db, planner, { ...input, date: '2026-11-17' }, monday);
+    await deleteShift(db, planner, tue, monday);
   });
 });

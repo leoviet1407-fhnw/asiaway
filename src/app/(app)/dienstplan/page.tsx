@@ -45,10 +45,13 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
   const view = await getWeekView(database, p, site.id, week);
   const mine = profile ? await listMyShifts(database, p, today, addDays(today, 14)) : [];
   const frozen = isFrozen(week, today); // the current and past weeks are planned already
+  // After publishing the Leitung still changes single shifts of the running week, from today on
+  const over = addDays(week, 6) < today;
+  const running = frozen && !over;
   const gaps = planner && !view.hidden && !frozen ? await listGaps(database, p, site.id, week) : [];
   // WhatsApp: the whole week to a group, or one message per person with their own shifts
   let whatsapp: { group: string; people: { id: string; name: string; link: string; hasNumber: boolean }[] } | null = null;
-  if (planner && !view.hidden && view.status === 'PUBLISHED' && !frozen) {
+  if (planner && !view.hidden && view.status === 'PUBLISHED' && !over) {
     const host = (await headers()).get('host');
     const url = host ? `https://${host}/dienstplan?site=${site.id}&woche=${week}` : '';
     const team = await listTeam(database, site.id);
@@ -161,9 +164,12 @@ export default async function RosterPage({ searchParams }: { searchParams: Promi
             availability={view.availability}
             absences={view.absences}
             violations={view.violations}
-            editable={planner && !frozen}
+            editable={planner && !over}
+            running={running}
+            lockedBefore={today}
           />
-          {planner && frozen && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.')}</p>}
+          {planner && running && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Laufende Woche: Schichten ab heute können Sie weiter ändern, auch wenn die Woche veröffentlicht ist. Vergangene Tage bleiben, wie sie waren.')}</p>}
+          {planner && over && <p className="rounded-btn bg-navy-50 p-3 text-sm text-navy">{t('Diese Woche ist vorbei. Geleistete Stunden korrigieren Sie unter „Stunden“.')}</p>}
           {planner && !frozen && <GapPanel site={site.id} gaps={gaps} />}
           {whatsapp && (
             <details className="card">

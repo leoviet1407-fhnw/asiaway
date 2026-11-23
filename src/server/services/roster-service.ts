@@ -13,6 +13,8 @@ import {
   validateRoster,
   worksAtSiteOn,
   FROZEN_MESSAGE,
+  PAST_DAY_MESSAGE,
+  isPastDay,
   dayHoursOf,
   weekdayNo,
   isFrozen,
@@ -68,6 +70,16 @@ export async function sitesFor(db: AppDatabase, p: Principal) {
 /** The current and past weeks cannot be planned any more. */
 function assertPlannable(date: string, now: Date) {
   if (isFrozen(date, todayIso(now))) throw domainError('VALIDATION_FAILED', FROZEN_MESSAGE);
+}
+
+/** The Leitung changes single shifts also after publishing, in the running week from today on. */
+function assertChangeable(date: string, now: Date) {
+  if (isPastDay(date, todayIso(now))) throw domainError('VALIDATION_FAILED', PAST_DAY_MESSAGE);
+}
+
+/** Publishing or taking back a week: possible as long as the week is not over. */
+function assertWeekOpen(weekStart: string, now: Date) {
+  if (isPastDay(addDays(weekStart, 6), todayIso(now))) throw domainError('VALIDATION_FAILED', PAST_DAY_MESSAGE);
 }
 
 function requirePlanner(p: Principal) {
@@ -333,7 +345,12 @@ export interface SaveShiftInput {
 
 export async function saveShift(db: AppDatabase, p: Principal, input: SaveShiftInput, now = new Date()): Promise<string> {
   requirePlanner(p);
-  if (isoDate(input.date)) assertPlannable(input.date, now);
+  if (isoDate(input.date)) assertChangeable(input.date, now);
+  if (input.id) {
+    // a shift of a day that is over is not moved or changed either
+    const [before] = await db.select({ date: shifts.workDate }).from(shifts).where(eq(shifts.id, input.id)).limit(1);
+    if (before) assertChangeable(before.date, now);
+  }
   if (!ROSTER_SITES.some((s) => s.id === input.site)) throw domainError('VALIDATION_FAILED', 'Standort ist ungültig.');
   if (!isoDate(input.date)) throw domainError('VALIDATION_FAILED', 'Datum ist ungültig.');
   const problem = checkShiftTimes(input.startMin, input.endMin, input.breakMin);
@@ -370,7 +387,7 @@ export async function deleteShift(db: AppDatabase, p: Principal, shiftId: string
   requirePlanner(p);
   if (!/^[0-9a-f-]{36}$/i.test(shiftId)) throw domainError('NOT_FOUND', 'Shift not found');
   const [existing] = await db.select({ date: shifts.workDate }).from(shifts).where(eq(shifts.id, shiftId)).limit(1);
-  if (existing) assertPlannable(existing.date, now);
+  if (existing) assertChangeable(existing.date, now);
   const [row] = await db.delete(shifts).where(eq(shifts.id, shiftId)).returning({ id: shifts.id, date: shifts.workDate });
   if (!row) throw domainError('NOT_FOUND', 'Shift not found');
   await audit(db, p.userId, 'shift.delete', 'shift', row.id, { date: row.date });
@@ -379,7 +396,7 @@ export async function deleteShift(db: AppDatabase, p: Principal, shiftId: string
 /** Publishes a week so staff can see it. Refused while there are errors. */
 export async function publishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<void> {
   requirePlanner(p);
-  assertPlannable(weekStart, now);
+  assertWeekOpen(weekStart, now);
   const view = await getWeekView(db, p, siteId, weekStart);
   if (hasBlockingViolation(view.violations)) {
     throw domainError('ROSTER_BLOCKED', 'Plan has errors', { errors: view.violations.filter((v) => v.severity === 'error').length });
@@ -393,7 +410,7 @@ export async function publishWeek(db: AppDatabase, p: Principal, siteId: string,
 
 export async function unpublishWeek(db: AppDatabase, p: Principal, siteId: string, weekStart: string, now = new Date()): Promise<void> {
   requirePlanner(p);
-  assertPlannable(weekStart, now);
+  assertWeekOpen(weekStart, now);
   await db.update(rosterWeeks).set({ status: 'DRAFT' }).where(and(eq(rosterWeeks.site, siteId), eq(rosterWeeks.weekStart, weekStart)));
   await audit(db, p.userId, 'roster.unpublish', 'roster_week', `${siteId}:${weekStart}`);
 }

@@ -64,6 +64,12 @@ export function dayHoursOf(siteId: string, date: string): DayHours {
 export const firstPlannableWeek = (today: string): string => addDays(mondayOf(today), 7);
 export const isFrozen = (date: string, today: string): boolean => date < firstPlannableWeek(today);
 export const FROZEN_MESSAGE = 'Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.';
+/**
+ * After publishing, the Leitung (planners and admins) still changes the plan: in the running week
+ * from today on. Days that are over stay as they were; worked hours are corrected under "Stunden".
+ */
+export const isPastDay = (date: string, today: string): boolean => date < today;
+export const PAST_DAY_MESSAGE = 'Dieser Tag ist vorbei und bleibt, wie er war. Geleistete Stunden korrigieren Sie unter „Stunden“.';
 
 /** Weekday number: 1 = Monday … 7 = Sunday. */
 export const weekdayNo = (iso: string): number => ((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
