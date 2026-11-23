@@ -272,6 +272,8 @@ export type AbsenceType = 'VACATION' | 'SICK' | 'OTHER';
 export const ABSENCE_LABEL: Record<AbsenceType, string> = { VACATION: 'Ferien', SICK: 'Krank', OTHER: 'Abwesend' };
 
 export interface Absence {
+  /** Set when it comes from the database (the planner can delete it). */
+  readonly id?: string;
   readonly userId: string;
   readonly startDate: string;
   readonly endDate: string;

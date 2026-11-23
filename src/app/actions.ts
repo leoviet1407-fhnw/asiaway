@@ -41,6 +41,7 @@ import {
   copyWeek,
   createStaffUser,
   decideAbsence,
+  enterAbsence,
   deleteShift,
   publishWeek,
   requestAbsence,
@@ -608,6 +609,20 @@ export async function requestAbsenceAction(_prev: { error?: string; saved?: bool
   } catch (error) {
     if (isRedirect(error)) throw error;
     return { error: (await fail(error)).error };
+  }
+}
+
+/** The Leitung enters an absence from the week planner; optionally the person's shifts become open. */
+export async function enterAbsenceAction(input: { userId: string; startDate: string; endDate: string; type: 'VACATION' | 'SICK' | 'OTHER'; releaseShifts: boolean }): Promise<ActionResult<number>> {
+  try {
+    const p = await requirePrincipal();
+    const type = input.type === 'SICK' || input.type === 'OTHER' ? input.type : 'VACATION';
+    const r = await enterAbsence(await db(), p, { userId: input.userId, startDate: input.startDate, endDate: input.endDate || input.startDate, type }, { releaseShifts: Boolean(input.releaseShifts) });
+    revalidatePath('/dienstplan', 'layout');
+    return { ok: true, value: r.released };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return await fail(error);
   }
 }
 

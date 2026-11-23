@@ -853,6 +853,12 @@ export const EN: Record<string, string> = {
   'Dieser Tag ist vorbei und bleibt, wie er war. Geleistete Stunden korrigieren Sie unter „Stunden“.': 'This day is over and stays as it was. Correct worked hours under “Hours”.',
   'Laufende Woche: Schichten ab heute können Sie weiter ändern, auch wenn die Woche veröffentlicht ist. Vergangene Tage bleiben, wie sie waren.': 'Running week: you can still change shifts from today on, even though the week is published. Past days stay as they were.',
   'Diese Woche ist vorbei. Geleistete Stunden korrigieren Sie unter „Stunden“.': 'This week is over. Correct worked hours under “Hours”.',
+  'Ferien / Abwesenheit': 'Holidays / absence',
+  'Schicht': 'Shift',
+  'Abwesenheit löschen': 'Delete absence',
+  'Schichten in dieser Zeit freigeben – sie werden zu offenen Schichten (ab heute).': 'Release the shifts in this period – they become open shifts (from today on).',
+  'Eingetragen: {who}, {what} {span}': 'Entered: {who}, {what} {span}',
+  '{n} Schichten sind jetzt offen.': '{n} shifts are open now.',
   'Diese Woche ist gesperrt: sie ist schon geplant. Geplant wird ab der nächsten Woche.': 'This week is locked: it is already planned. Planning starts with next week.',
   // --- Show password ---
   'Passwort anzeigen': 'Show password',

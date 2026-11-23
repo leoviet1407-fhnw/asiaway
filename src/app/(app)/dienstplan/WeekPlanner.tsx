@@ -18,7 +18,7 @@ import {
   type Shift,
   type Violation,
 } from '@/domain/roster';
-import { deleteShiftAction, publishMonthAction, saveShiftAction, suggestMonthAction, suggestWeekAction, weekStepAction } from '../../actions';
+import { absenceStepAction, deleteShiftAction, enterAbsenceAction, publishMonthAction, saveShiftAction, suggestMonthAction, suggestWeekAction, weekStepAction } from '../../actions';
 import { useT } from '@/i18n/client';
 import { TimeField, normalizeTime } from '@/components/TimeField';
 import { Icon } from '@/components/Icon';
@@ -83,6 +83,9 @@ export function WeekPlanner(props: Props) {
   const [undo, setUndo] = useState<Undo>(null);
   const [pasteCount, setPasteCount] = useState(0);
   const [alsoDays, setAlsoDays] = useState<string[]>([]);
+  /** The details box shows a shift, or holidays / sick leave for the person. */
+  const [mode, setMode] = useState<'shift' | 'absence'>('shift');
+  const [absence, setAbsence] = useState<{ type: 'VACATION' | 'SICK' | 'OTHER'; from: string; to: string; release: boolean }>({ type: 'VACATION', from: '', to: '', release: true });
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
 
@@ -96,6 +99,9 @@ export function WeekPlanner(props: Props) {
     }
     setError(null);
     setAlsoDays([]);
+    // a day that already has holidays opens on them; otherwise on the shift
+    setMode(!value.id && value.userId && absenceOn(value.userId, value.date) ? 'absence' : 'shift');
+    setAbsence({ type: 'VACATION', from: value.date, to: value.date, release: true });
     setEditing(value);
   };
   const close = () => {
@@ -155,6 +161,24 @@ export function WeekPlanner(props: Props) {
       return first;
     }, close);
   };
+
+  const ABSENCE_TEXT = { VACATION: 'Ferien', SICK: 'Krank', OTHER: 'Abwesend' } as const;
+  /** Holidays, sick leave or an absence for the person, approved at once. */
+  const saveAbsence = () => {
+    if (!editing?.userId) return;
+    const who = props.people.find((p) => p.userId === editing.userId)?.name ?? '';
+    const from = absence.from || editing.date;
+    const to = absence.to || from;
+    run(async () => {
+      const r = await enterAbsenceAction({ userId: editing.userId!, startDate: from, endDate: to, type: absence.type, releaseShifts: absence.release });
+      if (r.ok) {
+        const span = from === to ? dm(from) : `${dm(from)}–${dm(to)}`;
+        setNotice(t('Eingetragen: {who}, {what} {span}', { who, what: t(ABSENCE_TEXT[absence.type]), span }) + ((r.value ?? 0) > 0 ? ` ${t('{n} Schichten sind jetzt offen.', { n: r.value ?? 0 })}` : ''));
+      }
+      return r;
+    }, close);
+  };
+  const deleteAbsence = (id: string) => run(() => absenceStepAction(id, 'cancel'), close);
 
   /** Deletes at once; the bar at the bottom can put it back. */
   const remove = (s: { id: string; userId: string | null; date: string; startMin: number; endMin: number; breakMin: number; station: string; roleLabel: string | null }) => {
@@ -419,9 +443,63 @@ export function WeekPlanner(props: Props) {
             style={anchor?.wide ? { top: anchor.top, left: anchor.left, width: PANEL_WIDTH } : undefined}
           >
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg">{editing.id ? t('Schicht ändern') : t('Neue Schicht')}</h2>
+            <h2 className="text-lg">{mode === 'absence' ? t('Ferien / Abwesenheit') : editing.id ? t('Schicht ändern') : t('Neue Schicht')}</h2>
             <button type="button" className="btn-ghost min-h-0 px-2 py-1 text-lg leading-none" onClick={close} aria-label={t('Schliessen')}>×</button>
           </div>
+          {!editing.id && editing.userId && (
+            <div role="tablist" className="grid grid-cols-2 gap-1 rounded-btn bg-surface-sunken p-1">
+              {(['shift', 'absence'] as const).map((m) => (
+                <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`rounded-btn px-3 py-1.5 text-sm font-semibold ${mode === m ? 'bg-white text-navy shadow' : 'text-charcoal-muted'}`}>
+                  {m === 'shift' ? t('Schicht') : t('Ferien / Abwesenheit')}
+                </button>
+              ))}
+            </div>
+          )}
+          {editing.userId && (() => {
+            const a = absenceOn(editing.userId, editing.date);
+            if (!a) return null;
+            const span = a.startDate === a.endDate ? dm(a.startDate) : `${dm(a.startDate)}–${dm(a.endDate)}`;
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-btn bg-navy-50 p-2 text-sm text-navy">
+                <span>{t(ABSENCE_TEXT[a.type])}: {span}</span>
+                {a.id && (
+                  <button type="button" className="btn-secondary min-h-0 gap-1.5 px-3 py-1 text-sm text-brand-600" disabled={pending} onClick={() => deleteAbsence(a.id!)}>
+                    <Icon name="trash" className="h-4 w-4" /> {t('Abwesenheit löschen')}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+          {mode === 'absence' && editing.userId ? (
+            <>
+              <div>
+                <label className="label" htmlFor="abs-type">{t('Art')}</label>
+                <select id="abs-type" className="w-full" value={absence.type} onChange={(e) => setAbsence({ ...absence, type: e.target.value as 'VACATION' | 'SICK' | 'OTHER' })}>
+                  <option value="VACATION">{t('Ferien')}</option>
+                  <option value="SICK">{t('Krank')}</option>
+                  <option value="OTHER">{t('Abwesend')}</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="abs-from">{t('Von')}</label>
+                  <input id="abs-from" type="date" className="w-full" value={absence.from} onChange={(e) => setAbsence({ ...absence, from: e.target.value, to: absence.to < e.target.value ? e.target.value : absence.to })} />
+                </div>
+                <div>
+                  <label className="label" htmlFor="abs-to">{t('Bis')}</label>
+                  <input id="abs-to" type="date" className="w-full" min={absence.from} value={absence.to} onChange={(e) => setAbsence({ ...absence, to: e.target.value })} />
+                </div>
+              </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-0.5 min-h-0 accent-brand-600" checked={absence.release} onChange={(e) => setAbsence({ ...absence, release: e.target.checked })} />
+                <span>{t('Schichten in dieser Zeit freigeben – sie werden zu offenen Schichten (ab heute).')}</span>
+              </label>
+              {error && <p role="alert" className="rounded-btn bg-danger-50 p-2 text-sm text-danger-500">{error}</p>}
+              <button className="btn-primary w-full" disabled={pending || !absence.from} onClick={saveAbsence}>{t('Eintragen')}</button>
+              <button className="btn-ghost min-h-0 w-full px-3 py-2 text-sm" onClick={close}>{t('Abbrechen')}</button>
+            </>
+          ) : (
+          <>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label" htmlFor="person">{t('Mitarbeiter')}</label>
@@ -516,6 +594,8 @@ export function WeekPlanner(props: Props) {
             )}
             <button className="btn-ghost min-h-0 px-3 py-2 text-sm" onClick={close}>{t('Abbrechen')}</button>
           </div>
+          </>
+          )}
           </section>
         </>
       )}

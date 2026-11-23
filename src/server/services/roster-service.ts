@@ -274,7 +274,7 @@ export async function getWeekView(db: AppDatabase, p: Principal, siteId: string,
   const rows = await db.select().from(shifts).where(and(eq(shifts.site, siteId), gte(shifts.workDate, dates[0]!), lte(shifts.workDate, dates[6]!)));
   const weekShifts = rows.map(toShift);
   const ids = people.map((x) => x.userId);
-  const abs = (await listAbsences(db, ids, dates[0]!, dates[6]!)).map((a) => ({ userId: a.userId, startDate: a.startDate, endDate: a.endDate, type: a.type as AbsenceType }));
+  const abs = (await listAbsences(db, ids, dates[0]!, dates[6]!)).map((a) => ({ id: a.id, userId: a.userId, startDate: a.startDate, endDate: a.endDate, type: a.type as AbsenceType }));
   let avail: AvailabilityDay[] = [];
   let violations: Violation[] = [];
   if (planner) {
@@ -618,6 +618,37 @@ export interface AbsenceDecisionInput {
   /** Other days the Leitung suggests instead (both or none). */
   suggestedStart?: string | null;
   suggestedEnd?: string | null;
+}
+
+/**
+ * The Leitung enters holidays, sick leave or an absence straight from the week planner (approved
+ * at once). Optionally the person's shifts in that time become open shifts, from today on and at
+ * every site, so the plan shows what still needs someone; days that are over stay as they were.
+ */
+export async function enterAbsence(
+  db: AppDatabase,
+  p: Principal,
+  input: { userId: string; startDate: string; endDate: string; type: AbsenceType },
+  options: { releaseShifts: boolean },
+  now = new Date(),
+): Promise<{ id: string; released: number }> {
+  requirePlanner(p);
+  const id = await requestAbsence(db, p, { ...input, note: null }, now);
+  let released = 0;
+  if (options.releaseShifts) {
+    const today = todayIso(now);
+    const from = input.startDate > today ? input.startDate : today;
+    if (from <= input.endDate) {
+      const rows = await db
+        .update(shifts)
+        .set({ userId: null, updatedAt: now })
+        .where(and(eq(shifts.userId, input.userId), gte(shifts.workDate, from), lte(shifts.workDate, input.endDate)))
+        .returning({ id: shifts.id });
+      released = rows.length;
+      if (released > 0) await audit(db, p.userId, 'absence.release_shifts', 'user', input.userId, { from, to: input.endDate, released });
+    }
+  }
+  return { id, released };
 }
 
 export async function decideAbsence(db: AppDatabase, p: Principal, absenceId: string, approve: boolean, now = new Date(), decision: AbsenceDecisionInput = {}): Promise<void> {
